@@ -331,19 +331,19 @@ float3 ACESParametric_Inverse(float3 Color, float modE, float modA)
 
 // https://github.com/johnhable/fw-public
 float3 Hable(
-  in float3   InputColor,
-  inout float params_y0,
-  inout float params_y1,
-  inout float dstParams_W,
-  inout float toeSegment_lnA,
-  inout float toeSegment_B,
-  inout float midSegment_offsetX,
-  inout float midSegment_lnA,
-  inout float shoulderSegment_offsetX,
-  inout float shoulderSegment_offsetY,
-  inout float shoulderSegment_lnA,
-  inout float shoulderSegment_B,
-  inout float invScale)
+  in  float3 InputColor,
+  out float  params_y0,
+  out float  params_y1,
+  out float  dstParams_W,
+  out float  toeSegment_lnA,
+  out float  toeSegment_B,
+  out float  midSegment_offsetX,
+  out float  midSegment_lnA,
+  out float  shoulderSegment_offsetX,
+  out float  shoulderSegment_offsetY,
+  out float  shoulderSegment_lnA,
+  out float  shoulderSegment_B,
+  out float  invScale)
 {
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
