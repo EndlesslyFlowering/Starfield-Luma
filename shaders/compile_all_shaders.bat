@@ -20,42 +20,42 @@ if not exist "%target_folder%" (
 
 "%dxc%" "HDRComposite\HDRComposite_ps.hlsl" ^
         -T ps_6_6 -E PS -D APPLY_MERGED_COLOR_GRADING_LUT -Fo ^
-        "%target_folder%\HDRComposite\HDRComposite_E00FF1A_ps.bin"
+        "%target_folder%HDRComposite\HDRComposite_E00FF1A_ps.bin"
 
 "%dxc%" "HDRComposite\HDRComposite_ps.hlsl" ^
         -T ps_6_6 -E PS -Fo ^
-        "%target_folder%\HDRComposite\HDRComposite_600FF1A_ps.bin"
+        "%target_folder%HDRComposite\HDRComposite_600FF1A_ps.bin"
 
 "%dxc%" "HDRComposite\HDRComposite_ps.hlsl" ^
         -T ps_6_6 -E PS -D APPLY_BLOOM -Fo ^
-        "%target_folder%\HDRComposite\HDRComposite_700FF1A_ps.bin"
+        "%target_folder%HDRComposite\HDRComposite_700FF1A_ps.bin"
 
 "%dxc%" "HDRComposite\HDRComposite_ps.hlsl" ^
         -T ps_6_6 -E PS -D APPLY_BLOOM -D APPLY_MERGED_COLOR_GRADING_LUT -Fo ^
-        "%target_folder%\HDRComposite\HDRComposite_F00FF1A_ps.bin"
+        "%target_folder%HDRComposite\HDRComposite_F00FF1A_ps.bin"
 
 "%dxc%" "ScaleformComposite\ScaleformComposite_FFAA_ps.hlsl" ^
         -T ps_6_6 -E PS -Fo ^
-        "%target_folder%\ScaleformComposite\ScaleformComposite_FFAA_ps.bin"
+        "%target_folder%ScaleformComposite\ScaleformComposite_FFAA_ps.bin"
 
 "%dxc%" "ColorGradingMerge\ColorGradingMerge_FF81_cs.hlsl" ^
         -T cs_6_6 -E main -Fo ^
-        "%target_folder%\ColorGradingMerge\ColorGradingMerge_FF81_cs.bin"
+        "%target_folder%ColorGradingMerge\ColorGradingMerge_FF81_cs.bin"
 
 "%dxc%" "BinkMovie\BinkMovie_FFAB_ps.hlsl" ^
         -T ps_6_6 -E PS -Fo ^
-        "%target_folder%\BinkMovie\BinkMovie_FFAB_ps.bin"
+        "%target_folder%BinkMovie\BinkMovie_FFAB_ps.bin"
 
 "%dxc%" "FilmGrain\FilmGrain_FF75_ps.hlsl" ^
         -T ps_6_6 -E main -Fo ^
-        "%target_folder%\FilmGrain\FilmGrain_FF75_ps.bin"
+        "%target_folder%FilmGrain\FilmGrain_FF75_ps.bin"
 
 "%dxc%" "PostSharpen\PostSharpen_FF9A_ps.hlsl" ^
         -T ps_6_6 -E main -Fo ^
-        "%target_folder%\PostSharpen\PostSharpen_FF9A_ps.bin"
+        "%target_folder%PostSharpen\PostSharpen_FF9A_ps.bin"
 
 "%dxc%" "ContrastAdaptiveSharpening\ContrastAdaptiveSharpening_100FF94_cs.hlsl" ^
-        -T ps_6_6 -E main -Fo ^
-        "%target_folder%\ContrastAdaptiveSharpening\ContrastAdaptiveSharpening_100FF94_cs.bin"
+        -T cs_6_6 -E main -Fo ^
+        "%target_folder%ContrastAdaptiveSharpening\ContrastAdaptiveSharpening_100FF94_cs.bin"
 
 pause
