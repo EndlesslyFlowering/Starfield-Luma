@@ -1,10 +1,10 @@
-// Also in "tonemap" shaders.
-// This currently shifts colors too much, even if it's mathematically correct.
-#define FIX_LUT_GAMMA_MAPPING 1
-#define LUT_SIZE 16.f
+#include "../shared.h"
 
-static float additionalNeutralLUTPercentage = 0.5f;
-static float LUTLuminancePreservationPercentage = 0.5f;
+// 0 None, 1 ShortFuse technique, 2 luminance preservation (doesn't look so good)
+#define LUT_IMPROVEMENT_TYPE 0
+
+static float additionalNeutralLUTPercentage = 0.0f;
+static float LUTCorrectionPercentage = 0.0f;
 
 struct PushConstantWrapper_ColorGradingMerge
 {
@@ -105,14 +105,20 @@ void CS()
     float LUT3Luminance = Luminance(LUT3Color);
     float LUT4Luminance = Luminance(LUT4Color);
     
+#if LUT_IMPROVEMENT_TYPE == 0
+    
+#elif LUT_IMPROVEMENT_TYPE == 1
+    //TODO
+#elif LUT_IMPROVEMENT_TYPE == 2
     if (LUT1Luminance != 0.f)
-        LUT1Color *= lerp(1.f, neutralLUTLuminance / LUT1Luminance, LUTLuminancePreservationPercentage);
+        LUT1Color *= lerp(1.f, neutralLUTLuminance / LUT1Luminance, LUTCorrectionPercentage);
     if (LUT2Luminance != 0.f)
-        LUT2Color *= lerp(1.f, neutralLUTLuminance / LUT2Luminance, LUTLuminancePreservationPercentage);
+        LUT2Color *= lerp(1.f, neutralLUTLuminance / LUT2Luminance, LUTCorrectionPercentage);
     if (LUT3Luminance != 0.f)
-        LUT3Color *= lerp(1.f, neutralLUTLuminance / LUT3Luminance, LUTLuminancePreservationPercentage);
+        LUT3Color *= lerp(1.f, neutralLUTLuminance / LUT3Luminance, LUTCorrectionPercentage);
     if (LUT4Luminance != 0.f)
-        LUT4Color *= lerp(1.f, neutralLUTLuminance / LUT4Luminance, LUTLuminancePreservationPercentage);
+        LUT4Color *= lerp(1.f, neutralLUTLuminance / LUT4Luminance, LUTCorrectionPercentage);
+#endif
     
 #if !FIX_LUT_GAMMA_MAPPING && 0 // Disabled as it's still preferable to do LUT blends in linear space
     neutralLUTColor = gamma_linear_to_sRGB(neutralLUTColor);
