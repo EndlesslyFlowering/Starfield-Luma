@@ -1,21 +1,17 @@
+#include "../shared.h"
+
 // These are defined at compile time (shaders permutations)
 //#define APPLY_BLOOM
 //#define APPLY_TONEMAPPING
 //#define APPLY_CINEMATICS
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
-// Also in "ps_4105314757"
-#define ENABLE_HDR 1
-#define HDR_GAME_PAPER_WHITE 1.f
 #define SDR_USE_GAMMA_2_2 0
 #define FIX_WRONG_SRGB_GAMMA 1
-// Also in "cs_580663709"
-#define FIX_LUT_GAMMA_MAPPING 1
-#define LUT_SIZE 16.f
-// Also sets "DISABLE_LUT" and "DISABLE_POST_PROCESS" and "DISABLE_INVERSE_TONEMAP"
+// Also sets "DISABLE_LUT", "DISABLE_POST_PROCESS" and "DISABLE_INVERSE_TONEMAP"
 #define DISABLE_TONEMAP 0
-#define DISABLE_POST_PROCESS 1
-#define DISABLE_LUT 1
+#define DISABLE_POST_PROCESS 0
+#define DISABLE_LUT 0
 #define DISABLE_INVERSE_TONEMAP 0
 #define DISABLE_INVERSE_POST_PROCESS 1
 #define CLAMP_INPUT_OUTPUT 0

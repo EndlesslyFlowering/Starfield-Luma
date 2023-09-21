@@ -1,5 +1,5 @@
-#define ENABLE_HDR 1
-#define HDR_GAME_PAPER_WHITE 2.5f
+#include "../shared.h"
+
 #define HDR_USE_GAMMA_2_2 1
 
 Texture2D<float> _8 : register(t0, space8);

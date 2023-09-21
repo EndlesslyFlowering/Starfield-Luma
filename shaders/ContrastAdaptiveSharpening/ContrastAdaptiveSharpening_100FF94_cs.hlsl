@@ -1,4 +1,4 @@
-#define ENABLE_HDR 1
+#include "../shared.h"
 
 cbuffer _16_18 : register(b0, space6)
 {
