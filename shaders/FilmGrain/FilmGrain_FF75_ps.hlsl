@@ -1,5 +1,5 @@
-#define ENABLE_HDR 1
-#define HDR_GAME_PAPER_WHITE 1.f
+#include "../shared.h"
+
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
 cbuffer _13_15 : register(b0, space0)

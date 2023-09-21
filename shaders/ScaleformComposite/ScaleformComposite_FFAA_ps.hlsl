@@ -1,6 +1,5 @@
-// Also in "tonemap" shaders.
-#define ENABLE_HDR 1
-#define HDR_UI_PAPER_WHITE 2.5f
+#include "../shared.h"
+
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 #define HDR_UI_BLEND_POW 0.775f
 #define HDR_GAMMA_CORRECTION 1
