@@ -12,8 +12,13 @@
 // Also in "cs_580663709"
 #define FIX_LUT_GAMMA_MAPPING 1
 #define LUT_SIZE 16.f
+// Also sets "DISABLE_LUT" and "DISABLE_POST_PROCESS" and "DISABLE_INVERSE_TONEMAP"
 #define DISABLE_TONEMAP 0
-#define DISABLE_LUT 0
+#define DISABLE_POST_PROCESS 1
+#define DISABLE_LUT 1
+#define DISABLE_INVERSE_TONEMAP 1
+#define DISABLE_INVERSE_POST_PROCESS 1
+#define CLAMP_INPUT_OUTPUT 0
 
 struct ResolutionBlock
 {
@@ -211,8 +216,13 @@ struct PSOutput
 
 // exp2(x * 1.44269502162933349609375f) is the same as exp(x)
 
+#define FLT10_MAX		64512.f
+#define FLT11_MAX		65024.f
+#define FLT16_MAX		65504.f
+
 static float LUTStrenght = 0.f;
 static float RestorePreLUTLuminance = 1.f;
+static bool ForceACES = false; //TODO: delete once Hable works
 
 float gamma_linear_to_sRGB(float channel)
 {
@@ -293,6 +303,11 @@ float3 ACESParametric(in float3 Colour, in bool Clamp, inout float modE, inout f
 
 float3 ACES_Inverse(float3 Colour, float modE, float modA)
 {
+    //TODO: does this apply for `ACESParametric` as well? Probably
+    //TODO: figure out if we could still use the unclamped color. There should be a way to invert it.
+    // ACES is not defined for any values beyond 0-1
+    Colour = saturate(Colour);
+    
     float3 fixed0 = (-ACES_d * Colour) + ACES_b;
     float3 fixed1 = (ACES_c * Colour) - modA;
 
@@ -303,7 +318,8 @@ float3 ACES_Inverse(float3 Colour, float modE, float modA)
 
     float3 result0 = (fixed0 + variable_numerator) / denominator;
     float3 result1 = (fixed0 - variable_numerator) / denominator;
-
+    
+    // "result1" is likely what we always want
     return max(result0, result1);
 }
 
@@ -331,7 +347,8 @@ float3 Hable(
   inout float shoulderSegment_offsetY,
   inout float shoulderSegment_scaleX,
   inout float shoulderSegment_lnA,
-  inout float shoulderSegment_B)
+  inout float shoulderSegment_B,
+  inout float invScale)
 {
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
@@ -355,9 +372,10 @@ float3 Hable(
     float extraW = exp2(shoulderStrength) - LFLT1;
     float initialW = dstParams_x0 + remainingY;
     dstParams_W = initialW + extraW;
-
-    float dstParams_overshootX = 2.f * shoulderAngle * shoulderStrength;  // "* W" was optimised away by DXIL->SPIRV->HLSL conversion
-    float dstParams_overshootY = 0.5f * shoulderAngle * shoulderStrength; // as down the line there is a "/ W"
+    
+    // "W * " was optimised away by DXIL->SPIRV->HLSL conversion as down the line there is a "/ W"
+    float dstParams_overshootX = 2.f * shoulderAngle * shoulderStrength;
+    float dstParams_overshootY = 0.5f * shoulderAngle * shoulderStrength;
 
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L87
 
@@ -366,8 +384,8 @@ float3 Hable(
     //params
     float params_x0 = dstParams_x0 / dstParams_W;
     float params_x1 = dstParams_x1 / dstParams_W;
-    params_y0 = max(EPSILON, dstParams_y0);
-    params_y1 = max(EPSILON, dstParams_y1);
+    //float params_overshootX = dstParams_overshootX / dstParams_W; // this step was optimised away
+    #define params_overshootX dstParams_overshootX
     float dx = y1_offset / dstParams_W;
 
     // AsSlopeIntercept https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L67
@@ -377,42 +395,48 @@ float3 Hable(
 
     midSegment_offsetX = (b / m); //no minus
     midSegment_lnA = log2(m);
-
+    
     // EvalDerivativeLinearGamma https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L81
-    float toeM = exp2(log2(dstParams_y0)); // is pow(x, 1) because gamma = 1
-    toeM = max(EPSILON, toeM);
-    float shoulderM = exp2(log2(dstParams_y1)); // is pow(x, 1) because gamma = 1
-    shoulderM = max(EPSILON, shoulderM);
+    // max(EPSILON, pow(params_yX, gamma))
+    params_y0 = max(EPSILON, dstParams_y0); // is pow(x, 1) because gamma = 1
+    //OLD: params_y0 = max(EPSILON, exp2(log2(dstParams_y0))); // toeM
+    params_y1 = max(EPSILON, dstParams_y1); // is pow(x, 1) because gamma = 1
+    //OLD: params_y1 = max(EPSILON, exp2(log2(dstParams_y1))); // shoulderM
 
-    float params_overshootY = exp2(log2(1.f + dstParams_overshootY)); // is pow(x, 1) because gamma = 1
-
+    // pow(1.f + dstParams_overshootY, gamma) - 1.f
+    // -1 was optimised away as shoulderSegment_offsetY is params_overshootY + 1
+    float params_overshootY = 1.f + dstParams_overshootY; // is pow(x, 1) because gamma = 1
+    //OLD: float params_overshootY = exp2(log2(1.f + dstParams_overshootY));
+    
     // toe section
     // SolveAB https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L60
-    toeSegment_B = (m * params_x0) / (toeM + EPSILON);
-    float _410 = log2(toeM); //doesn't belong to SolveAB
+    toeSegment_B = (m * params_x0) / (params_y0 + EPSILON);
+    float _410 = log2(params_y0); //doesn't belong to SolveAB
     toeSegment_lnA = toeSegment_B * (-log(params_x0));
     // toe section end
-
+    
     // shoulder section
-    float shoulderSection_x0 = 1.f + dstParams_overshootX - params_x1;
-    float shoulderSection_y0 = params_overshootY - shoulderM;
-    shoulderSegment_offsetX = 1.f + dstParams_overshootX;
-    shoulderSegment_offsetY = 1.f + dstParams_overshootY;
+    float shoulderSection_x0 = 1.f + params_overshootX - params_x1;
+    float shoulderSection_y0 = params_overshootY - params_y1; // 1 + x was optimised away
+    shoulderSegment_offsetX = 1.f + params_overshootX * dstParams_W;
+    float shoulderSegment_offsetX_optimised = 1.f + params_overshootX;
+    shoulderSegment_offsetY = params_overshootY; // x + 1 was optimised away
     shoulderSegment_scaleX = -1.f; // could be optimised away if we move this outside of the PS
     // SolveAB
-    shoulderSegment_B   = ((m * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
+    shoulderSegment_B = ((m * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
     shoulderSegment_lnA = (log2(shoulderSection_y0) * RCP_LOG2_E) - (shoulderSegment_B * log2(shoulderSection_x0));
     float shoulderSegment_B_optimised = shoulderSegment_B * RCP_LOG2_E;
-
+    // shoulder section end
+    
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L6
     // Eval
     float evalY0 = 0.f;
-    if (dstParams_overshootX > 0.f)
+    if (params_overshootX > 0.f)
     {
-        evalY0 = -exp2(((shoulderSegment_B_optimised * log2(dstParams_overshootX)) + shoulderSegment_lnA) * LOG2_E);
+        evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + shoulderSegment_lnA) * LOG2_E);
     }
     // Eval end
-    float invScale = 1.f / (evalY0 + params_overshootY);
+    invScale = 1.f / (evalY0 + params_overshootY);
 
     float3 toneMapped;
 
@@ -436,8 +460,8 @@ float3 Hable(
         }
         else
         {
-            //float evalShoulderSegment_y0 = ((-1.f) - dstParams_overshootX) + normX;
-            float evalShoulderSegment_y0 = (normX - shoulderSegment_offsetX) * shoulderSegment_scaleX;
+            //float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX;
+            float evalShoulderSegment_y0 = (normX - shoulderSegment_offsetX_optimised) * shoulderSegment_scaleX;
             float evalShoulderReturn = 0.f;
             if (evalShoulderSegment_y0 > 0.f)
             {
@@ -485,7 +509,8 @@ float3 Hable_Inverse(
   float shoulderSegment_offsetY,
   float shoulderSegment_scaleX,
   float shoulderSegment_lnA,
-  float shoulderSegment_B)
+  float shoulderSegment_B,
+  float invScale)
 {
     float3 itmColour;
 
@@ -495,9 +520,9 @@ float3 Hable_Inverse(
         {
             itmColour[channel] = HableEvalInverse(InputColour[channel],
                                                   0.f,
-                                                  0.f,
+                                                  0.f, // * invScale
                                                   1.f,
-                                                  1.f,
+                                                  1.f * invScale,
                                                   toeSegment_lnA,
                                                   toeSegment_B);
         }
@@ -505,9 +530,9 @@ float3 Hable_Inverse(
         {
             itmColour[channel] = HableEvalInverse(InputColour[channel],
                                                   -midSegment_offsetX, // minus was optimised away
-                                                  0.f,
+                                                  0.f, // * invScale
                                                   1.f,
-                                                  1.f,
+                                                  1.f * invScale,
                                                   midSegment_lnA,
                                                   1.f);
         }
@@ -515,9 +540,9 @@ float3 Hable_Inverse(
         {
             itmColour[channel] = HableEvalInverse(InputColour[channel],
                                                   shoulderSegment_offsetX,
-                                                  shoulderSegment_offsetY,
+                                                  shoulderSegment_offsetY * invScale,
                                                   shoulderSegment_scaleX,
-                                                  -1.f,
+                                                  -1.f * invScale,
                                                   shoulderSegment_lnA,
                                                   shoulderSegment_B);
         }
@@ -526,7 +551,7 @@ float3 Hable_Inverse(
     return itmColour * dstParams_W;
 }
 
-float3 inv_tonemap_RestoreLuminance(float3 color, float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
+float FindLuminanceToRestore(float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
 {
 	// Try to restore any luminance above "color", as it would have been lost during tone mapping.
 	// 
@@ -539,20 +564,21 @@ float3 inv_tonemap_RestoreLuminance(float3 color, float tonemapLostLuminance, fl
 	// This will re-apply an amount of lost luminance based on how much the CC reduced it:
 	// the more the CC reduced the luminance, the less we will apply.
 	// If the CC increased the luminance though, we will apply even more than the base lost amount.
-    const float luminanceCCInvChange = 1.0f - (preColorCorrectionLuminance - postColorCorrectionLuminance);
+    tonemapLostLuminance = isnan(tonemapLostLuminance) ? 0.f : tonemapLostLuminance;
+    const float luminanceCCInvChange = max(1.f - (preColorCorrectionLuminance - postColorCorrectionLuminance), 0.f);
+    //const float luminanceCCInvChange = clamp(postColorCorrectionLuminance / preColorCorrectionLuminance, 0.f, 2.f); //TODO: try this
     const float currentLum = postColorCorrectionLuminance; // Should be equal to "Luminance(color)"
-    const float targetLum = currentLum + tonemapLostLuminance;
-    float3 targetColor = color;
-    if (currentLum != 0.f)
-        targetColor *= targetLum / currentLum;
-#if 0
-	return lerp(color, targetColor, luminanceCCInvChange);
-#else // Clamp the CC change ratio to avoid extreme values
-    return lerp(color, targetColor, clamp(luminanceCCInvChange, 0.0f, 2.0f));
-#endif
+    const float targetLum = max(currentLum + tonemapLostLuminance, 0.f);
+    float scale = luminanceCCInvChange;
+    if (currentLum > 0.f)
+    {
+        scale *= targetLum / currentLum;
+        return scale;
+    }
+    return 1.f;
 }
 
-float3 PostProcess(float3 Color)
+float3 PostProcess(float3 Color, inout float ColorLuminance)
 {
     const uint hdrCmpDatIndex = PcwHdrComposite.HdrCmpDatIndex;
     const float4 highlightsColorFilter = HdrCmpDat[hdrCmpDatIndex].HighlightsColourFilter;
@@ -562,29 +588,55 @@ float3 PostProcess(float3 Color)
     const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
     const float contrastMidPoint = PerSceneConstants[316u].z;
     
-    float colorLuminance = Luminance(Color);
-        
+    ColorLuminance = Luminance(Color);
+    
     // saturation adjustment a la Hable
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicColorGrading.cpp#L307-L309
-    Color = ((Color - colorLuminance) * hableSaturation) + colorLuminance;
+    Color = ((Color - ColorLuminance) * hableSaturation) + ColorLuminance;
     // Blend in another color based on the luminance.
-    Color += lerp(float3(0.f, 0.f, 0.f), colorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
+    Color += lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
     Color *= brightnessMultiplier;
         
     // Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
     // The higher the distance from the contrast middle point, the more contrast will change the color.
     Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
         
-    Color = ((colorFilter.rgb - Color) * colorFilter.a) + Color;
+    Color = lerp(Color, colorFilter.rgb, colorFilter.a);
+    return Color;
+}
+
+float3 PostProcess_Inverse(float3 Color, float ColorLuminance)
+{
+    const uint hdrCmpDatIndex = PcwHdrComposite.HdrCmpDatIndex;
+    const float4 highlightsColorFilter = HdrCmpDat[hdrCmpDatIndex].HighlightsColourFilter;
+    const float4 colorFilter = HdrCmpDat[hdrCmpDatIndex].ColourFilter;
+    const float hableSaturation = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
+    const float brightnessMultiplier = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
+    const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
+    const float contrastMidPoint = PerSceneConstants[316u].z;
+    
+    // We can't invert the color filter, so we will only inverse the post process by the unfiltered amount
+    const float colorFilterInverse = 1.f - colorFilter.a;
+    
+    Color = ((Color - contrastMidPoint) / contrastIntensity) + contrastMidPoint;
+    
+    Color /= brightnessMultiplier;
+    
+    Color -= lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
+    
+    Color = ((Color - ColorLuminance) / hableSaturation) + ColorLuminance;
+        
     return Color;
 }
 
 PSOutput PS(PSInput psInput)
 {    
     float3 inputColour = InputColour.Load(int3(int2(psInput.SV_Position.xy), 0));
+#if CLAMP_INPUT_OUTPUT
     // Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
     // Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
     inputColour = max(inputColour, 0.f);
+#endif
 
 #if defined(APPLY_BLOOM)
 
@@ -597,11 +649,11 @@ PSOutput PS(PSInput psInput)
 #endif // APPLY_BLOOM
 
     float3 tonemappedColor;
-    float3 unclampedTonemappedColor;
+    float3 tonemappedUnclampedColor;
 
 #if DISABLE_TONEMAP
     tonemappedColor = inputColour;
-    unclampedTonemappedColor = inputColour;
+    tonemappedUnclampedColor = inputColour;
 #else
     
     float acesParam_modE;
@@ -619,26 +671,22 @@ PSOutput PS(PSInput psInput)
     float hable_shoulderSegment_scaleX;
     float hable_shoulderSegment_lnA;
     float hable_shoulderSegment_B;
+    float hable_invScale;
 
     const bool clampACES = false;
-    if (PcwHdrComposite.Tmo == 1u)
+    if (PcwHdrComposite.Tmo == 1u || ForceACES)
     {
-        // ACESFilm by Krzysztof Narkowicz
-        unclampedTonemappedColor = ACESReference(inputColour, clampACES);
-        tonemappedColor = saturate(unclampedTonemappedColor);
+        tonemappedUnclampedColor = ACESReference(inputColour, clampACES);
+        tonemappedColor = saturate(tonemappedUnclampedColor);
     }
     else if (PcwHdrComposite.Tmo == 2u)
     {
-        // ACESFilm "per scene"
-        unclampedTonemappedColor = ACESParametric(inputColour,
-                                                    clampACES,
-                                                    acesParam_modE,
-                                                    acesParam_modA);
-        tonemappedColor = saturate(unclampedTonemappedColor);
+        tonemappedUnclampedColor = ACESParametric(inputColour, clampACES, acesParam_modE, acesParam_modA);
+        tonemappedColor = saturate(tonemappedUnclampedColor);
     }
     else if (PcwHdrComposite.Tmo == 3u)
     {
-        unclampedTonemappedColor = Hable(inputColour,
+        tonemappedUnclampedColor = Hable(inputColour,
                                            hable_params_y0,
                                            hable_params_y1,
                                            hable_dstParams_W,
@@ -650,25 +698,29 @@ PSOutput PS(PSInput psInput)
                                            hable_shoulderSegment_offsetY,
                                            hable_shoulderSegment_scaleX,
                                            hable_shoulderSegment_lnA,
-                                           hable_shoulderSegment_B);
-        tonemappedColor = unclampedTonemappedColor; // Hable was never clamped
+                                           hable_shoulderSegment_B,
+                                           hable_invScale);
+        tonemappedColor = tonemappedUnclampedColor; // Hable was never clamped
     }
     else
     {
-        // what a tone mapper!
-        unclampedTonemappedColor = inputColour;
-        tonemappedColor = saturate(unclampedTonemappedColor);
+        tonemappedUnclampedColor = inputColour;
+        tonemappedColor = saturate(tonemappedUnclampedColor);
     }
     
-    tonemappedColor = PostProcess(tonemappedColor);
+#if !DISABLE_POST_PROCESS
+    float prePostProcessColorLuminance;
+    float prePostProcessUnclampedColorLuminance;
+    tonemappedColor = PostProcess(tonemappedColor, prePostProcessColorLuminance);
     // Repeat on unclamped tonemapped color to later retrieve the lost luminance
-    unclampedTonemappedColor = PostProcess(unclampedTonemappedColor);
+    tonemappedUnclampedColor = PostProcess(tonemappedUnclampedColor, prePostProcessUnclampedColorLuminance);
+#endif
 #endif // DISABLE_TONEMAP
     
     tonemappedColor = saturate(tonemappedColor);
     
     // This is the luminance lost by clamping SDR tonemappers to the 0-1 range, and again by the fact that LUTs only take 0-1 range input.
-    const float tonemapLostLuminance = Luminance(unclampedTonemappedColor - tonemappedColor); //TODO: clip any negative values here? The unclamped tonemapper might actually have negative "lost" luminance.
+    const float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor); //TODO: clip any negative values here? The unclamped tonemapper might actually have negative "lost" luminance.
     
     const float preColorCorrectionLuminance = Luminance(tonemappedColor);
     
@@ -700,10 +752,17 @@ PSOutput PS(PSInput psInput)
     
 #if ENABLE_HDR
     // Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation
-    colour = inv_tonemap_RestoreLuminance(colour, tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
+    colour *= FindLuminanceToRestore(tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
     
-#if !DISABLE_TONEMAP && 0
-    if (PcwHdrComposite.Tmo == 1u)
+#if !DISABLE_TONEMAP && !DISABLE_INVERSE_TONEMAP
+    
+#if !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
+    //TODO: passing in the previous luminance might not be the best, though is there any other way really?
+    //Should we at least shift it by how much the LUT shifted the luminance? To invert it more correctly.
+    colour = PostProcess_Inverse(colour, prePostProcessColorLuminance);
+#endif // !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
+    
+    if (PcwHdrComposite.Tmo == 1u || ForceACES)
     {
         colour = ACESReference_Inverse(colour);
     }
@@ -725,24 +784,39 @@ PSOutput PS(PSInput psInput)
                                 hable_shoulderSegment_offsetY,
                                 hable_shoulderSegment_scaleX,
                                 hable_shoulderSegment_lnA,
-                                hable_shoulderSegment_B);
+                                hable_shoulderSegment_B,
+                                hable_invScale);
     }
     else
     {
         // Any luminance lost by this tonemap case would have already been restored above with "tonemapLostLuminance".
     }
-#endif // !DISABLE_TONEMAP
+    
+#if !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
+    //TODO: ... this has no use now, and also, it won't work in the HDR range
+    colour = PostProcess(colour, prePostProcessColorLuminance);
+#endif // !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
+#endif // !DISABLE_TONEMAP && !DISABLE_INVERSE_TONEMAP
     
     colour *= HDR_GAME_PAPER_WHITE;
+#if CLAMP_INPUT_OUTPUT
+    colour = clamp(colour, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
+#endif
     
     //TODO: do DICE tonemapping to display nits, or some Hable like HDR tonemapper.
+    
 #else
-#if SDR_USE_GAMMA_2_2 //TODO: enable this for SDR? It would make sense if we change the LUTs
+    
+#if SDR_USE_GAMMA_2_2 //TODO: This makes sense to have if we fix up the LUTs, though the SDR tonemapper had still been developed with sRGB<->2.2 mismatch
     colour = pow(colour, 1.f / 2.2f);
 #else
     // Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma
     colour = gamma_linear_to_sRGB(colour);
+#if CLAMP_INPUT_OUTPUT
+    colour = clamp(colour, 0.f, 1.f);
+#endif
 #endif // SDR_USE_GAMMA_2_2
+    
 #endif // ENABLE_HDR
     
     PSOutput psOutput;
