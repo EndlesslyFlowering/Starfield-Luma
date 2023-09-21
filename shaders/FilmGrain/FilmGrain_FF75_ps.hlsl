@@ -1,5 +1,5 @@
 #define ENABLE_HDR 1
-#define HDR_GAME_PAPER_WHITE 2.5f
+#define HDR_GAME_PAPER_WHITE 1.f
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
 cbuffer _13_15 : register(b0, space0)
@@ -80,7 +80,7 @@ void frag_main()
 #else
     float inverseLuminance = saturate(1.f - Luminance(tonemappedColor));
 #endif // ENABLE_HDR
-    
+
 #if 0 // WIP fixes
     const float filmGrainInvSize = 1.f / FILM_GRAIN_TEXTURE_SIZE; // This was "1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u)", though that seems incorrect
     const float filmGrainHalfSize = FILM_GRAIN_TEXTURE_SIZE * 0.5f; // This was "521.f", which seems like a mistake on 512

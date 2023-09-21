@@ -6,7 +6,7 @@
 
 // Also in "ps_4105314757"
 #define ENABLE_HDR 1
-#define HDR_GAME_PAPER_WHITE 2.5f
+#define HDR_GAME_PAPER_WHITE 1.f
 #define SDR_USE_GAMMA_2_2 0
 #define FIX_WRONG_SRGB_GAMMA 1
 // Also in "cs_580663709"
@@ -16,7 +16,7 @@
 #define DISABLE_TONEMAP 0
 #define DISABLE_POST_PROCESS 1
 #define DISABLE_LUT 1
-#define DISABLE_INVERSE_TONEMAP 1
+#define DISABLE_INVERSE_TONEMAP 0
 #define DISABLE_INVERSE_POST_PROCESS 1
 #define CLAMP_INPUT_OUTPUT 0
 
@@ -387,13 +387,16 @@ float3 Hable(
     #define params_overshootX dstParams_overshootX
     float dx = y1_offset / dstParams_W;
 
+    // mid section
     // AsSlopeIntercept https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L67
     float m = (abs(dx) < EPSILON) ? 1.f : (y1_offset / dx);
     m += EPSILON;
     float b = dstParams_y0 - (m * params_x0);
 
     midSegment_offsetX = (b / m); //no minus
-    midSegment_lnA = log2(m);
+    float midSegment_lnA_optimised = log2(m);
+    midSegment_lnA = RCP_LOG2_E * midSegment_lnA_optimised;
+    // mid section end
 
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L137-L138
     // max(EPSILON, pow(params_yX, gamma))
@@ -410,8 +413,9 @@ float3 Hable(
     // toe section
     // SolveAB https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L60
     toeSegment_B = (m * params_x0) / (params_y0 + EPSILON);
-    float _410 = log2(params_y0); //doesn't belong to SolveAB
-    toeSegment_lnA = toeSegment_B * (-log(params_x0));
+    float _410 = log2(params_y0); //doesn't belong to SolveAB (it might does)
+    float toeSegment_lnA_optimised = -toeSegment_B * log(params_x0);
+    toeSegment_lnA = _410 * RCP_LOG2_E + toeSegment_lnA_optimised;
     // toe section end
 
     // shoulder section
@@ -445,14 +449,14 @@ float3 Hable(
 
         if (isToeSegment && normX > 0.f)
         {
-            returnChannel = exp2(((((log2(normX) * toeSegment_B) + _410) * RCP_LOG2_E) + toeSegment_lnA) * LOG2_E);
+            returnChannel = exp2(((((log2(normX) * toeSegment_B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
         }
         else if (normX < params_x1)
         {
             float evalMidSegment_y0 = normX + midSegment_offsetX; //is -(-midSegment_offsetX)
             if (evalMidSegment_y0 > 0.f)
             {
-                returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA);
+                returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA_optimised);
             }
         }
         else
@@ -513,35 +517,39 @@ float3 Hable_Inverse(
 
     for (uint channel = 0; channel < 3; channel++)
     {
-        if (InputColor[channel] < params_y0)
+        // scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
+        if (InputColor[channel] < params_y0) // toe
         {
-            itmColor[channel] = HableEvalInverse(InputColor[channel],
-                                                 0.f,
-                                                 0.f, // * invScale
-                                                 1.f,
-                                                 1.f * invScale,
-                                                 toeSegment_lnA,
-                                                 toeSegment_B);
+            // scaleXY and offsetXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L151-L154
+            itmColor[channel] = HableEval_Inverse(InputColor[channel],
+                                                  0.f,
+                                                  0.f, // * invScale
+                                                  1.f,
+                                                  1.f * invScale,
+                                                  toeSegment_lnA,
+                                                  toeSegment_B);
         }
-        else if (InputColor[channel] < params_y1)
+        else if (InputColor[channel] < params_y1) // mid
         {
-            itmColor[channel] = HableEvalInverse(InputColor[channel],
-                                                 -midSegment_offsetX, // minus was optimised away
-                                                 0.f, // * invScale
-                                                 1.f,
-                                                 1.f * invScale,
-                                                 midSegment_lnA,
-                                                 1.f);
+            // scaleXY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L125-L127
+            itmColor[channel] = HableEval_Inverse(InputColor[channel],
+                                                  -midSegment_offsetX, // minus was optimised away
+                                                  0.f, // * invScale
+                                                  1.f,
+                                                  1.f * invScale,
+                                                  midSegment_lnA,
+                                                  1.f);
         }
-        else
+        else // shoulder
         {
-            itmColor[channel] = HableEvalInverse(InputColor[channel],
-                                                 shoulderSegment_offsetX,
-                                                 shoulderSegment_offsetY * invScale,
-                                                 shoulderSegment_scaleX,
-                                                 -1.f * invScale,
-                                                 shoulderSegment_lnA,
-                                                 shoulderSegment_B);
+            // scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
+            itmColor[channel] = HableEval_Inverse(InputColor[channel],
+                                                  shoulderSegment_offsetX,
+                                                  shoulderSegment_offsetY * invScale,
+                                                  -1.f,
+                                                  -1.f * invScale,
+                                                  shoulderSegment_lnA,
+                                                  shoulderSegment_B);
         }
     }
 
