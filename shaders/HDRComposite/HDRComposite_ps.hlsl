@@ -131,7 +131,7 @@ struct SPerSceneConstants
 
 struct PushConstantWrapper_HDRComposite
 {
-    uint  HdrCmpDatIndex;
+    uint  HdrCmpDatIndex; //index for HDRCompositeData
     uint  Tmo; //tone mapping operator
     float BloomMultiplier;
 };
@@ -345,7 +345,6 @@ float3 Hable(
   inout float midSegment_lnA,
   inout float shoulderSegment_offsetX,
   inout float shoulderSegment_offsetY,
-  inout float shoulderSegment_scaleX,
   inout float shoulderSegment_lnA,
   inout float shoulderSegment_B,
   inout float invScale)
@@ -396,16 +395,16 @@ float3 Hable(
     midSegment_offsetX = (b / m); //no minus
     midSegment_lnA = log2(m);
 
-    // EvalDerivativeLinearGamma https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L81
+    // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L137-L138
     // max(EPSILON, pow(params_yX, gamma))
-    params_y0 = max(EPSILON, dstParams_y0); // is pow(x, 1) because gamma = 1
-    //OLD: params_y0 = max(EPSILON, exp2(log2(dstParams_y0))); // toeM
-    params_y1 = max(EPSILON, dstParams_y1); // is pow(x, 1) because gamma = 1
-    //OLD: params_y1 = max(EPSILON, exp2(log2(dstParams_y1))); // shoulderM
+    params_y0 = max(EPSILON, dstParams_y0); // is pow(x, gamma) with gamma = 1
+    //OLD: params_y0 = max(EPSILON, exp2(log2(dstParams_y0)));
+    params_y1 = max(EPSILON, dstParams_y1); // is pow(x, gamma) with gamma = 1
+    //OLD: params_y1 = max(EPSILON, exp2(log2(dstParams_y1)));
 
     // pow(1.f + dstParams_overshootY, gamma) - 1.f
     // -1 was optimised away as shoulderSegment_offsetY is params_overshootY + 1
-    float params_overshootY = 1.f + dstParams_overshootY; // is pow(x, 1) because gamma = 1
+    float params_overshootY = 1.f + dstParams_overshootY; // is pow(x, gamma) with gamma = 1
     //OLD: float params_overshootY = exp2(log2(1.f + dstParams_overshootY));
 
     // toe section
@@ -418,14 +417,12 @@ float3 Hable(
     // shoulder section
     float shoulderSection_x0 = 1.f + params_overshootX - params_x1;
     float shoulderSection_y0 = params_overshootY - params_y1; // 1 + x was optimised away
-    shoulderSegment_offsetX = 1.f + params_overshootX * dstParams_W;
-    float shoulderSegment_offsetX_optimised = 1.f + params_overshootX;
+    shoulderSegment_offsetX = 1.f + params_overshootX;
     shoulderSegment_offsetY = params_overshootY; // x + 1 was optimised away
-    shoulderSegment_scaleX = -1.f; // could be optimised away if we move this outside of the PS
     // SolveAB
     shoulderSegment_B = ((m * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
-    shoulderSegment_lnA = (log2(shoulderSection_y0) * RCP_LOG2_E) - (shoulderSegment_B * log2(shoulderSection_x0));
     float shoulderSegment_B_optimised = shoulderSegment_B * RCP_LOG2_E;
+    shoulderSegment_lnA = (log2(shoulderSection_y0) * RCP_LOG2_E) - (shoulderSegment_B_optimised * log2(shoulderSection_x0));
     // shoulder section end
 
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L6
@@ -433,10 +430,10 @@ float3 Hable(
     float evalY0 = 0.f;
     if (params_overshootX > 0.f)
     {
-        evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + shoulderSegment_lnA) * LOG2_E);
+        evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + shoulderSegment_lnA) * LOG2_E) + params_overshootY;
     }
     // Eval end
-    invScale = 1.f / (evalY0 + params_overshootY);
+    invScale = 1.f / (evalY0);
 
     float3 toneMapped;
 
@@ -461,7 +458,8 @@ float3 Hable(
         else
         {
             //float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX;
-            float evalShoulderSegment_y0 = (normX - shoulderSegment_offsetX_optimised) * shoulderSegment_scaleX;
+            // small optimisation from the original decompilation
+            float evalShoulderSegment_y0 = (1.f + params_overshootX) - normX;
             float evalShoulderReturn = 0.f;
             if (evalShoulderSegment_y0 > 0.f)
             {
@@ -475,7 +473,7 @@ float3 Hable(
 }
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L21-L34
-float HableEvalInverse(
+float HableEval_Inverse(
   float Channel,
   float offsetX,
   float offsetY,
@@ -507,7 +505,6 @@ float3 Hable_Inverse(
   float  midSegment_lnA,
   float  shoulderSegment_offsetX,
   float  shoulderSegment_offsetY,
-  float  shoulderSegment_scaleX,
   float  shoulderSegment_lnA,
   float  shoulderSegment_B,
   float  invScale)
@@ -668,7 +665,6 @@ PSOutput PS(PSInput psInput)
     float hable_midSegment_lnA;
     float hable_shoulderSegment_offsetX;
     float hable_shoulderSegment_offsetY;
-    float hable_shoulderSegment_scaleX;
     float hable_shoulderSegment_lnA;
     float hable_shoulderSegment_B;
     float hable_invScale;
@@ -696,7 +692,6 @@ PSOutput PS(PSInput psInput)
                                          hable_midSegment_lnA,
                                          hable_shoulderSegment_offsetX,
                                          hable_shoulderSegment_offsetY,
-                                         hable_shoulderSegment_scaleX,
                                          hable_shoulderSegment_lnA,
                                          hable_shoulderSegment_B,
                                          hable_invScale);
@@ -782,7 +777,6 @@ PSOutput PS(PSInput psInput)
                               hable_midSegment_lnA,
                               hable_shoulderSegment_offsetX,
                               hable_shoulderSegment_offsetY,
-                              hable_shoulderSegment_scaleX,
                               hable_shoulderSegment_lnA,
                               hable_shoulderSegment_B,
                               hable_invScale);
