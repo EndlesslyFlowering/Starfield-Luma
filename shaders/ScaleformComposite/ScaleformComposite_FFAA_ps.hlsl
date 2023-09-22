@@ -1,4 +1,5 @@
 #include "../shared.h"
+#include "../color.h"
 
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 #define HDR_UI_BLEND_POW 0.775f
@@ -17,48 +18,6 @@ cbuffer stub_PushConstantWrapper_ScaleformCompositeLayout : register(b0)
 
 Texture2D<float4> inputTexture : register(t0, space8);
 SamplerState inputSampler : register(s0, space8);
-
-float gamma_linear_to_sRGB(float channel)
-{
-    [flatten]
-    if (channel <= 0.0031308f)
-    {
-        channel = channel * 12.92f;
-    }
-    else
-    {
-        channel = 1.055f * pow(channel, 1.0f / 2.4f) - 0.055f;
-    }
-    return channel;
-}
-
-float3 gamma_linear_to_sRGB(float3 Color)
-{
-    return float3(gamma_linear_to_sRGB(Color.r),
-                  gamma_linear_to_sRGB(Color.g),
-                  gamma_linear_to_sRGB(Color.b));
-}
-
-float gamma_sRGB_to_linear(float channel)
-{
-    [flatten]
-    if (channel <= 0.04045f)
-    {
-        channel = channel / 12.92f;
-    }
-    else
-    {
-        channel = pow((channel + 0.055f) / 1.055f, 2.4f);
-    }
-    return channel;
-}
-
-float3 gamma_sRGB_to_linear(float3 Color)
-{
-    return float3(gamma_sRGB_to_linear(Color.r),
-                  gamma_sRGB_to_linear(Color.g),
-                  gamma_sRGB_to_linear(Color.b));
-}
 
 struct PSInputs
 {
