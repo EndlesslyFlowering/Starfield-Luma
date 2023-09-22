@@ -5,6 +5,9 @@
 // 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good)
 #define LUT_IMPROVEMENT_TYPE 1
 
+// For future development
+#define UNUSED_PARAMS 0
+
 static float additionalNeutralLUTPercentage = 0.0f;
 static float LUTCorrectionPercentage = 1.0f;
 
@@ -24,18 +27,20 @@ cbuffer PushConstantWrapper_ColorGradingMerge : register(b0, space0)
 
 struct LUTAnalysis
 {
+    float minChannel;
+    float maxChannel;
+    float3 black;
+    float3 white;
+    
+#if UNUSED_PARAMS
     float minY;
     float maxY;
     float averageY;
     float range;
-    float3 black;
-    float3 white;
     float blackY;
     float whiteY;
-    //float medianY;
-    float minChannel;
+    float medianY;
     float averageChannel;
-    float maxChannel;
     float averageRed;
     float averageGreen;
     float averageBlue;
@@ -45,77 +50,84 @@ struct LUTAnalysis
     float minRed;
     float minGreen;
     float minBlue;
+#endif // UNUSED_PARAMS
 };
+
+// In/Out in pixels
+uint3 ThreeToTwoDimensionCoordinates(uint x, uint y, uint z)
+{
+    const uint U = (z << 4u) + x; // 4u is (LUT_SIZE / 4)
+    const uint3 UVW = uint3(U, y, 0u);
+    return UVW;
+}
 
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
+    Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0, 0, 0)).rgb);
+    Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(1, 1, 1)).rgb);
+#if UNUSED_PARAMS
     Analysis.minY = FLT_MAX;
-    Analysis.maxY = 0.f;
-    Analysis.minRed = FLT_MAX;
-    Analysis.minBlue = FLT_MAX;
-    Analysis.minGreen = FLT_MAX;
-    Analysis.maxRed = 0.f;
-    Analysis.maxBlue = 0.f;
-    Analysis.maxGreen = 0.f;
-    Analysis.black = gamma_sRGB_to_linear(LUT.Load(int3(0, 0, 0)).rgb);
-    Analysis.white = gamma_sRGB_to_linear(LUT.Load(int3(1, 1, 1)).rgb);
+    Analysis.maxY = -FLT_MAX;
     Analysis.blackY = Luminance(Analysis.black);
     Analysis.whiteY = Luminance(Analysis.white);
+#endif // UNUSED_PARAMS
     
-    float reds = 0.f;
-    float greens = 0.f;
-    float blues = 0.f;
+    float3 colors = 0.f;
     float Ys = 0.f;
+    
+    float3 minColor = FLT_MAX;
+    float3 maxColor = -FLT_MAX;
     
     const uint texelCount = LUT_SIZE * LUT_SIZE * LUT_SIZE;
     
+    //TODO: optimize, to get the min/max colors we could just iterate on the last (e.g.) 3 pixels of each axis
     for (uint x = 0; x < (uint)LUT_SIZE; x++)
     {
         for (uint y = 0; y < (uint)LUT_SIZE; y++)
         {
             for (uint z = 0; z < (uint)LUT_SIZE; z++)
             {
-                const uint inU = (z << 4u) + x;
-                const uint3 inUVW = uint3(inU, y, 0u); // In pixels
-                float3 LUTColor = gamma_sRGB_to_linear(LUT.Load(inUVW).rgb);
+                float3 LUTColor = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(x, y, z)).rgb);
+
+                minColor = min(minColor, LUTColor);
+                maxColor = max(maxColor, LUTColor);
                 
+#if UNUSED_PARAMS
                 float Y = Luminance(LUTColor);
                 Analysis.minY = min(Analysis.minY, Y);
                 Analysis.maxY = max(Analysis.maxY, Y);
-
-                Analysis.minRed = min(Analysis.minRed, LUTColor.r);
-                Analysis.minGreen = min(Analysis.minGreen, LUTColor.g);
-                Analysis.minBlue = min(Analysis.minBlue, LUTColor.b);
-
-                Analysis.maxRed = max(Analysis.maxRed, LUTColor.r);
-                Analysis.maxGreen = max(Analysis.maxGreen, LUTColor.g);
-                Analysis.maxBlue = max(Analysis.maxBlue, LUTColor.b);
-                
-                reds += LUTColor.r;
-                greens += LUTColor.g;
-                blues += LUTColor.b;
                 Ys += Y;
+                
+                colors += LUTColor.r;
+#endif // UNUSED_PARAMS
             }
         }
     }
     
     //TODO: either store min/max channels merged or separately, but not both
-    Analysis.minChannel = max(Analysis.minRed, max(Analysis.minGreen, Analysis.minBlue));
-    Analysis.maxChannel = max(Analysis.maxRed, max(Analysis.maxGreen, Analysis.maxBlue));
+    Analysis.minChannel = max(minColor.r, max(minColor.g, minColor.b));
+    Analysis.maxChannel = max(maxColor.r, max(maxColor.g, maxColor.b));
+    
+#if UNUSED_PARAMS
+    Analysis.minRed = minRed;
+    Analysis.minGreen = minGreen;
+    Analysis.minBlue = minBlue;
+    Analysis.maxRed = maxRed;
+    Analysis.maxGreen = maxGreen;
+    Analysis.maxBlue = maxBlue;
     
     Analysis.averageY = Ys / texelCount;
-    Analysis.averageRed = reds / texelCount;
-    Analysis.averageGreen = greens / texelCount;
-    Analysis.averageBlue = blues / texelCount;
+    Analysis.averageRed = colors.r / texelCount;
+    Analysis.averageGreen = colors.g / texelCount;
+    Analysis.averageBlue = colors.b / texelCount;
 
-    //TODO: necessary?
     Analysis.averageChannel = (Analysis.averageRed + Analysis.averageGreen + Analysis.averageBlue) / 3.f;
-    //TODO: unncessary?
     Analysis.range = Analysis.maxY - Analysis.minY;
     
     //TODO: ??? Can't do this in shader but it's not needed
     //Ys.sort((a, b) => a - b);
     //Analysis.medianY = ((Ys[Math.floor(texelCount / 2)]) + (Ys[Math.ceil(texelCount / 2)])) / 2;
+#endif // UNUSED_PARAMS
 }
 
 // Analyzes each LUT texel and normalize their range.
@@ -152,7 +164,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, bool SDRRange = false)
     float3 scaledColor = linearNormalization(color, 0.f, 1.f, scaleDown, scaleUp);
     color += scaledColor;
 
-    float YChange = linearNormalization<float>(blackDistance, 0.f, totalRange, -scaledBlackY, 1.f - scaledWhiteY);
+    float YChange = linearNormalization(blackDistance, 0.f, totalRange, -scaledBlackY, 1.f - scaledWhiteY);
     float Y = Luminance(color);
     if (Y > 0.f) // Black will always stay black (and should)
     {
@@ -187,8 +199,7 @@ struct SPIRV_Cross_Input
 void CS()
 {
     const uint3 outUVW = uint3(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z); // In pixels
-    const uint inU = (gl_GlobalInvocationID.z << 4u) + gl_GlobalInvocationID.x; // 4u is (LUT_SIZE / 4)
-    const uint3 inUVW = uint3(inU, gl_GlobalInvocationID.y, 0u); // In pixels
+    const uint3 inUVW = ThreeToTwoDimensionCoordinates(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z);
     const float UVWScale = 1.f / (LUT_SIZE - 1.f); // Was "0.066666670143604278564453125", pixel coordinates 0-15 for a resolution of 16, which is half of LUTs size of 16x16x16
     
     float3 neutralLUTColor = float3(outUVW) * UVWScale; // The neutral LUT is automatically generated by the coordinates, but it's baked with sRGB gamma
