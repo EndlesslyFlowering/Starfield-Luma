@@ -1,4 +1,5 @@
 #include "../shared.h"
+#include "../color.h"
 
 #define HDR_USE_GAMMA_2_2 1
 
@@ -12,27 +13,6 @@ struct PSInputs
     float4 pos : SV_Position;
     float2 TEXCOORD : TEXCOORD0;
 };
-
-float gamma_sRGB_to_linear(float channel)
-{
-    [flatten]
-    if (channel <= 0.04045f)
-    {
-        channel = channel / 12.92f;
-    }
-    else
-    {
-        channel = pow((channel + 0.055f) / 1.055f, 2.4f);
-    }
-    return channel;
-}
-
-float3 gamma_sRGB_to_linear(float3 Color)
-{
-    return float3(gamma_sRGB_to_linear(Color.r),
-                  gamma_sRGB_to_linear(Color.g),
-                  gamma_sRGB_to_linear(Color.b));
-}
 
 float4 PS(PSInputs inputs) : SV_Target
 {
