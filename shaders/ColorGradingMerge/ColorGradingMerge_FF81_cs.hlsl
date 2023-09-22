@@ -2,9 +2,13 @@
 #include "../color.h"
 #include "../math.h"
 
+#define LUT_SIZE_UINT (uint)LUT_SIZE
+
 // 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good)
 #define LUT_IMPROVEMENT_TYPE 1
 
+// Make some small quality cuts for the purpose of optimization
+#define OPTIMIZE_LUT_ANALYSIS true
 // For future development
 #define UNUSED_PARAMS 0
 
@@ -53,10 +57,13 @@ struct LUTAnalysis
 #endif // UNUSED_PARAMS
 };
 
+static const uint LUTSizeLog2 = (uint)log2(LUT_SIZE);
+
 // In/Out in pixels
 uint3 ThreeToTwoDimensionCoordinates(uint x, uint y, uint z)
 {
-    const uint U = (z << 4u) + x; // 4u is (LUT_SIZE / 4)
+    // 2D LUT extends horizontally.
+    const uint U = (z << LUTSizeLog2) + x;
     const uint3 UVW = uint3(U, y, 0u);
     return UVW;
 }
@@ -64,7 +71,7 @@ uint3 ThreeToTwoDimensionCoordinates(uint x, uint y, uint z)
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
     Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0, 0, 0)).rgb);
-    Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(1, 1, 1)).rgb);
+    Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u, LUT_SIZE_UINT - 1u, LUT_SIZE_UINT - 1u)).rgb);
 #if UNUSED_PARAMS
     Analysis.minY = FLT_MAX;
     Analysis.maxY = -FLT_MAX;
@@ -78,14 +85,21 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
     float3 minColor = FLT_MAX;
     float3 maxColor = -FLT_MAX;
     
-    const uint texelCount = LUT_SIZE * LUT_SIZE * LUT_SIZE;
+    const uint texelCount = LUT_SIZE_UINT * LUT_SIZE_UINT * LUT_SIZE_UINT;
     
-    //TODO: optimize, to get the min/max colors we could just iterate on the last (e.g.) 3 pixels of each axis
-    for (uint x = 0; x < (uint)LUT_SIZE; x++)
+    // TODO: this loops on every LUT pixel for every output pixel.
+    // given we only need the min/max color channels here, to optimize we could:
+    //  -Just iterate on the last (e.g.) 3 pixels of each axis, which should guarantee to find the max for all normal LUTs.
+    //   According to ShortFuse some LUTs don't have their min and max in the edges, but it could be in the middle or close to it.
+    //   It's arguable we'd care about this cases, and it's also arguable to correct them by global min instead of edges min, as the result could actually be worse?
+    //  -Work with atomic (shared variables), group sync and thread/thread group to only calculate this once.
+    //  -Add a new post LUT mixing compute shader pass that does this once.
+    const uint analyzeTexelFrequency = OPTIMIZE_LUT_ANALYSIS ? (LUT_SIZE_UINT - 1u) : 1u; // Set to 1 for all. Set to "LUT_SIZE_UINT - 1u" for edges only.
+    for (uint x = 0; x < LUT_SIZE_UINT; x += analyzeTexelFrequency)
     {
-        for (uint y = 0; y < (uint)LUT_SIZE; y++)
+        for (uint y = 0; y < LUT_SIZE_UINT; y += analyzeTexelFrequency)
         {
-            for (uint z = 0; z < (uint)LUT_SIZE; z++)
+            for (uint z = 0; z < LUT_SIZE_UINT; z += analyzeTexelFrequency)
             {
                 float3 LUTColor = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(x, y, z)).rgb);
 
@@ -267,7 +281,8 @@ void CS()
     outMixedLUT[outUVW] = float4(mixedLUT, 1.f);
 }
 
-[numthreads(16, 16, 1)]
+// Dispatch size is 1 1 16 (x and y have one thread and one thread group, while z has 16 thread groups with a thread each)
+[numthreads(LUT_SIZE_UINT, LUT_SIZE_UINT, 1u)]
 void main(SPIRV_Cross_Input stage_input)
 {
     gl_GlobalInvocationID = stage_input.gl_GlobalInvocationID;
