@@ -1,5 +1,6 @@
 #include "../shared.h"
 #include "../color.h"
+#include "../math.h"
 
 // These are defined at compile time (shaders permutations)
 //#define APPLY_BLOOM
@@ -12,8 +13,8 @@
 // Also sets "DISABLE_LUT", "DISABLE_POST_PROCESS" and "DISABLE_INVERSE_TONEMAP"
 #define DISABLE_TONEMAP 0
 #define DISABLE_POST_PROCESS 0
-#define DISABLE_LUT 0
-#define DISABLE_INVERSE_TONEMAP 0
+#define DISABLE_LUT 1
+#define DISABLE_REPLACED_TONEMAP 0
 #define DISABLE_INVERSE_POST_PROCESS 1
 #define CLAMP_INPUT_OUTPUT 1
 
@@ -504,6 +505,22 @@ float3 Hable_Inverse(
     return itmColor * dstParams_W;
 }
 
+// Tonemapper inspired from DICE. Works on luminance to maintain hue, not per channel.
+float3 DICETonemap(float3 Color, float MaxOutputLuminance)
+{
+    // Between 0 and 1. Determines where the highlights curve (shoulder) starts.
+    // Leaving at zero for now as it's a simple and good looking default.
+    const float highlightsShoulderStart = 0.f;
+    
+    const float sourceLuminance = Luminance(Color);
+    if (sourceLuminance > 0.0f)
+    {
+        const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, highlightsShoulderStart);
+        Color *= compressedLuminance / sourceLuminance;
+    }
+    return Color;
+}
+
 float FindLuminanceToRestore(float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
 {
     // Try to restore any luminance above "color", as it would have been lost during tone mapping.
@@ -704,7 +721,7 @@ PSOutput PS(PSInput psInput)
     // Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation
     color *= FindLuminanceToRestore(tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
 
-#if !DISABLE_TONEMAP && !DISABLE_INVERSE_TONEMAP
+#if !DISABLE_TONEMAP && !DISABLE_REPLACED_TONEMAP
 
 #if !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
     //TODO: passing in the previous luminance might not be the best, though is there any other way really?
@@ -712,6 +729,7 @@ PSOutput PS(PSInput psInput)
     color = PostProcess_Inverse(color, prePostProcessColorLuminance);
 #endif // !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
 
+    // Restore a color very close to the original linear one, but with all the other post process and LUT transformations baked in
     if (PcwHdrComposite.Tmo == 1u)
     {
         color = ACESReference_Inverse(color);
@@ -745,14 +763,21 @@ PSOutput PS(PSInput psInput)
     //TODO: ... this has no use now, and also, it won't work in the HDR range
     color = PostProcess(color, prePostProcessColorLuminance);
 #endif // !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
-#endif // !DISABLE_TONEMAP && !DISABLE_INVERSE_TONEMAP
-
+    
     color *= HDR_GAME_PAPER_WHITE;
+    
+    const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
+    //TODO: find a tonemapper that looks more like Hable?
+    color = DICETonemap(color, maxOutputLuminance);
+#else
+    
+    color *= HDR_GAME_PAPER_WHITE;
+    
+#endif // !DISABLE_TONEMAP && !DISABLE_REPLACED_TONEMAP
+
 #if CLAMP_INPUT_OUTPUT
     color = clamp(color, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
 #endif
-
-    //TODO: do DICE tonemapping to display nits, or some Hable like HDR tonemapper.
 
 #else
 
