@@ -14,7 +14,7 @@ float hypot3(float3 input)
 
 // From old to new range
 template<class T>
-T linearNormalization(T input, float min, float max, float newMin, float newMax)
+T linearNormalization(T input, T min, T max, T newMin, T newMax)
 {
 	return ((input - min) * ((newMax - newMin) / (max - min))) + newMin;
 }

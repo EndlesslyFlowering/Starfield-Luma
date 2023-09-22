@@ -35,7 +35,6 @@ struct LUTAnalysis
     float maxChannel;
     float3 black;
     float3 white;
-    
 #if UNUSED_PARAMS
     float minY;
     float maxY;
@@ -151,16 +150,16 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, bool SDRRange = false)
     LUTAnalysis analysis;
     AnalyzeLUT(LUT, analysis);
     
-    float scaleDown = (0.f - analysis.minChannel);
-    float scaleUp = (1.f - analysis.maxChannel);
     // Black will be scaled by min channel
-    float3 scaledBlack = analysis.black - analysis.minChannel;
+    float3 scaledBlack = 1.f - ((1.f - analysis.black) * (1.f / (1.f - analysis.minChannel)));
     // White will be scaled up by max channel
-    float3 scaledWhite = analysis.white + (1.f - analysis.maxChannel);
+    float3 scaledWhite = analysis.white / analysis.maxChannel;
     float scaledBlackY = Luminance(scaledBlack);
     float scaledWhiteY = Luminance(scaledWhite);
     
 #if 0 //TODO: delete once verified this works
+    float scaleDown = (0.f - analysis.minChannel);
+    float scaleUp = (1.f - analysis.maxChannel);
     if (saturate(scaleDown) != scaleDown || saturate(scaleUp) != scaleUp
         || saturate(scaledBlackY) != scaledBlackY || saturate(scaledWhiteY) != scaledWhiteY)
     {
@@ -169,24 +168,28 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, bool SDRRange = false)
 #endif
     
     float3 color = gamma_sRGB_to_linear(LUT.Load(UVW).rgb);
-    float3 originalColor = color;
+    const float3 originalColor = color;
     
-    float blackDistance = hypot3(color);
-    float whiteDistance = hypot3(1.f - color);
-    float totalRange = (blackDistance + whiteDistance);
+    //TODO: convert to using lerp function???
+    const float3 reducedColor = linearNormalization<float3>(color, 0.f, 1.f, 1.f / (1.f - analysis.minChannel), 1.f);
+    const float3 increasedColor = linearNormalization<float3>(color, 0.f, 1.f, 1.f, 1.f / analysis.maxChannel);
+    // Scale the color
+    color = (1.f - ((1.f - color) * reducedColor)) * increasedColor;
+    
+    const float blackDistance = hypot3(originalColor);
+    const float whiteDistance = hypot3(1.f - originalColor);
+    const float totalRange = (blackDistance + whiteDistance);
 
-    float3 scaledColor = linearNormalization(color, 0.f, 1.f, scaleDown, scaleUp);
-    color += scaledColor;
-
-    float YChange = linearNormalization(blackDistance, 0.f, totalRange, -scaledBlackY, 1.f - scaledWhiteY);
-    float Y = Luminance(color);
-    if (Y > 0.f) // Black will always stay black (and should)
+    const float sourceY = Luminance(color);
+    if (sourceY > 0.f) // Black will always stay black (and should)
     {
-        float targetY = Y + YChange;
+        const float decreasedY = linearNormalization(blackDistance, 0.f, totalRange, 1.f / (1.f - scaledBlackY), 1.f);
+        const float increasedY = linearNormalization(whiteDistance, 0.f, totalRange, 1.f / scaledWhiteY, 1.f);
+        const float targetY = (1.f - ((1.f - sourceY) * decreasedY)) * increasedY;
         if (SDRRange && targetY >= 1.f) // Retarget to pure white
             color = 1.f;
         else
-            color *= targetY / Y;
+            color *= max(targetY, 0.f) / sourceY; // targetY could be negative according to ShortFuse
     }
     
     // Optional step to keep colors in the SDR range.
