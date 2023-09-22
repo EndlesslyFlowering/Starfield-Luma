@@ -217,7 +217,7 @@ struct PSOutput
 #define FLT11_MAX 65024.f
 #define FLT16_MAX 65504.f
 
-static const float LUTStrength = 0.f;
+static const float LUTStrength = 1.f;
 static const float RestorePreLUTLuminance = 1.f;
 
 static const float ACES_a = 2.51f;
@@ -695,8 +695,7 @@ PSOutput PS(PSInput psInput)
 #endif // FIX_LUT_GAMMA_MAPPING
     float LUTMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
     color = lerp(LUTColor, color, LUTMaskAlpha);
-#else
-
+    
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
     const float postColorCorrectionLuminance = Luminance(color);
