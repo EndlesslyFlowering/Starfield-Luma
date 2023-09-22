@@ -1,4 +1,5 @@
 #include "../shared.h"
+#include "../color.h"
 
 // These are defined at compile time (shaders permutations)
 //#define APPLY_BLOOM
@@ -14,7 +15,7 @@
 #define DISABLE_LUT 0
 #define DISABLE_INVERSE_TONEMAP 0
 #define DISABLE_INVERSE_POST_PROCESS 1
-#define CLAMP_INPUT_OUTPUT 0
+#define CLAMP_INPUT_OUTPUT 1
 
 struct ResolutionBlock
 {
@@ -218,55 +219,6 @@ struct PSOutput
 
 static const float LUTStrength = 0.f;
 static const float RestorePreLUTLuminance = 1.f;
-static const bool  ForceACES = false; //TODO: delete once Hable works
-
-float gamma_linear_to_sRGB(float channel)
-{
-    [flatten]
-    if (channel <= 0.0031308f)
-    {
-        channel = channel * 12.92f;
-    }
-    else
-    {
-        channel = 1.055f * pow(channel, 1.0f / 2.4f) - 0.055f;
-    }
-    return channel;
-}
-
-float3 gamma_linear_to_sRGB(float3 Color)
-{
-    return float3(gamma_linear_to_sRGB(Color.r),
-                  gamma_linear_to_sRGB(Color.g),
-                  gamma_linear_to_sRGB(Color.b));
-}
-
-float gamma_sRGB_to_linear(float channel)
-{
-    [flatten]
-    if (channel <= 0.04045f)
-    {
-        channel = channel / 12.92f;
-    }
-    else
-    {
-        channel = pow((channel + 0.055f) / 1.055f, 2.4f);
-    }
-    return channel;
-}
-
-float3 gamma_sRGB_to_linear(float3 Color)
-{
-    return float3(gamma_sRGB_to_linear(Color.r),
-                  gamma_sRGB_to_linear(Color.g),
-                  gamma_sRGB_to_linear(Color.b));
-}
-
-float Luminance(float3 Color)
-{
-    // Fixed from "wrong" values: 0.2125 0.7154 0.0721f
-    return dot(Color, float3(0.2126f, 0.7152f, 0.0722f));
-}
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
@@ -674,7 +626,7 @@ PSOutput PS(PSInput psInput)
     float hable_invScale;
 
     const bool clampACES = false;
-    if (PcwHdrComposite.Tmo == 1u || ForceACES)
+    if (PcwHdrComposite.Tmo == 1u)
     {
         tonemappedUnclampedColor = ACESReference(inputColor, clampACES);
         tonemappedColor = saturate(tonemappedUnclampedColor);
@@ -761,7 +713,7 @@ PSOutput PS(PSInput psInput)
     color = PostProcess_Inverse(color, prePostProcessColorLuminance);
 #endif // !DISABLE_POST_PROCESS && !DISABLE_INVERSE_POST_PROCESS
 
-    if (PcwHdrComposite.Tmo == 1u || ForceACES)
+    if (PcwHdrComposite.Tmo == 1u)
     {
         color = ACESReference_Inverse(color);
     }
