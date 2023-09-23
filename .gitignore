@@ -1,2 +1,9 @@
+[Bb]uild/
+.vs/
+.vscode/
+*.zip
+*.timestamp
+deploy-*.ps1
+
 shaders/target_folder.txt
 tools/dxc_analysis_tools/dndxc.settings.xml
