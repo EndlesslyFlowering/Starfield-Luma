@@ -2,6 +2,7 @@
 #include "Settings.h"
 #include "Utils.h"
 #include "RE/Buffers.h"
+#include "RE/SettingsDataModel.h"
 
 #include <dxgi1_6.h>
 
@@ -101,12 +102,14 @@ namespace Hooks
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;
 	};
 
-#ifndef NDEBUG
 	class DebugHooks
 	{
 	public:
 		static void Hook()
 		{
+			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BBAA9, Hook_CreateDataModelOptions);
+
+#if 0
 			const auto callsite1 = AsAddress(dku::Hook::Module::get().base() + 0x32ED294);
 			const auto callsite2 = AsAddress(dku::Hook::Module::get().base() + 0x32ED341);
 			const auto callsite3 = AsAddress(dku::Hook::Module::get().base() + 0x32ED2C1);
@@ -116,16 +119,18 @@ namespace Hooks
 			dku::Hook::write_call<5>(callsite2, Hook_CreateRenderTargetView);
 			_CreateDepthStencilView = dku::Hook::write_call<5>(callsite3, Hook_CreateDepthStencilView);
 			dku::Hook::write_call<5>(callsite4, Hook_CreateDepthStencilView);
+#endif
 		}
 
 	private:
+		static void Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList);
+		static inline std::add_pointer_t<decltype(Hook_CreateDataModelOptions)> _CreateDataModelOptions;
+
 		static void Hook_CreateRenderTargetView(uintptr_t a1, ID3D12Resource* a_resource, DXGI_FORMAT a_format, uint8_t a4, uint16_t a5, uintptr_t a6);
 		static void Hook_CreateDepthStencilView(uintptr_t a1, ID3D12Resource* a_resource, DXGI_FORMAT a_format, uint8_t a4, uint16_t a5, uintptr_t a6);
-
 		static inline std::add_pointer_t<decltype(Hook_CreateRenderTargetView)> _CreateRenderTargetView;
 		static inline std::add_pointer_t<decltype(Hook_CreateDepthStencilView)> _CreateDepthStencilView;
 	};
-#endif
 
 	void Install();
 }
