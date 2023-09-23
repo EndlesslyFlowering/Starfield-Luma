@@ -118,7 +118,7 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
     }
     
     //TODO: either store min/max channels merged or separately, but not both
-    Analysis.minChannel = max(minColor.r, max(minColor.g, minColor.b));
+    Analysis.minChannel = min(minColor.r, min(minColor.g, minColor.b));
     Analysis.maxChannel = max(maxColor.r, max(maxColor.g, maxColor.b));
     
 #if UNUSED_PARAMS
@@ -194,6 +194,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
             // targetY could be on LUTs (raised black point and dark blues)
             color *= max(targetY, 0.f) / sourceY;
         }
+    } else {
+        color = 0; // Color may have gone below 0 when scaling
     }
     
     // Optional step to keep colors in the SDR range.
