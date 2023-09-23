@@ -171,13 +171,13 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
     const float3 originalColor = color;
     
     //TODO: convert to using lerp function???
-    const float3 reducedColor = linearNormalization<float3>(color, 0.f, 1.f, 1.f / (1.f - analysis.minChannel), 1.f);
-    const float3 increasedColor = linearNormalization<float3>(color, 0.f, 1.f, 1.f, 1.f / analysis.maxChannel);
+    const float3 reducedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f / (1.f - analysis.minChannel), 1.f);
+    const float3 increasedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f, 1.f / analysis.maxChannel);
     // Scale the color ("neutralLUTColor" here represents the coordinates of the point).
-    color = (1.f - ((1.f - neutralLUTColor) * reducedColor)) * increasedColor;
+    color = (1.f - ((1.f - color) * reducedColor)) * increasedColor;
     
-    const float blackDistance = hypot3(originalColor);
-    const float whiteDistance = hypot3(1.f - originalColor);
+    const float blackDistance = hypot3(neutralLUTColor);
+    const float whiteDistance = hypot3(1.f - neutralLUTColor);
     const float totalRange = (blackDistance + whiteDistance);
 
     const float sourceY = Luminance(color);
@@ -186,10 +186,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         const float decreasedY = linearNormalization(blackDistance, 0.f, totalRange, 1.f / (1.f - scaledBlackY), 1.f);
         const float increasedY = linearNormalization(whiteDistance, 0.f, totalRange, 1.f / scaledWhiteY, 1.f);
         const float targetY = (1.f - ((1.f - sourceY) * decreasedY)) * increasedY;
-        if (SDRRange && targetY >= 1.f) // Retarget to pure white
-            color = 1.f;
-        else
-            color *= max(targetY, 0.f) / sourceY; // targetY could be negative according to ShortFuse
+        if (targetY >= 0.9999f && targetY <= 1.0005f) {
+            color = 1.f; // Intentionally targeting pure white (1,1,1)
+        } else if (SDRRange && targetY >= 0.999f) {
+            color = 1.f; // Clamp
+        } else {
+            // targetY could be on LUTs (raised black point and dark blues)
+            color *= max(targetY, 0.f) / sourceY;
+        }
     }
     
     // Optional step to keep colors in the SDR range.
