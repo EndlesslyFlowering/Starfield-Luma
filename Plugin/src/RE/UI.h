@@ -9,28 +9,26 @@ namespace RE
 	{
 	public:
 		IUIValue() = default;
-		virtual ~IUIValue() = default;                                 // 00
-		virtual void IUIValue_01() = 0;                                // 01
-		virtual void IUIValue_02() = 0;                                // 02
-		virtual void IUIValue_03() = 0;                                // 03
-		virtual void IUIValue_04() = 0;                                // 04
-		virtual void IUIValue_05() = 0;                                // 05
-		virtual void IUIValue_06() = 0;                                // 06
-		virtual void IUIValue_07() = 0;                                // 07
-		virtual bool GetNeedsUpdate();                                 // 08
-		virtual void SetNeedsUpdateAndNotifyParent(bool NeedsUpdate);  // 09
-		virtual void SetNeedsUpdate();                                 // 0A
-		virtual void IUIValue_0B() = 0;                                // 0B
+		virtual ~IUIValue() = default;                                  // 00
+		virtual void IUIValue_01() = 0;                                 // 01
+		virtual void IUIValue_02() = 0;                                 // 02
+		virtual void IUIValue_03() = 0;                                 // 03
+		virtual void IUIValue_04() = 0;                                 // 04
+		virtual void IUIValue_05() = 0;                                 // 05
+		virtual void IUIValue_06() = 0;                                 // 06
+		virtual void IUIValue_07() = 0;                                 // 07
+		virtual bool GetNeedsUpdate();                                  // 08
+		virtual void SetNeedsUpdateAndNotifyShuttle(bool NeedsUpdate);  // 09
+		virtual void SetNeedsUpdate();                                  // 0A
+		virtual void IUIValue_0B() = 0;                                 // 0B
 
-		void* m_Parent = nullptr;   // 08
-		bool m_NeedsUpdate = true;  // 10
+		UIDataShuttle* m_DataShuttle = nullptr;  // 08
+		bool m_NeedsUpdate = true;               // 10
 
 		void TriggerParentUpdate()
 		{
-			if (m_Parent) {
-				if ((*(bool (**)(void*))(*(__int64*)m_Parent + 48))(m_Parent))
-					(*(void (**)(void*, IUIValue&))(*(__int64*)m_Parent + 16))(m_Parent, *this);
-			}
+			if (m_DataShuttle && m_DataShuttle->UIDataShuttle_06())
+				m_DataShuttle->UIDataShuttle_02(*this);
 		}
 	};
 	static_assert(sizeof(IUIValue) == 0x18);
@@ -64,7 +62,7 @@ namespace RE
 
 			if (m_Value != Value) {
 				m_Value = Value;
-				SetNeedsUpdateAndNotifyParent(true);
+				SetNeedsUpdateAndNotifyShuttle(true);
 			}
 
 			return *this;
@@ -77,9 +75,9 @@ namespace RE
 	{
 	public:
 		StringUIValue() = default;
-		virtual ~StringUIValue() override = default;       // 00
-		virtual void StringUIValue_0C();                   // 0C
-		virtual void SetStringValue(const char* Value);    // 0D
+		virtual ~StringUIValue() override = default;     // 00
+		virtual void StringUIValue_0C();                 // 0C
+		virtual void SetStringValue(const char* Value);  // 0D
 	};
 	static_assert(sizeof(StringUIValue) == 0x20);
 
@@ -91,25 +89,25 @@ namespace RE
 		virtual ~NestedUIValue() override = default;  // 00
 
 		// IUIValue
-		virtual void IUIValue_01() override;                                    // 01
-		virtual void IUIValue_02() override;                                    // 02
-		virtual void IUIValue_03() override;                                    // 03
-		virtual void IUIValue_04() override;                                    // 04
-		virtual void IUIValue_05() override;                                    // 05
-		virtual void IUIValue_06() override;                                    // 06
-		virtual void IUIValue_07() override;                                    // 07
-		virtual void SetNeedsUpdateAndNotifyParent(bool NeedsUpdate) override;  // 09
-		virtual void SetNeedsUpdate() override;                                 // 0A
-		virtual void IUIValue_0B() override;                                    // 0B
+		virtual void IUIValue_01() override;                                     // 01
+		virtual void IUIValue_02() override;                                     // 02
+		virtual void IUIValue_03() override;                                     // 03
+		virtual void IUIValue_04() override;                                     // 04
+		virtual void IUIValue_05() override;                                     // 05
+		virtual void IUIValue_06() override;                                     // 06
+		virtual void IUIValue_07() override;                                     // 07
+		virtual void SetNeedsUpdateAndNotifyShuttle(bool NeedsUpdate) override;  // 09
+		virtual void SetNeedsUpdate() override;                                  // 0A
+		virtual void IUIValue_0B() override;                                     // 0B
 
 		// UIDataShuttle
-		virtual void UIDataShuttle_01() override;  // 01
-		virtual void UIDataShuttle_02() override;  // 02
-		virtual void UIDataShuttle_03() override;  // 03
-		virtual void UIDataShuttle_04() override;  // 04
-		virtual void UIDataShuttle_05() override;  // 05
-		virtual bool UIDataShuttle_06() override;  // 06
-		virtual bool UIDataShuttle_07() override;  // 07
+		virtual void UIDataShuttle_01() override;                   // 01
+		virtual void UIDataShuttle_02(IUIValue& UIValue) override;  // 02
+		virtual void UIDataShuttle_03() override;                   // 03
+		virtual void UIDataShuttle_04() override;                   // 04
+		virtual void UIDataShuttle_05() override;                   // 05
+		virtual bool UIDataShuttle_06() override;                   // 06
+		virtual bool UIDataShuttle_07() override;                   // 07
 
 		TUIDataShuttleContainerMap<T> m_ShuttleMap;  // 28
 	};
@@ -122,25 +120,25 @@ namespace RE
 		virtual ~ArrayUIValue() override = default;  // 00
 
 		// IUIValue
-		virtual void IUIValue_01() override;                                    // 01
-		virtual void IUIValue_02() override;                                    // 02
-		virtual void IUIValue_03() override;                                    // 03
-		virtual void IUIValue_04() override;                                    // 04
-		virtual void IUIValue_05() override;                                    // 05
-		virtual void IUIValue_06() override;                                    // 06
-		virtual void IUIValue_07() override;                                    // 07
-		virtual void SetNeedsUpdateAndNotifyParent(bool NeedsUpdate) override;  // 09
-		virtual void SetNeedsUpdate() override;                                 // 0A
-		virtual void IUIValue_0B() override;                                    // 0B
+		virtual void IUIValue_01() override;                                     // 01
+		virtual void IUIValue_02() override;                                     // 02
+		virtual void IUIValue_03() override;                                     // 03
+		virtual void IUIValue_04() override;                                     // 04
+		virtual void IUIValue_05() override;                                     // 05
+		virtual void IUIValue_06() override;                                     // 06
+		virtual void IUIValue_07() override;                                     // 07
+		virtual void SetNeedsUpdateAndNotifyShuttle(bool NeedsUpdate) override;  // 09
+		virtual void SetNeedsUpdate() override;                                  // 0A
+		virtual void IUIValue_0B() override;                                     // 0B
 
 		// UIDataShuttle
-		virtual void UIDataShuttle_01() override;  // 01
-		virtual void UIDataShuttle_02() override;  // 02
-		virtual void UIDataShuttle_03() override;  // 03
-		virtual void UIDataShuttle_04() override;  // 04
-		virtual void UIDataShuttle_05() override;  // 05
-		virtual bool UIDataShuttle_06() override;  // 06
-		virtual bool UIDataShuttle_07() override;  // 07
+		virtual void UIDataShuttle_01() override;                   // 01
+		virtual void UIDataShuttle_02(IUIValue& UIValue) override;  // 02
+		virtual void UIDataShuttle_03() override;                   // 03
+		virtual void UIDataShuttle_04() override;                   // 04
+		virtual void UIDataShuttle_05() override;                   // 05
+		virtual bool UIDataShuttle_06() override;                   // 06
+		virtual bool UIDataShuttle_07() override;                   // 07
 
 		TUIDataShuttleContainerArray<T> m_ShuttleArray;  // 28
 
@@ -165,7 +163,7 @@ namespace RE
 		{
 			// Seems like they have a helper function to apply NestedUIValue<> to the type
 			auto addr = dku::Hook::Module::get().base() + 0x20B50C8;
-			auto func = reinterpret_cast<void (*)(TUIDataShuttleContainerArray<NestedUIValue<T>> *, T&)>(addr);
+			auto func = reinterpret_cast<void (*)(TUIDataShuttleContainerArray<NestedUIValue<T>>*, T&)>(addr);
 			func(&__super::m_ShuttleArray, Item);
 		}
 	};

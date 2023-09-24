@@ -4,18 +4,20 @@
 
 namespace RE
 {
+	class IUIValue;
+
 	class __declspec(novtable) UIDataShuttle
 	{
 	public:
 		UIDataShuttle() = default;
-		virtual ~UIDataShuttle() = default;   // 00
-		virtual void UIDataShuttle_01() = 0;  // 01
-		virtual void UIDataShuttle_02() = 0;  // 02
-		virtual void UIDataShuttle_03() = 0;  // 03
-		virtual void UIDataShuttle_04() = 0;  // 04
-		virtual void UIDataShuttle_05() = 0;  // 05
-		virtual bool UIDataShuttle_06() = 0;  // 06
-		virtual bool UIDataShuttle_07() = 0;  // 07
+		virtual ~UIDataShuttle() = default;                    // 00
+		virtual void UIDataShuttle_01() = 0;                   // 01
+		virtual void UIDataShuttle_02(IUIValue& UIValue) = 0;  // 02
+		virtual void UIDataShuttle_03() = 0;                   // 03
+		virtual void UIDataShuttle_04() = 0;                   // 04
+		virtual void UIDataShuttle_05() = 0;                   // 05
+		virtual bool UIDataShuttle_06() = 0;                   // 06
+		virtual bool UIDataShuttle_07() = 0;                   // 07
 
 		char _pad0[0x8];  // 08
 	};
@@ -62,7 +64,7 @@ namespace RE
 
 		[[nodiscard]] auto Items() const noexcept
 		{
-			return { m_ArrayBegin, m_ArrayEnd };
+			return std::span{ m_ArrayBegin, m_ArrayEnd };
 		}
 	};
 	//static_assert(sizeof(TUIDataShuttleContainerArray<TUIValue<int>>) == 0x50);
@@ -81,8 +83,8 @@ namespace RE
 		virtual void UIDataShuttleContainer_07() override;         // 07
 		virtual void UIDataShuttleContainer_08() override;         // 08
 		virtual ~TUIDataShuttleContainerMap() override = default;  // 09
-		virtual void TUIDataShuttleContainerMap_0A();              // 0A Identical to GetDataHolder(). Const version?
-		virtual T& GetData();                                      // 0B
+		virtual void TUIDataShuttleContainerMap_0A();              // 0A Identical to GetData(). Const version?
+		virtual T& GetData();                                      // 0A
 
 		char _pad10[0x18];  // 10
 		T m_Data;           // 28

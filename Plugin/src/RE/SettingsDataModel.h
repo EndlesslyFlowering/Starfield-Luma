@@ -65,7 +65,7 @@ namespace RE
 			NestedUIValue<SliderData> m_SliderData;      // C0
 			NestedUIValue<StepperData> m_StepperData;    // 158
 			NestedUIValue<CheckBoxData> m_CheckBoxData;  // 248
-			char _pad2C0[0x58];                          // 2D0
+			char _pad2C0[0x8];							 // 2D0
 
 			GeneralSetting()
 			{
@@ -99,11 +99,23 @@ namespace RE
 				int Int;
 				float Float;
 			} m_Value;
-			int m_ID;
+			int m_SettingID;
 		};
 
-		char _pad0[0x190 + 0x20];
-		TUIDataShuttleContainerMap<SubSettingsList> m_SubSettingsMap;
+		char _pad0[0x190 + 0x20];                                      // 0
+		TUIDataShuttleContainerMap<SubSettingsList> m_SubSettingsMap;  // 1B0
+
+		SubSettingsList::GeneralSetting* FindSettingById(int Id)
+		{
+			// This is supposed to be held under a lock but I don't care enough right now
+			for (auto& item : m_SubSettingsMap.GetData().m_Settings.Items())
+			{
+				if (item.m_ShuttleMap.GetData().m_ID.m_Value == Id)
+					return &item.m_ShuttleMap.GetData();
+			}
+
+			return nullptr;
+		}
 	};
 
 	// Sanity checks
@@ -117,7 +129,7 @@ namespace RE
 
 	static_assert(sizeof(ArrayUIValue<NestedUIValue<SubSettingsList::GeneralSetting::SliderData>, 0>) == 0x78);
 
-	static_assert(sizeof(SubSettingsList::GeneralSetting) == 0x318);
+	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting>) == 0x318);
 	static_assert(sizeof(ArrayNestedUIValue<SubSettingsList::GeneralSetting, 0>) == 0x78);
 
 	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList>) == 0xA8);
