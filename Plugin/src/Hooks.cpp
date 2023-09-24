@@ -199,6 +199,48 @@ namespace Hooks
 		_CreateDataModelOptions(a_arg1, a_SettingList);
 	}
 
+	void DebugHooks::Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+	{
+		char buffer[128];
+		sprintf_s(buffer, "Got a bool event: %d %s\n", EventData.m_SettingID, EventData.m_Value.Bool ? "true" : "false");
+		OutputDebugStringA(buffer);
+
+		_SettingsDataModelBoolEvent(a_arg1, EventData);
+	}
+
+	void DebugHooks::Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+	{
+		char buffer[128];
+		sprintf_s(buffer, "Got an integer event: %d %d\n", EventData.m_SettingID, EventData.m_Value.Int);
+		OutputDebugStringA(buffer);
+
+		if (auto settingTest = EventData.m_Model->FindSettingById(602))
+		{
+			OutputDebugStringA("Manually updating checkbox state\n");
+			settingTest->m_CheckBoxData.m_ShuttleMap.GetData().m_Value.SetValue(false);
+		}
+
+		_SettingsDataModelIntEvent(a_arg1, EventData);
+	}
+
+	void DebugHooks::Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+	{
+		char buffer[128];
+		sprintf_s(buffer, "Got a float event: %d %f\n", EventData.m_SettingID, EventData.m_Value.Float);
+		OutputDebugStringA(buffer);
+
+		if (EventData.m_SettingID >= 600) {
+			if (auto settingTest = EventData.m_Model->FindSettingById(EventData.m_SettingID)) {
+				char buffer[128];
+				sprintf_s(buffer, "%.0f%%", EventData.m_Value.Float * 100.0f);
+
+				settingTest->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(buffer);
+			}
+		}
+
+		_SettingsDataModelFloatEvent(a_arg1, EventData);
+	}
+
     void DebugHooks::Hook_CreateRenderTargetView(uintptr_t a1, ID3D12Resource* a_resource, DXGI_FORMAT a_format, uint8_t a4, uint16_t a5, uintptr_t a6)
     {
 		const auto textureDesc = a_resource->GetDesc();
