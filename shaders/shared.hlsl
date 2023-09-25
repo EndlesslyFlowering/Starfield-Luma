@@ -13,7 +13,10 @@
 
 // This possibly shifts colors a lot, but it's mathematically correct, it's also necessary for HDR LUTs to work.
 #define LUT_FIX_GAMMA_MAPPING 1
-#define LUT_BLEND_LUTS_IN_LINEAR 0
 #define LUT_CUSTOM_STRENGTH 1
 #define LUT_ADDITIONAL_NEUTRAL_PERCENTAGE 1
 #define LUT_SIZE 16.f
+#define LUT_SIZE_UINT (uint)LUT_SIZE
+
+// 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good)
+#define LUT_IMPROVEMENT_TYPE 1
