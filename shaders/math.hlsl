@@ -1,5 +1,4 @@
-#ifndef MATH_H
-#define MATH_H
+#pragma once
 
 #define FLT_MAX 3.402823466e+38F
 #define FLT10_MAX 64512.f
@@ -53,5 +52,3 @@ float luminanceCompress(float fInValue, float fOutMaxValue, float fShoulderStart
 	float fPossibleOutValue = fShoulderStart + fCompressedRange * rangeCompressPow(fCompressableValue / fCompressedRange, fCompressableRange / fCompressedRange, fModulationPow);
 	return fInValue <= fShoulderStart ? fInValue : fPossibleOutValue;
 }
-
-#endif

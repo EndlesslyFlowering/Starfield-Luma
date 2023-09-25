@@ -1,5 +1,4 @@
-#ifndef COLOR_H
-#define COLOR_H
+#pragma once
 
 // Rec.709 SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_BT709 = 80.f;
@@ -77,5 +76,3 @@ float Luminance(float3 color)
     // Fixed from "wrong" values: 0.2125 0.7154 0.0721f
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
-
-#endif
