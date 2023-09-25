@@ -20,6 +20,7 @@
 #define ENABLE_INVERSE_POST_PROCESS 0
 #define CLAMP_INPUT_OUTPUT 1
 
+#define LUT_USE_TETRAHEDRAL_INTERPOLATION 1
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -490,6 +491,126 @@ float3 PostProcess_Inverse(float3 Color, float ColorLuminance)
     return Color;
 }
 
+
+float3 TetrahedralInterpolation(
+    Texture3D<float3> Lut,
+    float3            Color)
+{
+    float3 coords = Color.rgb * (LUT_SIZE - 1);
+
+    // baseInd is on [0,LUT_SIZE-1]
+    int3 baseInd = coords;
+    int3 nextInd = baseInd + 1;
+
+    // fract is on [0,1]
+    float3 fract = frac(coords);
+
+    float3 f1, f4;
+
+    float3 v1 = Lut.Load(int4(baseInd, 0)).rgb;
+    float3 v4 = Lut.Load(int4(nextInd, 0)).rgb;
+
+    if (fract.r >= fract.g)
+    {
+        if (fract.g >= fract.b)  // R > G > B
+        {
+            nextInd = baseInd + int3(1, 0, 0);
+            float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            nextInd = baseInd + int3(1, 1, 0);
+            float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            f1 = 1.f - fract.r;
+            f4 = fract.b;
+            float3 f2 = fract.r - fract.g;
+            float3 f3 = fract.g - fract.b;
+
+            Color = (f2 * v2) + (f3 * v3);
+        }
+        else if (fract.r >= fract.b)  // R > B > G
+        {
+            nextInd = baseInd + int3(1, 0, 0);
+            float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            nextInd = baseInd + int3(1, 0, 1);
+            float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            f1 = 1.f - fract.r;
+            f4 = fract.g;
+            float3 f2 = fract.r - fract.b;
+            float3 f3 = fract.b - fract.g;
+
+            Color.rgb = (f2 * v2) + (f3 * v3);
+        }
+        else  // B > R > G
+        {
+            nextInd = baseInd + int3(0, 0, 1);
+            float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            nextInd = baseInd + int3(1, 0, 1);
+            float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            f1 = 1.f - fract.b;
+            f4 = fract.g;
+            float3 f2 = fract.b - fract.r;
+            float3 f3 = fract.r - fract.g;
+
+            Color = (f2 * v2) + (f3 * v3);
+        }
+    }
+    else
+    {
+         if (fract.g <= fract.b)  // B > G > R
+        {
+            nextInd = baseInd + int3(0, 0, 1);
+            float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            nextInd = baseInd + int3(0, 1, 1);
+            float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            f1 = 1.f - fract.b;
+            f4 = fract.r;
+            float3 f2 = fract.b - fract.g;
+            float3 f3 = fract.g - fract.r;
+
+            Color = (f2 * v2) + (f3 * v3);
+        }
+        else if (fract.r >= fract.b)  // G > R > B
+        {
+            nextInd = baseInd + int3(0, 1, 0);
+            float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            nextInd = baseInd + int3(1, 1, 0);
+            float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            f1 = 1.f - fract.g;
+            f4 = fract.b;
+            float3 f2 = fract.g - fract.r;
+            float3 f3 = fract.r - fract.b;
+
+            Color = (f2 * v2) + (f3 * v3);
+        }
+        else  // G > B > R
+        {
+            nextInd = baseInd + int3(0, 1, 0);
+            float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            nextInd = baseInd + int3(0, 1, 1);
+            float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+
+            f1 = 1.f - fract.g;
+            f4 = fract.r;
+            float3 f2 = fract.g - fract.b;
+            float3 f3 = fract.b - fract.r;
+
+            Color = (f2 * v2) + (f3 * v3);
+        }
+    }
+
+    return Color + (f1 * v1) + (f4 * v4);
+}
+
+
 PSOutput PS(PSInput psInput)
 {
     float3 inputColor = InputColor.Load(int3(int2(psInput.SV_Position.xy), 0));
@@ -614,7 +735,15 @@ PSOutput PS(PSInput psInput)
 
 #endif // FIX_WRONG_SRGB_GAMMA
 
+#if LUT_USE_TETRAHEDRAL_INTERPOLATION
+
+    float3 LutColor = TetrahedralInterpolation(Lut, colorForLutSampling);
+
+#else
+
     float3 LutColor = Lut.Sample(Sampler0, colorForLutSampling * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+
+#endif //LUT_USE_TETRAHEDRAL_INTERPOLATION
 
 #if LUT_CUSTOM_STRENGTH
 
@@ -697,9 +826,9 @@ PSOutput PS(PSInput psInput)
 
     color *= HDR_GAME_PAPER_WHITE;
 
-    const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
+    //const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
     //TODO: find a tonemapper that looks more like Hable?
-    color = DICETonemap(color, maxOutputLuminance);
+    //color = DICETonemap(color, maxOutputLuminance);
 
 #else
 
