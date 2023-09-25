@@ -1,5 +1,5 @@
-#include "../shared.h"
-#include "../color.h"
+#include "../shared.hlsl"
+#include "../color.hlsl"
 
 cbuffer _13_15 : register(b0, space7)
 {

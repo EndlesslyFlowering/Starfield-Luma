@@ -1,5 +1,5 @@
-#include "../shared.h"
-#include "../color.h"
+#include "../shared.hlsl"
+#include "../color.hlsl"
 
 #define HDR_USE_GAMMA_2_2 1
 
