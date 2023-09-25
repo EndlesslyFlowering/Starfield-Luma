@@ -409,7 +409,7 @@ float3 DICETonemap(float3 Color, float MaxOutputLuminance)
 float FindLuminanceToRestore(float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
 {
     // Try to restore any luminance above "color", as it would have been lost during tone mapping.
-    // 
+    //
     // To achieve this, we re-apply the lost luminance, but only by the inverse amount the luminance changed during the color correction.
     // e.g. if the color correction fully changed the luminance, then we don't change it any further,
     // but if the color correction changed the luminance only by 25%, then we re-apply apply 75% of the lost luminance on top.
@@ -600,34 +600,35 @@ PSOutput PS(PSInput psInput)
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 
-#if FIX_WRONG_SRGB_GAMMA || !LUT_FIX_GAMMA_MAPPING || !LUT_BLEND_LUTS_IN_LINEAR
+#if FIX_WRONG_SRGB_GAMMA
 
-    color = gamma_linear_to_sRGB(color);
+    float3 colorForLutSampling = gamma_linear_to_sRGB(color);
 
-#elif !LUT_FIX_GAMMA_MAPPING || !LUT_BLEND_LUTS_IN_LINEAR
+#else
 
     //read gamma ini value, defaulting at 2.4 (makes little sense)
     float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
     //weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
-    color = (pow(color, inverseGamma) * 1.055f) - 0.055f;
-    color = max(color, 0.f); // Unnecessary as the LUT sampling is already clamped.
+    float3 colorForLutSampling = (pow(color, inverseGamma) * 1.055f) - 0.055f;
+    colorForLutSampling = max(colorForLutSampling, 0.f); // Unnecessary as the LUT sampling is already clamped.
 
-#endif // FIX_WRONG_SRGB_GAMMA || !LUT_FIX_GAMMA_MAPPING
+#endif // FIX_WRONG_SRGB_GAMMA
 
-    float3 LUTColor = Lut.Sample(Sampler0, color * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+    float3 LutColor = Lut.Sample(Sampler0, colorForLutSampling * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 
 #if LUT_CUSTOM_STRENGTH
 
-    float LUTMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
+    float LutMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
+
 #else
 
-    float LUTMaskAlpha = LutMask.Sample(Sampler0, psInput.TEXCOORD).x;
+    float LutMaskAlpha = LutMask.Sample(Sampler0, psInput.TEXCOORD).x;
 
 #endif // LUT_CUSTOM_STRENGTH
 
-    color = lerp(LUTColor, color, LUTMaskAlpha);
+    color = lerp(LutColor, color, LutMaskAlpha);
 
-#if !LUT_FIX_GAMMA_MAPPING || !LUT_BLEND_LUTS_IN_LINEAR
+#if !LUT_FIX_GAMMA_MAPPING
 
     color = pow(color, 2.2f);
 
