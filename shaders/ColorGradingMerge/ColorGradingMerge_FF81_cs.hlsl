@@ -23,17 +23,17 @@ RWTexture3D<float4> OutMixetLUT : register(u0, space8);
 
 struct LUTAnalysis
 {
-    float minChannel;
-    float maxChannel;
     float3 black;
     float3 white;
+    float whiteY;
 #if UNUSED_PARAMS
+    float minChannel;
+    float maxChannel;
     float minY;
     float maxY;
     float averageY;
     float range;
     float blackY;
-    float whiteY;
     float medianY;
     float averageChannel;
     float averageRed;
@@ -62,12 +62,11 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
     Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0)).rgb);
     Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
+    Analysis.whiteY = Luminance(Analysis.white);
 #if UNUSED_PARAMS
     Analysis.minY = FLT_MAX;
     Analysis.maxY = -FLT_MAX;
     Analysis.blackY = Luminance(Analysis.black);
-    Analysis.whiteY = Luminance(Analysis.white);
-#endif // UNUSED_PARAMS
 
     float3 colors = 0.f;
     float Ys = 0.f;
@@ -96,14 +95,12 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
                 minColor = min(minColor, LUTColor);
                 maxColor = max(maxColor, LUTColor);
 
-#if UNUSED_PARAMS
                 float Y = Luminance(LUTColor);
                 Analysis.minY = min(Analysis.minY, Y);
                 Analysis.maxY = max(Analysis.maxY, Y);
                 Ys += Y;
 
                 colors += LUTColor.r;
-#endif // UNUSED_PARAMS
             }
         }
     }
@@ -111,8 +108,6 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
     //TODO: either store min/max channels merged or separately, but not both
     Analysis.minChannel = min(minColor.r, min(minColor.g, minColor.b));
     Analysis.maxChannel = max(maxColor.r, max(maxColor.g, maxColor.b));
-
-#if UNUSED_PARAMS
     Analysis.minRed = minRed;
     Analysis.minGreen = minGreen;
     Analysis.minBlue = minBlue;
@@ -141,33 +136,20 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
     LUTAnalysis analysis;
     AnalyzeLUT(LUT, analysis);
 
-    // Black will be scaled by min channel
-    float3 scaledBlack = 1.f - ((1.f - analysis.black) * (1.f / (1.f - analysis.minChannel)));
-    // White will be scaled up by max channel
-    float3 scaledWhite = analysis.white / analysis.maxChannel;
-    float scaledBlackY = Luminance(scaledBlack);
-    float scaledWhiteY = Luminance(scaledWhite);
-
-#if 0 //TODO: delete once verified this works
-    float scaleDown = (0.f - analysis.minChannel);
-    float scaleUp = (1.f - analysis.maxChannel);
-    if (saturate(scaleDown)    != scaleDown
-     || saturate(scaleUp)      != scaleUp
-     || saturate(scaledBlackY) != scaledBlackY
-     || saturate(scaledWhiteY) != scaledWhiteY)
-    {
-        return 0;
-    }
-#endif
-
     float3 color = gamma_sRGB_to_linear(LUT.Load(UVW).rgb);
     const float3 originalColor = color;
 
     //TODO: convert to using lerp function???
-    const float3 reducedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f / (1.f - analysis.minChannel), 1.f);
-    const float3 increasedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f, 1.f / analysis.maxChannel);
-    // Scale the color ("neutralLUTColor" here represents the coordinates of the point).
+    // Reduce all colors by raised level of black texel
+    // Normalize as relative to their distance from black ("neutralLUTColor" is xyz coordinates)
+    const float3 reducedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f / (1.f - analysis.black), 1.f);
+    
+    // Reapply black level as a multiple (applies shadow tint)
+    const float3 increasedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f + analysis.black, 1.f);
+    
+    // Apply to base color
     color = (1.f - ((1.f - color) * reducedColor)) * increasedColor;
+
 
     const float blackDistance = hypot3(neutralLUTColor);
     const float whiteDistance = hypot3(1.f - neutralLUTColor);
@@ -176,9 +158,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
     const float sourceY = Luminance(color);
     if (sourceY > 0.f) // Black will always stay black (and should)
     {
-        const float decreasedY = linearNormalization(blackDistance, 0.f, totalRange, 1.f / (1.f - scaledBlackY), 1.f);
-        const float increasedY = linearNormalization(whiteDistance, 0.f, totalRange, 1.f / scaledWhiteY, 1.f);
-        const float targetY = (1.f - ((1.f - sourceY) * decreasedY)) * increasedY;
+        const float increasedY = linearNormalization(whiteDistance, 0.f, totalRange, 1.f / analysis.whiteY, 1.f);
+        const float targetY = (1.f - (1.f - sourceY)) * increasedY;
 
         if (targetY >= 0.9999f && targetY <= 1.0005f)
         {
@@ -196,6 +177,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
     }
     else
     {
+        // TODO: Consider removal since no longer scaling
         color = 0; // Color may have gone below 0 when scaling
     }
 
