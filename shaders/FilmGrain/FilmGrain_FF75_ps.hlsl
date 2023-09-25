@@ -1,5 +1,5 @@
-#include "../shared.h"
-#include "../color.h"
+#include "../shared.hlsl"
+#include "../color.hlsl"
 
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
