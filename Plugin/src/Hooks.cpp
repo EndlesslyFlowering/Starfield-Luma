@@ -1,5 +1,4 @@
 #include "Hooks.h"
-
 #include "Offsets.h"
 #include "Utils.h"
 
@@ -69,7 +68,179 @@ namespace Hooks
 		return _UnkFunc(a1, a2);		
     }
 
-#ifndef NDEBUG
+	void DebugHooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
+	{
+		int id = 600;
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Checkbox");
+			s.m_Description.SetStringValue("Hello World Checkbox Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Checkbox);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(true);
+			s.m_CheckBoxData.m_ShuttleMap.GetData().m_Value.SetValue(false);
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Checkbox Disabled");
+			s.m_Description.SetStringValue("Hello World Checkbox Disabled Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Checkbox);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(false);
+			s.m_CheckBoxData.m_ShuttleMap.GetData().m_Value.SetValue(false);
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Checkbox On");
+			s.m_Description.SetStringValue("Hello World Checkbox On Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Checkbox);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(false);
+			s.m_CheckBoxData.m_ShuttleMap.GetData().m_Value.SetValue(true);
+			a_SettingList.AddItem(s);
+		}
+		
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Stepper");
+			s.m_Description.SetStringValue("Hello World Stepper Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Stepper);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(true);
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 1");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 2");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 3");
+			s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(0);
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Stepper Disabled");
+			s.m_Description.SetStringValue("Hello World Stepper Disabled Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Stepper);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(false);
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 1");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 2");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 3");
+			s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(0);
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Stepper On");
+			s.m_Description.SetStringValue("Hello World Stepper On Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Stepper);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(false);
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 1");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 2");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("Option 3");
+			s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(2);
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Slider");
+			s.m_Description.SetStringValue("Hello World Slider Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Slider);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(true);
+			s.m_SliderData.m_ShuttleMap.GetData().m_Value.SetValue(0.5f);
+			s.m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue("0.5");
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+			s.m_Text.SetStringValue("Hello Slider Disabled");
+			s.m_Description.SetStringValue("Hello World Slider Disabled Description");
+			s.m_ID.SetValue(id++);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Slider);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(false);
+			s.m_SliderData.m_ShuttleMap.GetData().m_Value.SetValue(0.5f);
+			s.m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue("0.5");
+			a_SettingList.AddItem(s);
+		}
+
+		// Initialize the rest of the settings after ours
+		_CreateDataModelOptions(a_arg1, a_SettingList);
+	}
+
+	void DebugHooks::Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+	{
+		char buffer[128];
+		sprintf_s(buffer, "Got a bool event: %d %s\n", EventData.m_SettingID, EventData.m_Value.Bool ? "true" : "false");
+		OutputDebugStringA(buffer);
+
+		_SettingsDataModelBoolEvent(a_arg1, EventData);
+	}
+
+	void DebugHooks::Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+	{
+		char buffer[128];
+		sprintf_s(buffer, "Got an integer event: %d %d\n", EventData.m_SettingID, EventData.m_Value.Int);
+		OutputDebugStringA(buffer);
+
+		if (auto settingTest = EventData.m_Model->FindSettingById(602))
+		{
+			OutputDebugStringA("Manually updating checkbox state\n");
+			settingTest->m_CheckBoxData.m_ShuttleMap.GetData().m_Value.SetValue(false);
+		}
+
+		_SettingsDataModelIntEvent(a_arg1, EventData);
+	}
+
+	void DebugHooks::Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+	{
+		char buffer[128];
+		sprintf_s(buffer, "Got a float event: %d %f\n", EventData.m_SettingID, EventData.m_Value.Float);
+		OutputDebugStringA(buffer);
+
+		if (EventData.m_SettingID >= 600) {
+			if (auto settingTest = EventData.m_Model->FindSettingById(EventData.m_SettingID)) {
+				char buffer[128];
+				sprintf_s(buffer, "%.0f%%", EventData.m_Value.Float * 100.0f);
+
+				settingTest->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(buffer);
+			}
+		}
+
+		_SettingsDataModelFloatEvent(a_arg1, EventData);
+	}
+
     void DebugHooks::Hook_CreateRenderTargetView(uintptr_t a1, ID3D12Resource* a_resource, DXGI_FORMAT a_format, uint8_t a4, uint16_t a5, uintptr_t a6)
     {
 		const auto textureDesc = a_resource->GetDesc();
@@ -83,14 +254,13 @@ namespace Hooks
 
 		_CreateDepthStencilView(a1, a_resource, a_format, a4, a5, a6);
     }
-#endif
 
     void Install()
 	{
-#ifndef NDEBUG
+//#ifndef NDEBUG
 	    Utils::LogBuffers();
 		DebugHooks::Hook();
-#endif
+//#endif
 		Hooks::Hook();
 		Patches::Patch();
 	}
