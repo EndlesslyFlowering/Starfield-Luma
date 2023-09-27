@@ -159,4 +159,21 @@ namespace Utils
 		INFO(logString)
 		INFO("===END LOGGING BUFFERS===")
     }
+
+    void SetBufferFormat(RE::BufferDefinition* a_buffer, RE::BS_DXGI_FORMAT a_format)
+    {
+		if (!a_buffer) {
+			return;
+		}
+
+		auto formatNames = Utils::GetDXGIFormatNameMap();
+		INFO("{} - changing from format {} to {}", a_buffer->bufferName, formatNames[Offsets::GetDXGIFormat(a_buffer->format)], formatNames[Offsets::GetDXGIFormat(a_format)])
+		a_buffer->format = a_format;
+    }
+
+    void SetBufferFormat(RE::Buffers a_buffer, RE::BS_DXGI_FORMAT a_format)
+    {
+		const auto buffer = (*Offsets::bufferArray)[static_cast<uint32_t>(a_buffer)];
+		SetBufferFormat(buffer, a_format);
+    }
 }

@@ -1,4 +1,6 @@
 #pragma once
+#include <d3d12.h>
+#include <dxgi1_4.h>
 
 namespace RE
 {
@@ -362,4 +364,26 @@ namespace RE
 		uint32_t unk4C;
 	};
 	static_assert(sizeof(BufferDefinition) == 0x50);
+
+	struct BGSSwapChainObject
+	{
+		HWND hwnd;
+		uint64_t unk08;
+		uint32_t unk10;
+		uint32_t bufferCount;
+		uint32_t width;
+		uint32_t height;
+		uint32_t unk20;
+		uint32_t sampleQuality;
+		BS_DXGI_FORMAT format;
+		uint64_t unk30;
+		uint64_t unk38;
+		uint64_t unk40;
+		uint64_t unk48;
+		IDXGISwapChain3* swapChainInterface;
+		uint64_t unk58;
+		ID3D12Resource** renderTargets;
+		uint64_t unk68;
+		HANDLE handle;
+	};
 }

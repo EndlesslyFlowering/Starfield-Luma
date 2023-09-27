@@ -4,8 +4,6 @@
 #include "RE/Buffers.h"
 #include "RE/SettingsDataModel.h"
 
-#include <dxgi1_6.h>
-
 namespace Hooks
 {
 	class Patches
@@ -17,24 +15,24 @@ namespace Hooks
 
 			switch (*settings->FrameBufferFormat) {
 			case 1:
-				SetBufferFormat(RE::Buffers::FrameBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM);
+                Utils::SetBufferFormat(RE::Buffers::FrameBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM);
                 break;
 			case 2:
-				SetBufferFormat(RE::Buffers::FrameBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
+                Utils::SetBufferFormat(RE::Buffers::FrameBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
 				break;
 			}
 
 			switch (*settings->ImageSpaceBufferFormat) {
 			case 1:
-				SetBufferFormat(RE::Buffers::ImageSpaceBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM);
+                Utils::SetBufferFormat(RE::Buffers::ImageSpaceBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM);
 				break;
 			case 2:
-				SetBufferFormat(RE::Buffers::ImageSpaceBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
+                Utils::SetBufferFormat(RE::Buffers::ImageSpaceBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
 				break;
 			}
 
 			if (*settings->UpgradeUIRenderTarget) {
-				SetBufferFormat(RE::Buffers::ScaleformCompositeBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
+                Utils::SetBufferFormat(RE::Buffers::ScaleformCompositeBuffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
 			}
 
 			{
@@ -57,49 +55,47 @@ namespace Hooks
 		static RE::BufferDefinition* GetBufferFromString(std::string_view a_bufferName);
 
 		static void UpgradeRenderTarget(RE::BufferDefinition* a_buffer, RE::BS_DXGI_FORMAT a_format, bool a_bLimited);
-		static void SetBufferFormat(RE::BufferDefinition* a_buffer, RE::BS_DXGI_FORMAT a_format);
-		static void SetBufferFormat(RE::Buffers a_buffer, RE::BS_DXGI_FORMAT a_format);
 	};
 
 	class Hooks
 	{
 	public:
-		struct UnkObject
-		{
-			uint64_t unk00;
-			uint64_t unk08;
-			uint64_t unk10;
-			uint64_t unk18;
-			uint64_t unk20;
-			uint64_t unk28;
-			uint64_t unk30;
-			uint64_t unk38;
-			uint64_t unk40;
-			uint64_t unk48;
-			IDXGISwapChain3* swapChainInterface;
-		};
-
 		static void Hook()
 		{
-			const auto settings = Settings::Main::GetSingleton();
-			if (*settings->FrameBufferFormat != 0) {
-				const auto scan = static_cast<uint8_t*>(dku::Hook::Assembly::search_pattern<"E8 ?? ?? ?? ?? 8B 4D A8 8B 45 AC">());
-				if (!scan) {
-					ERROR("Failed to find color space hook")
-				}
-				const auto callsiteOffset = *reinterpret_cast<int32_t*>(scan + 1);
-				const auto UnkFuncCallsite = AsAddress(scan + 5 + callsiteOffset + 0x3EA);
-
-				_UnkFunc = dku::Hook::write_call<5>(UnkFuncCallsite, Hook_UnkFunc);  // 32E7856
-
-				INFO("Found color space hook callsite at {:X}", UnkFuncCallsite)
+			const auto scan = static_cast<uint8_t*>(dku::Hook::Assembly::search_pattern<"E8 ?? ?? ?? ?? 8B 4D A8 8B 45 AC">());
+			if (!scan) {
+				ERROR("Failed to find color space hook")
 			}
+			const auto callsiteOffset = *reinterpret_cast<int32_t*>(scan + 1);
+			const auto UnkFuncCallsite = AsAddress(scan + 5 + callsiteOffset + 0x3EA);
+
+			_UnkFunc = dku::Hook::write_call<5>(UnkFuncCallsite, Hook_UnkFunc);  // 32E7856
+
+			INFO("Found color space hook callsite at {:X}", UnkFuncCallsite)
+
+			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BD2F9, Hook_CreateDataModelOptions);
+			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB63E, Hook_SettingsDataModelBoolEvent);
+			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB937, Hook_SettingsDataModelIntEvent);
+			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB8EB, Hook_SettingsDataModelFloatEvent);
 		}
 
 	private:
-		static void Hook_UnkFunc(uintptr_t a1, UnkObject* a2);
+	    static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
 
+		static void RecreateSwapChain(RE::BGSSwapChainObject* a_bgsSwapchainObject, RE::BS_DXGI_FORMAT a_newFormat);
+		static void ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable);
+
+		static void Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;
+
+		static void Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList);
+		static inline std::add_pointer_t<decltype(Hook_CreateDataModelOptions)> _CreateDataModelOptions;
+		static void Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelBoolEvent)> _SettingsDataModelBoolEvent;
+		static void Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelIntEvent)> _SettingsDataModelIntEvent;
+		static void Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelFloatEvent)> _SettingsDataModelFloatEvent;
 	};
 
 	class DebugHooks
@@ -107,7 +103,7 @@ namespace Hooks
 	public:
 		static void Hook()
 		{
-			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BD2F9, Hook_CreateDataModelOptions);
+			//_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BD2F9, Hook_CreateDataModelOptions);
 			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB63E, Hook_SettingsDataModelBoolEvent);
 			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB937, Hook_SettingsDataModelIntEvent);
 			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB8EB, Hook_SettingsDataModelFloatEvent);
