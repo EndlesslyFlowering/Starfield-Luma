@@ -33,42 +33,186 @@ namespace Hooks
 			return;
 		}
 
-		SetBufferFormat(a_buffer, a_newFormat);
+        Utils::SetBufferFormat(a_buffer, a_newFormat);
     }
 
-    void Patches::SetBufferFormat(RE::BufferDefinition* a_buffer, RE::BS_DXGI_FORMAT a_newFormat)
+    void Hooks::RecreateSwapChain(RE::BGSSwapChainObject* a_bgsSwapchainObject, RE::BS_DXGI_FORMAT a_newFormat)
     {
-		if (!a_buffer) {
-		    return;
+		if (a_bgsSwapchainObject->format != a_newFormat) {
+			a_bgsSwapchainObject->format = a_newFormat;
+			Offsets::RecreateSwapChain(*reinterpret_cast<void**>(*Offsets::unkRecreateSwapChainArg1Ptr + 0x28), a_bgsSwapchainObject, a_bgsSwapchainObject->width, a_bgsSwapchainObject->height, *Offsets::unkRecreateSwapChainArg5);
+
+			// set correct color space
+			DXGI_COLOR_SPACE_TYPE newColorSpace;
+			switch (a_newFormat) {
+			case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_B8G8R8A8_UNORM:
+			default:
+				newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+				break;
+			case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM:
+				newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+			    break;
+			case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT:
+				newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+			}
+			a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(newColorSpace);
+		}
+    }
+
+    void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable)
+    {
+		if (const auto maxLuminanceSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kMaxLuminance))) {
+		    maxLuminanceSetting->m_Enabled.SetValue(a_bEnable);
 		}
 
-		auto formatNames = Utils::GetDXGIFormatNameMap();
-		INFO("{} - changing from format {} to {}", a_buffer->bufferName, formatNames[Offsets::GetDXGIFormat(a_buffer->format)], formatNames[Offsets::GetDXGIFormat(a_newFormat)])
-		a_buffer->format = a_newFormat;
+		if (const auto paperwhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kPaperwhite))) {
+			paperwhiteSetting->m_Enabled.SetValue(a_bEnable);
+		}
     }
 
-    void Patches::SetBufferFormat(RE::Buffers a_buffer, RE::BS_DXGI_FORMAT a_format)
-	{
-		const auto buffer = (*Offsets::bufferArray)[static_cast<uint32_t>(a_buffer)];
-		SetBufferFormat(buffer, a_format);
-	}
-
-    void Hooks::Hook_UnkFunc(uintptr_t a1, UnkObject* a2)
+    void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
+		// save the pointer for later
+		swapChainObject = a_bgsSwapchainObject;
+
 		const auto settings = Settings::Main::GetSingleton();
 		switch (*settings->FrameBufferFormat) {
 		case 1:
-			a2->swapChainInterface->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
+			a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020);
 			break;
 		case 2:
-			a2->swapChainInterface->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709);
+			a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709);
 			break;
 		}
 
-		return _UnkFunc(a1, a2);		
+		return _UnkFunc(a1, a_bgsSwapchainObject);		
     }
 
-	void DebugHooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
+    void Hooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
+    {
+		const auto settings = Settings::Main::GetSingleton();
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+			constexpr auto id = static_cast<unsigned int>(Settings::SettingID::kHDR);
+
+			s.m_Text.SetStringValue("HDR");
+			s.m_Description.SetStringValue("Sets the game's output mode between SDR, HDR10 PQ, or HDR10 scRGB.");
+			s.m_ID.SetValue(id);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Stepper);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(true);
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("OFF");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("HDR10 PQ");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("HDR10 scRGB");
+			s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(*settings->FrameBufferFormat);
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+			constexpr auto id = static_cast<unsigned int>(Settings::SettingID::kMaxLuminance);
+
+			s.m_Text.SetStringValue("Max Luminance");
+			s.m_Description.SetStringValue("Sets the maximum luminance in HDR modes.");
+			s.m_ID.SetValue(id);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Slider);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(settings->IsHDREnabled());
+			s.m_SliderData.m_ShuttleMap.GetData().m_Value.SetValue(settings->GetMaxLuminanceSliderPercentage());
+			s.m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(settings->GetMaxLuminanceText().data());
+			a_SettingList.AddItem(s);
+		}
+
+		{
+			auto hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+			auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+			constexpr auto id = static_cast<unsigned int>(Settings::SettingID::kPaperwhite);
+
+			s.m_Text.SetStringValue("Paperwhite Brightness");
+			s.m_Description.SetStringValue("Sets the paperwhite brightness used in HDR modes.");
+			s.m_ID.SetValue(id);
+			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Slider);
+			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+			s.m_Enabled.SetValue(settings->IsHDREnabled());
+			s.m_SliderData.m_ShuttleMap.GetData().m_Value.SetValue(settings->GetPaperwhiteSliderPercentage());
+			s.m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(settings->GetPaperwhiteText().data());
+			a_SettingList.AddItem(s);
+		}
+
+		// Initialize the rest of the settings after ours
+		_CreateDataModelOptions(a_arg1, a_SettingList);
+    }
+
+    void Hooks::Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+    {
+		_SettingsDataModelBoolEvent(a_arg1, EventData);
+    }
+
+    void Hooks::Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+    {
+		if (EventData.m_SettingID == static_cast<int>(Settings::SettingID::kHDR)) {
+			const auto settings = Settings::Main::GetSingleton();
+
+			const auto prevValue = *settings->FrameBufferFormat;
+			const auto newValue = EventData.m_Value.Int;
+			if (prevValue != newValue) {
+				*settings->FrameBufferFormat = newValue;
+				
+				RE::BS_DXGI_FORMAT newFormat;
+				switch (*settings->FrameBufferFormat) {
+				case 0:
+				default:
+					newFormat = RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_B8G8R8A8_UNORM;
+					break;
+				case 1:
+					newFormat = RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM;
+					break;
+				case 2:
+					newFormat = RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT;
+					break;
+				}
+
+				// the value in the buffer definition is not going to be read by the game anymore by this point, but changing it anyway in case something else tries to read it
+				Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
+
+				if (prevValue == 0) {
+					ToggleEnableHDRSubSettings(EventData.m_Model, true);
+				} else if (newValue == 0) {
+					ToggleEnableHDRSubSettings(EventData.m_Model, false);
+				}
+
+				RecreateSwapChain(swapChainObject, newFormat);
+			}
+		}
+
+		_SettingsDataModelIntEvent(a_arg1, EventData);
+    }
+
+    void Hooks::Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& EventData)
+    {
+		if (EventData.m_SettingID == static_cast<int>(Settings::SettingID::kMaxLuminance)) {
+			const auto settings = Settings::Main::GetSingleton();
+
+			settings->SetMaxLuminanceFromSlider(EventData.m_Value.Float);
+			if (auto setting = EventData.m_Model->FindSettingById(EventData.m_SettingID)) {
+				setting->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(settings->GetMaxLuminanceText().data());
+			}
+
+			//settingTest->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(buffer);
+		} else if (EventData.m_SettingID == static_cast<int>(Settings::SettingID::kPaperwhite)) {
+			const auto settings = Settings::Main::GetSingleton();
+
+			settings->SetPaperwhiteFromSlider(EventData.m_Value.Float);
+			if (auto setting = EventData.m_Model->FindSettingById(EventData.m_SettingID)) {
+				setting->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(settings->GetPaperwhiteText().data());
+			}
+		}
+    }
+
+    void DebugHooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
 	{
 		int id = 600;
 
@@ -259,7 +403,7 @@ namespace Hooks
 	{
 //#ifndef NDEBUG
 	    Utils::LogBuffers();
-		DebugHooks::Hook();
+		//DebugHooks::Hook();
 //#endif
 		Hooks::Hook();
 		Patches::Patch();
