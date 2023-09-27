@@ -24,6 +24,7 @@ RWTexture3D<float4> OutMixetLUT : register(u0, space8);
 struct LUTAnalysis
 {
     float3 black;
+    float blackY;
     float3 white;
     float whiteY;
 #if UNUSED_PARAMS
@@ -33,7 +34,6 @@ struct LUTAnalysis
     float maxY;
     float averageY;
     float range;
-    float blackY;
     float medianY;
     float averageChannel;
     float averageRed;
@@ -61,12 +61,12 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
     Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0)).rgb);
+    Analysis.blackY = Luminance(Analysis.black);
     Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
     Analysis.whiteY = Luminance(Analysis.white);
 #if UNUSED_PARAMS
     Analysis.minY = FLT_MAX;
     Analysis.maxY = -FLT_MAX;
-    Analysis.blackY = Luminance(Analysis.black);
 
     float3 colors = 0.f;
     float Ys = 0.f;
@@ -131,60 +131,91 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 
 // Analyzes each LUT texel and normalize their range.
 // Slow but effective.
-float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, bool SDRRange = false)
+float3 PatchLUTColor(Texture2D<float3> LUT, int3 UVW, float3 neutralLUTColor, bool SDRRange = false)
 {
     LUTAnalysis analysis;
     AnalyzeLUT(LUT, analysis);
 
-    float3 color = gamma_sRGB_to_linear(LUT.Load(UVW).rgb);
+    float3 color = gamma_sRGB_to_linear(LUT.Load(UVW));
     const float3 originalColor = color;
 
-    //TODO: convert to using lerp function???
-    // Reduce all colors by raised level of black texel
-    // Normalize as relative to their distance from black ("neutralLUTColor" is xyz coordinates)
-    const float3 reducedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f / (1.f - analysis.black), 1.f);
-    
-    // Reapply black level as a multiple (applies shadow tint)
-    const float3 increasedColor = linearNormalization<float3>(neutralLUTColor, 0.f, 1.f, 1.f + analysis.black, 1.f);
-    
-    // Apply to base color
-    color = (1.f - ((1.f - color) * reducedColor)) * increasedColor;
+    if ((analysis.whiteY > analysis.blackY)
+        && ((analysis.whiteY - analysis.blackY) < 1.f)) {
+        // LUT is clamped and not inversed
 
+        // Lower black floor (shadow pass):
+        // In 3D space, drags all points towards 0 relative to how much black
+        // point has moved (eg: -4, -10, -5)
+        // Distance from 0 is factor to decide how much each pixel should move,
+        // with (1) (white) not moving at all.
+        // *Applying to each channel individually also removes tint
+        const float3 reduceFactor = linearNormalization<float3>(
+            neutralLUTColor, 
+            0.f,
+            1.f,
+            1.f / (1.f - analysis.black),
+            1.f);
 
-    const float blackDistance = hypot3(neutralLUTColor);
-    const float whiteDistance = hypot3(1.f - neutralLUTColor);
-    const float totalRange = (blackDistance + whiteDistance);
+        // Reapply tint without raising black floor:
+        // In 3D space, shift points away from black **per channel** to
+        // reintroduce tint back to the pixels. Use multiplication to avoid
+        // raised black floor.
+        const float3 increaseFactor = linearNormalization<float3>(
+            neutralLUTColor,
+            0.f,
+            1.f,
+            1.f + analysis.black,
+            1.f);
 
-    const float sourceY = Luminance(color);
-    if (sourceY > 0.f) // Black will always stay black (and should)
-    {
-        const float increasedY = linearNormalization(whiteDistance, 0.f, totalRange, 1.f / analysis.whiteY, 1.f);
-        const float targetY = (1.f - (1.f - sourceY)) * increasedY;
+        // color * reduce = [0,1] relative to XYZ:
+        // result *= black tint
+        // (0,0,0) must always compute to 0
+        // (1,1,1) must remain unchanged
+        // Scaling is strongest at 0, and weakest at 1 (none)
+        color = (1.f - ((1.f - color) * reduceFactor)) * increaseFactor;
 
-        if (targetY >= 0.9999f && targetY <= 1.0005f)
-        {
-            color = 1.f; // Intentionally targeting pure white (1,1,1)
+        const float blackDistance = hypot3(neutralLUTColor);
+        const float whiteDistance = hypot3(1.f - neutralLUTColor);
+        const float totalRange = (blackDistance + whiteDistance);
+
+        const float currentY = Luminance(color);
+        if (currentY > 0.f) { // Skip if black
+            float shadowRaise = 1.f;
+            if (currentY < analysis.blackY) {
+                shadowRaise = linearNormalization(
+                    currentY,
+                    0.f,
+                    analysis.blackY,
+                    1.f + (1.f - analysis.blackY),
+                    1.f);
+            }
+            const float highlightsRaise = linearNormalization(
+                whiteDistance, 
+                0.f, 
+                totalRange, 
+                1.f / analysis.whiteY,
+                1.f);
+            const float targetY = (1.f - (1.f - currentY))
+                * highlightsRaise
+                * shadowRaise;
+
+            if (targetY >= 0.9999f && targetY <= 1.0005f) {
+                color = 1.f; // Intentionally targeting pure white (1,1,1)
+            } else if (SDRRange && targetY >= 0.999f) {
+                color = 1.f; // Clamp
+            } else {
+                // targetY could be on LUTs (raised black point and dark blues)
+                color *= max(targetY, 0.f) / currentY;
+            }
+        } else {
+            // TODO: Consider removal since no longer scaling
+            color = 0; // Color may have gone below 0 when scaling
         }
-        else if (SDRRange && targetY >= 0.999f)
-        {
-            color = 1.f; // Clamp
-        }
-        else
-        {
-            // targetY could be on LUTs (raised black point and dark blues)
-            color *= max(targetY, 0.f) / sourceY;
-        }
-    }
-    else
-    {
-        // TODO: Consider removal since no longer scaling
-        color = 0; // Color may have gone below 0 when scaling
-    }
 
-    // Optional step to keep colors in the SDR range.
-    if (SDRRange)
-    {
-        color = saturate(color);
+        // Optional step to keep colors in the SDR range.
+        if (SDRRange) {
+            color = saturate(color);
+        }
     }
 
     color = lerp(originalColor, color, LUTCorrectionPercentage);
@@ -218,7 +249,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 #if LUT_IMPROVEMENT_TYPE == 1
     const bool SDRRange = false;
     float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
-    float3 LUT2Color = PatchLUTColor(LUT3, inUVW, neutralLUTColor, SDRRange);
+    float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);
     float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralLUTColor, SDRRange);
     float3 LUT4Color = PatchLUTColor(LUT4, inUVW, neutralLUTColor, SDRRange);
 #elif LUT_IMPROVEMENT_TYPE == 2
