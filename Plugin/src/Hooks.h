@@ -107,10 +107,10 @@ namespace Hooks
 	public:
 		static void Hook()
 		{
-			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BBAA9, Hook_CreateDataModelOptions);
-			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20C9DEE, Hook_SettingsDataModelBoolEvent);
-			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CA0E7, Hook_SettingsDataModelIntEvent);
-			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CA09B, Hook_SettingsDataModelFloatEvent);
+			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BD2F9, Hook_CreateDataModelOptions);
+			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB63E, Hook_SettingsDataModelBoolEvent);
+			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB937, Hook_SettingsDataModelIntEvent);
+			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB8EB, Hook_SettingsDataModelFloatEvent);
 
 #if 0
 			const auto callsite1 = AsAddress(dku::Hook::Module::get().base() + 0x32ED294);
