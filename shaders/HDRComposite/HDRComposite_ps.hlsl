@@ -719,31 +719,39 @@ PSOutput PS(PSInput psInput)
 
     float3 color = tonemappedColor;
 
+    float3 lutColor = color;
+
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 
 #if FIX_WRONG_SRGB_GAMMA
 
-    float3 colorForLutSampling = gamma_linear_to_sRGB(color);
+    lutColor = gamma_linear_to_sRGB(lutColor);
 
-#else
+#elif LUT_FIX_GAMMA_MAPPING
 
     //read gamma ini value, defaulting at 2.4 (makes little sense)
     float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
     //weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
-    float3 colorForLutSampling = (pow(color, inverseGamma) * 1.055f) - 0.055f;
-    colorForLutSampling = max(colorForLutSampling, 0.f); // Unnecessary as the LUT sampling is already clamped.
+    lutColor = (pow(lutColor, inverseGamma) * 1.055f) - 0.055f;
+    lutColor = max(lutColor, 0.f); // Unnecessary as the LUT sampling is already clamped.
 
 #endif // FIX_WRONG_SRGB_GAMMA
 
 #if LUT_USE_TETRAHEDRAL_INTERPOLATION
 
-    float3 LutColor = TetrahedralInterpolation(Lut, colorForLutSampling);
+    lutColor = TetrahedralInterpolation(Lut, lutColor);
 
 #else
 
-    float3 LutColor = Lut.Sample(Sampler0, colorForLutSampling * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+    lutColor = Lut.Sample(Sampler0, lutColor * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 
 #endif //LUT_USE_TETRAHEDRAL_INTERPOLATION
+
+#if !LUT_FIX_GAMMA_MAPPING
+
+    lutColor = gamma_sRGB_to_linear(lutColor);
+
+#endif // !LUT_FIX_GAMMA_MAPPING
 
 #if LUT_CUSTOM_STRENGTH
 
@@ -755,13 +763,7 @@ PSOutput PS(PSInput psInput)
 
 #endif // LUT_CUSTOM_STRENGTH
 
-    color = lerp(LutColor, color, LutMaskAlpha);
-
-#if !LUT_FIX_GAMMA_MAPPING
-
-    color = pow(color, 2.2f);
-
-#endif // !LUT_FIX_GAMMA_MAPPING
+    color = lerp(lutColor, color, LutMaskAlpha);
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
