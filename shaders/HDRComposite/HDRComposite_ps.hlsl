@@ -14,13 +14,13 @@
 // Also sets "ENABLE_LUT", "ENABLE_POST_PROCESS" and "ENABLE_INVERSE_TONEMAP"
 #define ENABLE_TONEMAP 1
 #define ENABLE_POST_PROCESS 1
-#define ENABLE_PP_CONTRAST_ADJUSTMENT 1
+#define ENABLE_SIGMOIDAL_CONTRAST_ADJUSTMENT 1
 #define ENABLE_LUT 1
+#define LUT_USE_TETRAHEDRAL_INTERPOLATION 1
 #define ENABLE_REPLACED_TONEMAP 1
 #define ENABLE_INVERSE_POST_PROCESS 0
 #define CLAMP_INPUT_OUTPUT 1
 
-#define LUT_USE_TETRAHEDRAL_INTERPOLATION 1
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -455,7 +455,22 @@ float3 PostProcess(float3 Color, inout float ColorLuminance)
     Color *= brightnessMultiplier;
 
 
-#if ENABLE_PP_CONTRAST_ADJUSTMENT
+#if ENABLE_SIGMOIDAL_CONTRAST_ADJUSTMENT
+
+    // sigmoidal contrast adjustment doesn't clip colors
+    // https://www.imagemagick.org/Usage/color_mods/#sigmoidal
+
+    // * 2.5 to somewhat match default contrast adjustment
+    float c = max(contrastIntensity * 2.5f, EPSILON); // protect against division by zero
+    float s = contrastMidPoint; // can be set to 0.5 for better darkening of shadows
+
+    float minus = -1 / (1 + exp(c * s));
+
+    // there should be some optimisation left here
+    Color = (1 / (1 + exp(c * (s - Color))) + minus)
+          / (1 / (1 + exp(c * (s - 1)))     + minus);
+
+#else
 
     // Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
     // The higher the distance from the contrast middle point, the more contrast will change the color.
