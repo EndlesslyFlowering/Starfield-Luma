@@ -10,11 +10,9 @@
 #define HDR_GAME_PAPER_WHITE 1.f
 #define HDR_UI_PAPER_WHITE 2.5f
 
-
-// This possibly shifts colors a lot, but it's mathematically correct, it's also necessary for HDR LUTs to work.
+// Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
+// This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
 #define LUT_FIX_GAMMA_MAPPING 1
-#define LUT_CUSTOM_STRENGTH 1
-#define LUT_ADDITIONAL_NEUTRAL_PERCENTAGE 1
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 

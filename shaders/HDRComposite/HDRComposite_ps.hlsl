@@ -8,10 +8,12 @@
 //#define APPLY_CINEMATICS
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
-#define SDR_USE_GAMMA_2_2 0
+// This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping, though the SDR tonemapper had still been developed with sRGB<->2.2 mismatch.
+#define SDR_USE_GAMMA_2_2 1
+// Suggested if "LUT_FIX_GAMMA_MAPPING" is true
 #define FIX_WRONG_SRGB_GAMMA 1
 
-// Also sets "ENABLE_LUT", "ENABLE_POST_PROCESS" and "ENABLE_INVERSE_TONEMAP"
+// Also disables "ENABLE_LUT", "ENABLE_POST_PROCESS" and "ENABLE_INVERSE_TONEMAP"
 #define ENABLE_TONEMAP 1
 #define ENABLE_POST_PROCESS 1
 #define ENABLE_SIGMOIDAL_CONTRAST_ADJUSTMENT 1
@@ -409,7 +411,7 @@ float3 DICETonemap(float3 Color, float MaxOutputLuminance)
 
 float FindLuminanceToRestore(float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
 {
-    // Try to restore any luminance above "color", as it would have been lost during tone mapping.
+    // Try to restore any luminance that would have been lost during tone mapping (e.g. tonemapping, post process, LUTs, ... can all clip values).
     //
     // To achieve this, we re-apply the lost luminance, but only by the inverse amount the luminance changed during the color correction.
     // e.g. if the color correction fully changed the luminance, then we don't change it any further,
@@ -506,12 +508,13 @@ float3 PostProcess_Inverse(float3 Color, float ColorLuminance)
     return Color;
 }
 
-
+// Takes input coordinates. Returns output color in linear space (also works in sRGB but it's not ideal).
 float3 TetrahedralInterpolation(
     Texture3D<float3> Lut,
-    float3            Color)
+    float3            EncodedColor)
 {
-    float3 coords = Color.rgb * (LUT_SIZE - 1);
+    float3 coords = EncodedColor.rgb * (LUT_SIZE - 1);
+    float3 color = 0;
 
     // baseInd is on [0,LUT_SIZE-1]
     int3 baseInd = coords;
@@ -540,7 +543,7 @@ float3 TetrahedralInterpolation(
             float3 f2 = fract.r - fract.g;
             float3 f3 = fract.g - fract.b;
 
-            Color = (f2 * v2) + (f3 * v3);
+            color = (f2 * v2) + (f3 * v3);
         }
         else if (fract.r >= fract.b)  // R > B > G
         {
@@ -555,7 +558,7 @@ float3 TetrahedralInterpolation(
             float3 f2 = fract.r - fract.b;
             float3 f3 = fract.b - fract.g;
 
-            Color.rgb = (f2 * v2) + (f3 * v3);
+            color = (f2 * v2) + (f3 * v3);
         }
         else  // B > R > G
         {
@@ -570,12 +573,12 @@ float3 TetrahedralInterpolation(
             float3 f2 = fract.b - fract.r;
             float3 f3 = fract.r - fract.g;
 
-            Color = (f2 * v2) + (f3 * v3);
+            color = (f2 * v2) + (f3 * v3);
         }
     }
     else
     {
-         if (fract.g <= fract.b)  // B > G > R
+        if (fract.g <= fract.b)  // B > G > R
         {
             nextInd = baseInd + int3(0, 0, 1);
             float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
@@ -588,7 +591,7 @@ float3 TetrahedralInterpolation(
             float3 f2 = fract.b - fract.g;
             float3 f3 = fract.g - fract.r;
 
-            Color = (f2 * v2) + (f3 * v3);
+            color = (f2 * v2) + (f3 * v3);
         }
         else if (fract.r >= fract.b)  // G > R > B
         {
@@ -603,7 +606,7 @@ float3 TetrahedralInterpolation(
             float3 f2 = fract.g - fract.r;
             float3 f3 = fract.r - fract.b;
 
-            Color = (f2 * v2) + (f3 * v3);
+            color = (f2 * v2) + (f3 * v3);
         }
         else  // G > B > R
         {
@@ -618,11 +621,11 @@ float3 TetrahedralInterpolation(
             float3 f2 = fract.g - fract.b;
             float3 f3 = fract.b - fract.r;
 
-            Color = (f2 * v2) + (f3 * v3);
+            color = (f2 * v2) + (f3 * v3);
         }
     }
 
-    return Color + (f1 * v1) + (f4 * v4);
+    return color + (f1 * v1) + (f4 * v4);
 }
 
 
@@ -636,7 +639,7 @@ PSOutput PS(PSInput psInput)
     // Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
     inputColor = max(inputColor, 0.f);
 
-#endif
+#endif // CLAMP_INPUT_OUTPUT
 
 #if defined(APPLY_BLOOM)
 
@@ -728,63 +731,52 @@ PSOutput PS(PSInput psInput)
     tonemappedColor = saturate(tonemappedColor);
 
     // This is the luminance lost by clamping SDR tonemappers to the 0-1 range, and again by the fact that LUTs only take 0-1 range input.
-    const float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor); //TODO: clip any negative values here? The unclamped tonemapper might actually have negative "lost" luminance.
+    const float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor);
 
     const float preColorCorrectionLuminance = Luminance(tonemappedColor);
 
     float3 color = tonemappedColor;
 
-    float3 lutColor = color;
-
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 
 #if FIX_WRONG_SRGB_GAMMA
 
-    lutColor = gamma_linear_to_sRGB(lutColor);
+    const float3 LUTCoordinates = gamma_linear_to_sRGB(color);
 
-#elif LUT_FIX_GAMMA_MAPPING
+#else
 
-    //read gamma ini value, defaulting at 2.4 (makes little sense)
+    // Read gamma ini value, defaulting at 2.4 (makes little sense)
     float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
-    //weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
-    lutColor = (pow(lutColor, inverseGamma) * 1.055f) - 0.055f;
-    lutColor = max(lutColor, 0.f); // Unnecessary as the LUT sampling is already clamped.
+    // Weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
+    const float3 LUTCoordinates = max((pow(color, inverseGamma) * 1.055f) - 0.055f, 0.f); // Does "max()" is unnecessary as LUT sampling is already clamped.
 
 #endif // FIX_WRONG_SRGB_GAMMA
 
 #if LUT_USE_TETRAHEDRAL_INTERPOLATION
 
-    lutColor = TetrahedralInterpolation(Lut, lutColor);
+    const float3 lutColor = TetrahedralInterpolation(Lut, LUTCoordinates);
 
 #else
 
-    lutColor = Lut.Sample(Sampler0, lutColor * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+    const float3 lutColor = Lut.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 
 #endif //LUT_USE_TETRAHEDRAL_INTERPOLATION
 
 #if !LUT_FIX_GAMMA_MAPPING
 
-    lutColor = gamma_sRGB_to_linear(lutColor);
+    lutColor = gamma_sRGB_to_linear(lutColor); // We always work in linear space
 
 #endif // !LUT_FIX_GAMMA_MAPPING
 
-#if LUT_CUSTOM_STRENGTH
-
     float LutMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
-
-#else
-
-    float LutMaskAlpha = LutMask.Sample(Sampler0, psInput.TEXCOORD).x;
-
-#endif // LUT_CUSTOM_STRENGTH
 
     color = lerp(lutColor, color, LutMaskAlpha);
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
-    const float postColorCorrectionLuminance = Luminance(color);
-
 #if ENABLE_HDR
+
+    const float postColorCorrectionLuminance = Luminance(color);
 
     // Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation
     color *= FindLuminanceToRestore(tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
@@ -795,6 +787,7 @@ PSOutput PS(PSInput psInput)
 
     //TODO: passing in the previous luminance might not be the best, though is there any other way really?
     //Should we at least shift it by how much the LUT shifted the luminance? To invert it more correctly.
+    //If we did this, we should also move FindLuminanceToRestore() to be after it?
     color = PostProcess_Inverse(color, prePostProcessColorLuminance);
 
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
@@ -842,10 +835,10 @@ PSOutput PS(PSInput psInput)
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
     color *= HDR_GAME_PAPER_WHITE;
-
-    //const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
+    
     //TODO: find a tonemapper that looks more like Hable?
-    //color = DICETonemap(color, maxOutputLuminance);
+    const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
+    color = DICETonemap(color, maxOutputLuminance);
 
 #else
 
@@ -857,26 +850,26 @@ PSOutput PS(PSInput psInput)
 
     color = clamp(color, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
 
-#endif
+#endif // CLAMP_INPUT_OUTPUT
 
-#else
+#else // ENABLE_HDR
 
-#if SDR_USE_GAMMA_2_2 //TODO: This makes sense to have if we fix up the LUTs, though the SDR tonemapper had still been developed with sRGB<->2.2 mismatch
+#if SDR_USE_GAMMA_2_2
 
     color = pow(color, 1.f / 2.2f);
 
 #else
 
-    // Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma
+    // Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
     color = gamma_linear_to_sRGB(color);
+
+#endif // SDR_USE_GAMMA_2_2
 
 #if CLAMP_INPUT_OUTPUT
 
     color = saturate(color);
 
 #endif // CLAMP_INPUT_OUTPUT
-
-#endif // SDR_USE_GAMMA_2_2
 
 #endif // ENABLE_HDR
 
