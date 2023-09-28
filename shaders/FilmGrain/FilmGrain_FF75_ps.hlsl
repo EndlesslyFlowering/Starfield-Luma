@@ -75,9 +75,11 @@ void frag_main()
     float uniqueX = randomNormalized1 + TEXCOORD.x;
     float uniqueY = (randomNormalized2 + TEXCOORD.y) * filmGrainHalfSize;
     
+    // Unique each frame and texel. (Is it though?)
     float seed = (uniqueX + uniqueY);
-    // Random number between -1 and -1;
-    // luminanceShift at 0 is black, 0.5 unchanged, 1 negative of current texel
+
+    // Generate a random number between -1 and -1;
+    // luminanceShift at -1 is black, 0 unchanged, 1 negative of current texel
     float luminanceShift = (bethesdaRandom(seed) * 2.f) - 1.f;
 
 #if 0 // WIP fixes
