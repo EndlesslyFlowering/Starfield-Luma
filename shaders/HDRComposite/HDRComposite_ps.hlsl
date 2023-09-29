@@ -905,6 +905,8 @@ PSOutput PS(PSInput psInput)
             break;
     }
     
+    const float midGrayScale = midGrayOut / midGrayIn;
+    
 #if ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
     color = PostProcess(color, prePostProcessColorLuminance, midGrayScale);
@@ -912,7 +914,6 @@ PSOutput PS(PSInput psInput)
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
 #if ENABLE_LUMINANCE_RESTORE //TODO: this will go beyond the max output nits if "ENABLE_AUTOHDR" is true, we need to fix a way to make them work together (maybe re-tonemap always at the end?)
-    float midGrayScale = midGrayOut / midGrayIn;
     // Change the "tonemapLostLuminance" from being in the tonemapped SDR (0-1) range to the untonemapped HDR image range (by scaling it by the mid gray change, which is the best we can do).
     // This will also acknowledge any clipped luminance from the range beyond 0-1.
     tonemapLostLuminance *= midGrayScale;
