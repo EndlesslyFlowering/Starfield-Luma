@@ -2,6 +2,10 @@
 
 // Rec.709 SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_BT709 = 80.f;
+static const float ReferenceWhiteNits_BT2408 = 203.f;
+
+// SDR mid gray
+static const float MidGray = 0.18f;
 
 // SMPTE ST 2084 (Perceptual Quantization) is only defined until this amount of nits.
 // This is also the max each color channel can have in HDR10.

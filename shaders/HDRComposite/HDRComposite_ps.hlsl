@@ -11,16 +11,20 @@
 // This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping, though the SDR tonemapper had still been developed with sRGB<->2.2 mismatch.
 #define SDR_USE_GAMMA_2_2 1
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
-#define FIX_WRONG_SRGB_GAMMA 1
+#define FIX_WRONG_SRGB_GAMMA_FORMULA 1
 
-// Also disables "ENABLE_LUT", "ENABLE_POST_PROCESS" and "ENABLE_INVERSE_TONEMAP"
+// This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
 #define ENABLE_POST_PROCESS 1
-#define ENABLE_SIGMOIDAL_CONTRAST_ADJUSTMENT 1
+// 0 original (weak, generates values beyond 0-1 which then get clipped), 1 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks), 2 Sigmoidal (smoothest looking, but harder to match)
+#define POST_PROCESS_CONTRAST_TYPE 1
 #define ENABLE_LUT 1
-#define LUT_USE_TETRAHEDRAL_INTERPOLATION 1
+#define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
 #define ENABLE_REPLACED_TONEMAP 1
+// Use AutoHDR as "inverse tonemapper" (maintains a look closer to the original)
+#define ENABLE_AUTOHDR 1
 #define ENABLE_INVERSE_POST_PROCESS 0
+#define ENABLE_LUMINANCE_RESTORE 1
 #define CLAMP_INPUT_OUTPUT 1
 
 
@@ -93,6 +97,8 @@ struct PSOutput
 
 static const float LUTStrength = 1.f;
 static const float RestorePreLUTLuminance = 1.f;
+// 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
+static const uint ForceTonemapper = 0;
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
@@ -347,6 +353,9 @@ float3 Hable_Inverse(
   float  shoulderSegment_B,
   float  invScale)
 {
+    // There's no inverse formula for colors beyond the 0-1 range
+    InputColor = saturate(InputColor);
+    
     float3 itmColor;
 
     for (uint channel = 0; channel < 3; channel++)
@@ -409,7 +418,24 @@ float3 DICETonemap(float3 Color, float MaxOutputLuminance)
     return Color;
 }
 
-float FindLuminanceToRestore(float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
+// AutoHDR pass to generate some HDR brightess out of an SDR signal (it has no effect if HDR is not engaged).
+// This is hue conserving and only really affects highlights.
+// https://github.com/Filoppi/PumboAutoHDR
+float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
+{
+    static const float AutoHDRShoulderPow = 3.5f; //TODO: exposure to user?
+    
+    const float SDRRatio = Luminance(Color);
+	// Limit AutoHDR brightness, it won't look good beyond a certain level.
+	// The paper white multiplier is applied later so we account for that.
+    const float AutoHDRMaxWhite = max(MaxOutputNits / PaperWhite, WhiteNits_BT709) / WhiteNits_BT709;
+    const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
+    const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, AutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
+    const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
+    return Color * (AutoHDRTotalRatio / SDRRatio);
+}
+
+float FindLuminanceToRestoreScale(float3 color, float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
 {
     // Try to restore any luminance that would have been lost during tone mapping (e.g. tonemapping, post process, LUTs, ... can all clip values).
     //
@@ -419,25 +445,26 @@ float FindLuminanceToRestore(float tonemapLostLuminance, float preColorCorrectio
     // This will be "accurate" as long as the color correction scaled the luminance linearly in the output as it grew in the input,
     // but even if it didn't, it should still look fine.
 
-    // This will re-apply an amount of lost luminance based on how much the CC reduced it:
+    // This will re-apply an amount of lost luminance based on how much the CC (LUT) reduced it:
     // the more the CC reduced the luminance, the less we will apply.
     // If the CC increased the luminance though, we will apply even more than the base lost amount.
-    tonemapLostLuminance = isnan(tonemapLostLuminance) ? 0.f : tonemapLostLuminance;
-    const float luminanceCCInvChange = max(1.f - (preColorCorrectionLuminance - postColorCorrectionLuminance), 0.f);
-    //const float luminanceCCInvChange = clamp(postColorCorrectionLuminance / preColorCorrectionLuminance, 0.f, 2.f); //TODO: try this
-    const float currentLum = postColorCorrectionLuminance; // Should be equal to "Luminance(color)"
-    const float targetLum = max(currentLum + tonemapLostLuminance, 0.f);
-    float scale = luminanceCCInvChange;
-
+    const float currentLum = Luminance(color);
     if (currentLum > 0.f)
     {
+        tonemapLostLuminance = isnan(tonemapLostLuminance) ? 0.f : tonemapLostLuminance;
+        const float luminanceCCInvChange = max(1.f - (preColorCorrectionLuminance - postColorCorrectionLuminance), 0.f);
+        //const float luminanceCCInvChange = clamp(postColorCorrectionLuminance / preColorCorrectionLuminance, 0.f, 2.f); //TODO: try this
+        
+        const float targetLum = max(currentLum + tonemapLostLuminance, 0.f);
+        float scale = luminanceCCInvChange;
         scale *= targetLum / currentLum;
         return scale;
     }
     return 1.f;
 }
 
-float3 PostProcess(float3 Color, inout float ColorLuminance)
+// "MidGrayScale" is how much the mid gray shifted from the originally intended tonemapped input (e.g. if we run this function on the untonemapped image, we can remap the mid gray)
+float3 PostProcess(float3 Color, inout float ColorLuminance, float MidGrayScale = 1.f)
 {
     const uint hdrCmpDatIndex = PcwHdrComposite.HdrCmpDatIndex;
     const float4 highlightsColorFilter = HdrCmpDat[hdrCmpDatIndex].HighlightsColorFilter;
@@ -445,7 +472,7 @@ float3 PostProcess(float3 Color, inout float ColorLuminance)
     const float hableSaturation = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
     const float brightnessMultiplier = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
     const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
-    const float contrastMidPoint = PerSceneConstants[316u].z;
+    const float contrastMidPoint = PerSceneConstants[316u].z * MidGrayScale;
 
     ColorLuminance = Luminance(Color);
 
@@ -456,14 +483,24 @@ float3 PostProcess(float3 Color, inout float ColorLuminance)
     Color += lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
     Color *= brightnessMultiplier;
 
-
-#if ENABLE_SIGMOIDAL_CONTRAST_ADJUSTMENT
+#if POST_PROCESS_CONTRAST_TYPE == 0
+    
+    // Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
+    // The higher the distance from the contrast middle point, the more contrast will change the color.
+    Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
+    
+#elif POST_PROCESS_CONTRAST_TYPE == 1
+    
+    Color = pow(Color / contrastMidPoint, contrastIntensity) * contrastMidPoint;
+    
+#elif POST_PROCESS_CONTRAST_TYPE == 2
 
     // sigmoidal contrast adjustment doesn't clip colors
     // https://www.imagemagick.org/Usage/color_mods/#sigmoidal
 
-    // * 2.5 to somewhat match default contrast adjustment
-    float c = max(contrastIntensity * 2.5f, EPSILON); // protect against division by zero
+    // Multiplier to somewhat match the original contrast adjustment
+    static const float SigmoidalContrastAdjustment = 2.5f; //TODO: we could probably find an even better default multiplication
+    float c = max(contrastIntensity * SigmoidalContrastAdjustment, EPSILON); // protect against division by zero
     float s = contrastMidPoint; // can be set to 0.5 for better darkening of shadows
 
     float minus = -1 / (1 + exp(c * s));
@@ -472,19 +509,13 @@ float3 PostProcess(float3 Color, inout float ColorLuminance)
     Color = (1 / (1 + exp(c * (s - Color))) + minus)
           / (1 / (1 + exp(c * (s - 1)))     + minus);
 
-#else
-
-    // Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
-    // The higher the distance from the contrast middle point, the more contrast will change the color.
-    Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
-
 #endif
 
-    Color = lerp(Color, colorFilter.rgb, colorFilter.a);
+    Color = lerp(Color, colorFilter.rgb * MidGrayScale, colorFilter.a);
     return Color;
 }
 
-float3 PostProcess_Inverse(float3 Color, float ColorLuminance)
+float3 PostProcess_Inverse(float3 Color, float ColorLuminance, float MidGrayScale = 1.f)
 {
     const uint hdrCmpDatIndex = PcwHdrComposite.HdrCmpDatIndex;
     const float4 highlightsColorFilter = HdrCmpDat[hdrCmpDatIndex].HighlightsColorFilter;
@@ -492,12 +523,18 @@ float3 PostProcess_Inverse(float3 Color, float ColorLuminance)
     const float hableSaturation = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
     const float brightnessMultiplier = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
     const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
-    const float contrastMidPoint = PerSceneConstants[316u].z;
+    const float contrastMidPoint = PerSceneConstants[316u].z * MidGrayScale;
 
     // We can't invert the color filter, so we will only inverse the post process by the unfiltered amount
     const float colorFilterInverse = 1.f - colorFilter.a;
 
+#if POST_PROCESS_CONTRAST_TYPE == 0
     Color = ((Color - contrastMidPoint) / contrastIntensity) + contrastMidPoint;
+#elif POST_PROCESS_CONTRAST_TYPE == 1
+    Color = pow(Color / contrastMidPoint, 1.f / contrastIntensity) * contrastMidPoint;
+#elif POST_PROCESS_CONTRAST_TYPE == 2
+    //TODO: implement
+#endif
 
     Color /= brightnessMultiplier;
 
@@ -511,9 +548,10 @@ float3 PostProcess_Inverse(float3 Color, float ColorLuminance)
 // Takes input coordinates. Returns output color in linear space (also works in sRGB but it's not ideal).
 float3 TetrahedralInterpolation(
     Texture3D<float3> Lut,
-    float3            EncodedColor)
+    float3            LUTCoordinates)
 {
-    float3 coords = EncodedColor.rgb * (LUT_SIZE - 1);
+    // We need to clip the input coordinates as LUT texure samples below are not clamped.
+    float3 coords = saturate(LUTCoordinates.rgb) * (LUT_SIZE - 1); // Pixel coords
     float3 color = 0;
 
     // baseInd is on [0,LUT_SIZE-1]
@@ -676,8 +714,10 @@ PSOutput PS(PSInput psInput)
     float hable_invScale;
 
     const bool clampACES = false;
+    
+    int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
 
-    switch (PcwHdrComposite.Tmo)
+    switch (tonemapperIndex)
     {
         case 1:
         {
@@ -726,12 +766,12 @@ PSOutput PS(PSInput psInput)
 
 #endif //ENABLE_POST_PROCESS
 
-#endif // ENABLE_TONEMAP
-
     tonemappedColor = saturate(tonemappedColor);
 
+#endif // ENABLE_TONEMAP
+
     // This is the luminance lost by clamping SDR tonemappers to the 0-1 range, and again by the fact that LUTs only take 0-1 range input.
-    const float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor);
+    float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor);
 
     const float preColorCorrectionLuminance = Luminance(tonemappedColor);
 
@@ -739,7 +779,7 @@ PSOutput PS(PSInput psInput)
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 
-#if FIX_WRONG_SRGB_GAMMA
+#if FIX_WRONG_SRGB_GAMMA_FORMULA
 
     const float3 LUTCoordinates = gamma_linear_to_sRGB(color);
 
@@ -750,25 +790,27 @@ PSOutput PS(PSInput psInput)
     // Weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
     const float3 LUTCoordinates = max((pow(color, inverseGamma) * 1.055f) - 0.055f, 0.f); // Does "max()" is unnecessary as LUT sampling is already clamped.
 
-#endif // FIX_WRONG_SRGB_GAMMA
+#endif // FIX_WRONG_SRGB_GAMMA_FORMULA
 
-#if LUT_USE_TETRAHEDRAL_INTERPOLATION
+#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
-    const float3 lutColor = TetrahedralInterpolation(Lut, LUTCoordinates);
+    float3 lutColor = TetrahedralInterpolation(Lut, LUTCoordinates);
 
 #else
 
-    const float3 lutColor = Lut.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+    float3 lutColor = Lut.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 
-#endif //LUT_USE_TETRAHEDRAL_INTERPOLATION
+#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
 #if !LUT_FIX_GAMMA_MAPPING
 
-    lutColor = gamma_sRGB_to_linear(lutColor); // We always work in linear space
+    // We always work in linear space so convert to it.
+    // We never acknowledge the original wrong gamma function here (we don't really care).
+    lutColor = gamma_sRGB_to_linear(lutColor);
 
 #endif // !LUT_FIX_GAMMA_MAPPING
 
-    float LutMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
+    const float LutMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
 
     color = lerp(lutColor, color, LutMaskAlpha);
 
@@ -776,33 +818,54 @@ PSOutput PS(PSInput psInput)
 
 #if ENABLE_HDR
 
-    const float postColorCorrectionLuminance = Luminance(color);
-
-    // Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation
-    color *= FindLuminanceToRestore(tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
-
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+
+    float postColorCorrectionLuminance = Luminance(color);
+    //TODO: this isn't hue conserving, though we don't really have a way of doing it in a hue conserving way, as then it would break the brightness mapping.
+    const float postColorCorrectionClampedLuminance = Luminance(saturate(color));
+    // Some inverse tonemapper formulas can't take any values beyond 0-1, so we'll need to clip them and restore their luminance.
+    const float colorCorrectionHDRClippedLuminanceChange = postColorCorrectionClampedLuminance > 0.f ? (postColorCorrectionLuminance / postColorCorrectionClampedLuminance) : 1.f;
 
 #if ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
     //TODO: passing in the previous luminance might not be the best, though is there any other way really?
     //Should we at least shift it by how much the LUT shifted the luminance? To invert it more correctly.
-    //If we did this, we should also move FindLuminanceToRestore() to be after it?
     color = PostProcess_Inverse(color, prePostProcessColorLuminance);
 
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
+    
+    float paperWhite = HDR_GAME_PAPER_WHITE;
+    
+    const float midGrayIn = MidGray;
+    float midGrayOut = midGrayIn;
+#if ENABLE_AUTOHDR
+    if (tonemapperIndex == 1 || tonemapperIndex == 2 || tonemapperIndex == 3)
+    {
+        paperWhite = HDR_REFERENCE_PAPER_WHITE; //TODO: fix this up, this is because HDR_GAME_PAPER_WHITE is 1 atm and it's not good for AutoHDR
+        tonemapperIndex = 0;
+        color = PumboAutoHDR(color, HDR_MAX_OUTPUT_NITS, paperWhite);
+        midGrayOut = PumboAutoHDR(midGrayIn.xxx, HDR_MAX_OUTPUT_NITS, paperWhite).x;
 
+    }
+#endif // ENABLE_AUTOHDR
+    
     // Restore a color very close to the original linear one, but with all the other post process and LUT transformations baked in
-    switch(PcwHdrComposite.Tmo)
+    switch (tonemapperIndex)
     {
         case 1:
         {
             color = ACESReference_Inverse(color);
+            midGrayOut = ACESReference_Inverse(midGrayIn.xxx).x;
+            tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
+            postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
         } break;
 
         case 2:
         {
             color = ACESParametric_Inverse(color, acesParam_modE, acesParam_modA);
+            midGrayOut = ACESParametric_Inverse(midGrayIn.xxx, acesParam_modE, acesParam_modA).x;
+            tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
+            postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
         } break;
 
         case 3:
@@ -820,27 +883,56 @@ PSOutput PS(PSInput psInput)
                                   hable_shoulderSegment_lnA,
                                   hable_shoulderSegment_B,
                                   hable_invScale);
+            midGrayOut = Hable_Inverse(midGrayIn.xxx,
+                                  hable_params_y0,
+                                  hable_params_y1,
+                                  hable_dstParams_W,
+                                  hable_toeSegment_lnA,
+                                  hable_toeSegment_B,
+                                  hable_midSegment_offsetX,
+                                  hable_midSegment_lnA,
+                                  hable_shoulderSegment_offsetX,
+                                  hable_shoulderSegment_offsetY,
+                                  hable_shoulderSegment_lnA,
+                                  hable_shoulderSegment_B,
+                                  hable_invScale).x;
+            tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
+            postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
         } break;
 
         default:
-            break;
             // Any luminance lost by this tonemap case would have already been restored above with "tonemapLostLuminance".
+            break;
     }
-
+    
 #if ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
-    //TODO: ... this has no use now, and also, it won't work in the HDR range
-    color = PostProcess(color, prePostProcessColorLuminance);
+    color = PostProcess(color, prePostProcessColorLuminance, midGrayScale);
 
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
-    color *= HDR_GAME_PAPER_WHITE;
+#if ENABLE_LUMINANCE_RESTORE //TODO: this will go beyond the max output nits if "ENABLE_AUTOHDR" is true, we need to fix a way to make them work together (maybe re-tonemap always at the end?)
+    float midGrayScale = midGrayOut / midGrayIn;
+    // Change the "tonemapLostLuminance" from being in the tonemapped SDR (0-1) range to the untonemapped HDR image range (by scaling it by the mid gray change, which is the best we can do).
+    // This will also acknowledge any clipped luminance from the range beyond 0-1.
+    tonemapLostLuminance *= midGrayScale;
+    
+    // Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation.
+    // It's important to do these after the inverse tonemappers, as they can't handle values beyond 0-1.
+    color *= FindLuminanceToRestoreScale(color, tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
+#endif // ENABLE_LUMINANCE_RESTORE
+
+    color *= paperWhite;
+    
+#if !ENABLE_AUTOHDR
     
     //TODO: find a tonemapper that looks more like Hable?
     const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
     color = DICETonemap(color, maxOutputLuminance);
+    
+#endif // !ENABLE_AUTOHDR
 
-#else
+#else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
     color *= HDR_GAME_PAPER_WHITE;
 
