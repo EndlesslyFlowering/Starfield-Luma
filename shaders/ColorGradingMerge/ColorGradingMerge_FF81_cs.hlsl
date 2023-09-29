@@ -2,6 +2,9 @@
 #include "../color.hlsl"
 #include "../math.hlsl"
 
+// 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good)
+#define LUT_IMPROVEMENT_TYPE 1
+#define FORCE_SDR_RANGE_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
@@ -180,7 +183,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
         const float currentY = Luminance(color);
         if (currentY > 0.f) { // Skip if black
-            float shadowRaise = 1.f;
+            float shadowRaise = 1.f; // Brightness multiplier from shadow
             if (currentY < analysis.blackY) {
                 shadowRaise = linearNormalization(
                     currentY,
@@ -194,11 +197,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
                 0.f, 
                 totalRange, 
                 1.f / analysis.whiteY,
-                1.f);
-            const float targetY = (1.f - (1.f - currentY))
-                * highlightsRaise
-                * shadowRaise;
+                1.f); // Brightness multiplier from highlight
+            const float targetY = currentY * highlightsRaise * shadowRaise;
 
+            // TODO: why are we clamping to full white here? luminance 1 (or beyond) might not match a white color at all, should we instead try to conserve the hue? Though that's much harder as we'd need hue mapping.
             if (SDRRange && targetY >= 1.f) {
                 color = 1.f; // Clamp
             } else {
@@ -244,7 +246,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 #endif // LUT_IMPROVEMENT_TYPE
 
 #if LUT_IMPROVEMENT_TYPE == 1
-    const bool SDRRange = !((bool)ENABLE_HDR);
+    const bool SDRRange = !((bool)ENABLE_HDR) || (bool)FORCE_SDR_RANGE_LUTS;
     float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
     float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);
     float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralLUTColor, SDRRange);
