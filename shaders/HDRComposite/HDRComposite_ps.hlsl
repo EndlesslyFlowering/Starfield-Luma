@@ -238,6 +238,12 @@ float3 Hable(
     midSegment_lnA = RCP_LOG2_E * midSegment_lnA_optimised;
     // mid section end
 
+    // toeM and shoulderM are missing because EvalDerivativeLinearGamma (https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L81-L85)
+    // evaluates to gamma * m * pow(m * x + b, gamma - 1) with gamma being 1
+    // this just returns m
+    #define toeM m
+    #define shoulderM m
+
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L137-L138
     // max(EPSILON, pow(params_yX, gamma))
     params_y0 = max(EPSILON, dstParams_y0); // is pow(x, gamma) with gamma = 1
@@ -252,7 +258,7 @@ float3 Hable(
 
     // toe section
     // SolveAB https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L60
-    toeSegment_B = (m * params_x0) / (params_y0 + EPSILON);
+    toeSegment_B = (toeM * params_x0) / (params_y0 + EPSILON);
     float _410 = log2(params_y0); //doesn't belong to SolveAB (it might does)
     float toeSegment_lnA_optimised = -toeSegment_B * log(params_x0);
     toeSegment_lnA = _410 * RCP_LOG2_E + toeSegment_lnA_optimised;
@@ -264,7 +270,7 @@ float3 Hable(
     shoulderSegment_offsetX = 1.f + params_overshootX;
     shoulderSegment_offsetY = params_overshootY; // x + 1 was optimised away
     // SolveAB
-    shoulderSegment_B = ((m * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
+    shoulderSegment_B = ((shoulderM * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
     float shoulderSegment_B_optimised = shoulderSegment_B * RCP_LOG2_E;
     shoulderSegment_lnA = (log2(shoulderSection_y0) * RCP_LOG2_E) - (shoulderSegment_B_optimised * log2(shoulderSection_x0));
     // shoulder section end
