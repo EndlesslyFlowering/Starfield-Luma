@@ -7,17 +7,17 @@ set dxc=..\tools\dxc_2023_08_14\bin\x64\dxc.exe
 for /f "delims=" %%x in (target_folder.txt) do set target_folder=%%x
 
 if "%target_folder%" == "" (
-  echo target folder isn't set in "target_folder.txt"!
-  echo single line with the folder with no quotation marks and a trailing \
-  echo example: C:\Games\Starfield\Data\shadersfx\
-  pause
-  goto :eof
+	echo target folder isn't set in "target_folder.txt"!
+	echo single line with the folder with no quotation marks and a trailing \
+	echo example: C:\Games\Starfield\Data\shadersfx\
+	pause
+	goto :eof
 )
 
 if not exist "%target_folder%" (
-  echo target folder doesn't exist!
-  echo creating it...
-  mkdir "%target_folder%"
+	echo target folder doesn't exist!
+	echo creating it...
+	mkdir "%target_folder%"
 )
 
 "%dxc%" "HDRComposite\HDRComposite_ps.hlsl" ^
@@ -83,10 +83,10 @@ call :errorlevel_check
 pause
 
 :errorlevel_check
-  if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo compilation failed. Press any key to continue...
-    pause > NUL
-    echo.
-  )
+	if %ERRORLEVEL% NEQ 0 (
+		echo.
+		echo compilation failed. Press any key to continue...
+		pause > NUL
+		echo.
+	)
 goto :eof
