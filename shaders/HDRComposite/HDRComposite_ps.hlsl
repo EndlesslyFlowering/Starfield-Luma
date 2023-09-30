@@ -16,7 +16,7 @@
 // This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
 // Tweak the OG tonemappers to either look better in general, or simply be more compatible with HDR
-#define ENABLE_TONEMAP_IMPROVEMENTS 1
+#define ENABLE_TONEMAP_IMPROVEMENTS 0
 #define ENABLE_POST_PROCESS 1
 // 0 original (weak, generates values beyond 0-1 which then get clipped), 1 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks), 2 Sigmoidal (smoothest looking, but harder to match)
 #define POST_PROCESS_CONTRAST_TYPE 1
@@ -24,6 +24,10 @@
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
 #define ENABLE_REPLACED_TONEMAP 1
+// Invert tonemap by luminance (conserves SDR hue)
+#define INVERT_TONEMAP_BY_LUMINANCE 1
+// Only invert highlights, which helps conserve the SDR filmic look (shadow crush)
+#define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
 // Use AutoHDR as "inverse tonemapper" (maintains a look closer to the original)
 #define ENABLE_AUTOHDR 0
 #define ENABLE_INVERSE_POST_PROCESS 0
@@ -137,41 +141,44 @@ float3 ACESReference(float3 Color, bool Clamp)
 // ACESFilm "per scene"
 float3 ACESParametric(in float3 Color, in bool Clamp, inout float modE, inout float modA)
 {
-    const float AcesParam0 = PerSceneConstants[3266u].x;
-    const float AcesParam1 = PerSceneConstants[3266u].y;
+    const float AcesParam0 = PerSceneConstants[3266u].x; // Constant is usually 11.2
+    const float AcesParam1 = PerSceneConstants[3266u].y; // Constant is usually 0.022
     modE = AcesParam1;
     modA = ((0.56f / AcesParam0) + ACES_b) + (AcesParam1 / (AcesParam0 * AcesParam0));
     return ACES(Color, Clamp, modE, modA);
 }
 
-float3 ACES_Inverse(float3 Color, float modE, float modA)
+template<class T>
+T ACES_Inverse(T Color, float modE, float modA)
 {
     //TODO: does this apply for `ACESParametric` as well? Probably
     //TODO: figure out if we could still use the unclamped color. There should be a way to invert it.
     // ACES is not defined for any values beyond 0-1
     Color = saturate(Color);
 
-    float3 fixed0 = (-ACES_d * Color) + ACES_b;
-    float3 fixed1 = (ACES_c * Color) - modA;
+    T fixed0 = (-ACES_d * Color) + ACES_b;
+    T fixed1 = (ACES_c * Color) - modA;
 
-    float3 variable_numerator_part0 = -fixed0;
-    float3 variable_numerator = sqrt((variable_numerator_part0 * variable_numerator_part0) - (4.f * modE * Color * fixed1));
+    T variable_numerator_part0 = -fixed0;
+    T variable_numerator = sqrt((variable_numerator_part0 * variable_numerator_part0) - (4.f * modE * Color * fixed1));
 
-    float3 denominator = 2.f * fixed1;
+    T denominator = 2.f * fixed1;
 
-    float3 result0 = (fixed0 + variable_numerator) / denominator;
-    float3 result1 = (fixed0 - variable_numerator) / denominator;
+    T result0 = (fixed0 + variable_numerator) / denominator;
+    T result1 = (fixed0 - variable_numerator) / denominator;
 
     // "result1" is likely what we always want
     return max(result0, result1);
 }
 
-float3 ACESReference_Inverse(float3 Color)
+template<class T>
+T ACESReference_Inverse(T Color)
 {
     return ACES_Inverse(Color, ACES_e, ACES_a);
 }
 
-float3 ACESParametric_Inverse(float3 Color, float modE, float modA)
+template<class T>
+T ACESParametric_Inverse(T Color, float modE, float modA)
 {
     return ACES_Inverse(Color, modE, modA);
 }
@@ -196,13 +203,14 @@ float3 Hable(
 {
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
-    float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // 2.2 is probably based on perceptual gamma, but we don't know why it's applied here
-    float toeStrength      = saturate(PerSceneConstants[3266u].z);
-    float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST);
-    float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f);
-    float shoulderAngle    = saturate(PerSceneConstants[3267u].z);
+    // 2.2 is probably based on perceptual gamma, but we don't know why it's applied here
+    const float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
+    const float toeStrength      = saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
+    const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
+    const float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
+    const float shoulderAngle    = saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 #if ENABLE_TONEMAP_IMPROVEMENTS
-    
+    //TODO: fix highlights
 #endif
 
     //dstParams
@@ -339,7 +347,7 @@ float HableEval_Inverse(
   float lnA,
   float B)
 {
-#if 0 // This version might work better on Nvidia (to be investigated more before deleting the alternative branch)
+#if 0 //TODO: delete. This version might work better on Nvidia (to be investigated more before deleting the alternative branch)
     float y0 = max((Channel - offsetY) / scaleY, EPSILON);
     float x0 = exp((log(y0) - lnA) / B);
 
@@ -357,9 +365,8 @@ float HableEval_Inverse(
 #endif
 }
 
-// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L45-L52
-float3 Hable_Inverse(
-  float3 InputColor,
+void Hable_Inverse_Channel(
+  inout float ColorChannel,
   float  params_y0,
   float  params_y1,
   float  dstParams_W,
@@ -371,57 +378,129 @@ float3 Hable_Inverse(
   float  shoulderSegment_offsetY,
   float  shoulderSegment_lnA,
   float  shoulderSegment_B,
-  float  invScale)
+  float  invScale,
+  bool   onlyInvertHighlights = false)
+{
+    // Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
+    const float minHighlightsColor = max(params_y0, params_y1); // Check both toe and mid params for extra safety
+    if (onlyInvertHighlights && ColorChannel < minHighlightsColor)
+    {
+        ColorChannel *= HableEval_Inverse(minHighlightsColor,
+                                     shoulderSegment_offsetX,
+                                     shoulderSegment_offsetY * invScale,
+                                     -1.f,
+                                     -1.f * invScale,
+                                     shoulderSegment_lnA,
+                                     shoulderSegment_B) / minHighlightsColor;
+        return;
+    }
+    
+    // scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
+    // toe
+    if (ColorChannel < params_y0)
+    {
+        // scaleXY and offsetXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L151-L154
+        ColorChannel = HableEval_Inverse(ColorChannel,
+                                     0.f,
+                                     0.f, // * invScale
+                                     1.f,
+                                     1.f * invScale,
+                                     toeSegment_lnA,
+                                     toeSegment_B);
+    }
+    // mid (linear segment)
+    else if (ColorChannel < params_y1)
+    {
+        // scaleXY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L125-L127
+        ColorChannel = HableEval_Inverse(ColorChannel,
+                                     -midSegment_offsetX, // minus was optimised away
+                                     0.f, // * invScale
+                                     1.f,
+                                     1.f * invScale,
+                                     midSegment_lnA,
+                                     1.f);
+    }
+    // shoulder
+    else
+    {
+#if ENABLE_TONEMAP_IMPROVEMENTS && 0 //TODO: remove... temp workaround for broken shoulder
+        ColorChannel = min(ColorChannel, 0.995f);
+#endif
+        
+        // scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
+        ColorChannel = HableEval_Inverse(ColorChannel,
+                                     shoulderSegment_offsetX,
+                                     shoulderSegment_offsetY * invScale,
+                                     -1.f,
+                                     -1.f * invScale,
+                                     shoulderSegment_lnA,
+                                     shoulderSegment_B);
+    }
+}
+
+// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L45-L52
+template<class T>
+T Hable_Inverse(
+  T InputColor,
+  uint  Channels /*1 to 3*/,
+  float  params_y0,
+  float  params_y1,
+  float  dstParams_W,
+  float  toeSegment_lnA,
+  float  toeSegment_B,
+  float  midSegment_offsetX,
+  float  midSegment_lnA,
+  float  shoulderSegment_offsetX,
+  float  shoulderSegment_offsetY,
+  float  shoulderSegment_lnA,
+  float  shoulderSegment_B,
+  float  invScale,
+  bool   onlyInvertHighlights = false)
 {
     // There's no inverse formula for colors beyond the 0-1 range
     InputColor = saturate(InputColor);
     
-    float3 itmColor;
+    float3 itmColor = InputColor; // Make this float3 to make it compile for all cases
 
-    for (uint channel = 0; channel < 3; channel++)
+    if (Channels <= 1) // InputColor[channel] won't compile if T is float(1)
     {
-        InputColor[channel] = min(InputColor[channel], 0.995f); //TODO: remove... temp workaround for broken shoulder
-        
-        // scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
-        // toe
-        if (InputColor[channel] < params_y0)
+        Hable_Inverse_Channel(itmColor.x,
+                              params_y0,
+                              params_y1,
+                              dstParams_W,
+                              toeSegment_lnA,
+                              toeSegment_B,
+                              midSegment_offsetX,
+                              midSegment_lnA,
+                              shoulderSegment_offsetX,
+                              shoulderSegment_offsetY,
+                              shoulderSegment_lnA,
+                              shoulderSegment_B,
+                              invScale,
+                              onlyInvertHighlights);
+    }
+    else
+    {
+        for (uint channel = 0; channel < Channels; channel++)
         {
-            // scaleXY and offsetXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L151-L154
-            itmColor[channel] = HableEval_Inverse(InputColor[channel],
-                                                  0.f,
-                                                  0.f, // * invScale
-                                                  1.f,
-                                                  1.f * invScale,
-                                                  toeSegment_lnA,
-                                                  toeSegment_B);
-        }
-        // mid
-        else if (InputColor[channel] < params_y1)
-        {
-            // scaleXY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L125-L127
-            itmColor[channel] = HableEval_Inverse(InputColor[channel],
-                                                  -midSegment_offsetX, // minus was optimised away
-                                                  0.f, // * invScale
-                                                  1.f,
-                                                  1.f * invScale,
-                                                  midSegment_lnA,
-                                                  1.f);
-        }
-        // shoulder
-        else
-        {
-            // scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
-            itmColor[channel] = HableEval_Inverse(InputColor[channel],
-                                                  shoulderSegment_offsetX,
-                                                  shoulderSegment_offsetY * invScale,
-                                                  -1.f,
-                                                  -1.f * invScale,
-                                                  shoulderSegment_lnA,
-                                                  shoulderSegment_B);
+            Hable_Inverse_Channel(itmColor[channel],
+                                  params_y0,
+                                  params_y1,
+                                  dstParams_W,
+                                  toeSegment_lnA,
+                                  toeSegment_B,
+                                  midSegment_offsetX,
+                                  midSegment_lnA,
+                                  shoulderSegment_offsetX,
+                                  shoulderSegment_offsetY,
+                                  shoulderSegment_lnA,
+                                  shoulderSegment_B,
+                                  invScale,
+                                  onlyInvertHighlights);
         }
     }
 
-    return itmColor * dstParams_W;
+    return (T)itmColor * dstParams_W;
 }
 
 // Tonemapper inspired from DICE. Works on luminance to maintain hue, not per channel.
@@ -494,7 +573,7 @@ float3 PostProcess(float3 Color, inout float ColorLuminance, float MidGrayScale 
     const float hableSaturation = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
     const float brightnessMultiplier = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
     const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
-    const float contrastMidPoint = PerSceneConstants[316u].z * MidGrayScale;
+    const float contrastMidPoint = PerSceneConstants[316u].z * MidGrayScale; // Game usually has this around 0.18 (mid gray)
 
     ColorLuminance = Luminance(Color);
 
@@ -856,43 +935,69 @@ PSOutput PS(PSInput psInput)
 
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
     
-    float paperWhite = HDR_GAME_PAPER_WHITE;
+    const float paperWhite = HDR_GAME_PAPER_WHITE;
     
     const float midGrayIn = MidGray;
     float midGrayOut = midGrayIn;
 #if ENABLE_AUTOHDR
     if (tonemapperIndex == 1 || tonemapperIndex == 2 || tonemapperIndex == 3)
     {
-        paperWhite = HDR_REFERENCE_PAPER_WHITE; //TODO: fix this up, this is because HDR_GAME_PAPER_WHITE is 1 atm and it's not good for AutoHDR
         tonemapperIndex = 0;
         color = PumboAutoHDR(color, HDR_MAX_OUTPUT_NITS, paperWhite);
         midGrayOut = PumboAutoHDR(midGrayIn.xxx, HDR_MAX_OUTPUT_NITS, paperWhite).x;
-
     }
 #endif // ENABLE_AUTOHDR
+    
+#if INVERT_TONEMAP_BY_LUMINANCE
+    float preInverseTonemapColorLuminance = Luminance(color);
+    float inverseTonemapColor = preInverseTonemapColorLuminance;
+    const uint inverseTonemapColorComponents = 1;
+#else
+    float3 inverseTonemapColor = color;
+    const uint inverseTonemapColorComponents = 3;
+#endif
     
     // Restore a color very close to the original linear one, but with all the other post process and LUT transformations baked in
     switch (tonemapperIndex)
     {
+        //TODO: implement INVERT_TONEMAP_HIGHLIGHTS_ONLY for ACES
+        
         case 1:
         {
-            color = ACESReference_Inverse(color);
-            midGrayOut = ACESReference_Inverse(midGrayIn.xxx).x;
+            inverseTonemapColor = ACESReference_Inverse(inverseTonemapColor);
+            midGrayOut = ACESReference_Inverse(midGrayIn);
             tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
             postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
         } break;
 
         case 2:
         {
-            color = ACESParametric_Inverse(color, acesParam_modE, acesParam_modA);
-            midGrayOut = ACESParametric_Inverse(midGrayIn.xxx, acesParam_modE, acesParam_modA).x;
+            inverseTonemapColor = ACESParametric_Inverse(inverseTonemapColor, acesParam_modE, acesParam_modA);
+            midGrayOut = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
             tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
             postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
         } break;
 
         case 3:
         {
-            color = Hable_Inverse(color,
+            const bool onlyInvertHighlights = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY;
+            inverseTonemapColor = Hable_Inverse(inverseTonemapColor,
+                                    inverseTonemapColorComponents,
+                                    hable_params_y0,
+                                    hable_params_y1,
+                                    hable_dstParams_W,
+                                    hable_toeSegment_lnA,
+                                    hable_toeSegment_B,
+                                    hable_midSegment_offsetX,
+                                    hable_midSegment_lnA,
+                                    hable_shoulderSegment_offsetX,
+                                    hable_shoulderSegment_offsetY,
+                                    hable_shoulderSegment_lnA,
+                                    hable_shoulderSegment_B,
+                                    hable_invScale,
+                                    onlyInvertHighlights);
+            midGrayOut = Hable_Inverse(midGrayIn,
+                                  1,
                                   hable_params_y0,
                                   hable_params_y1,
                                   hable_dstParams_W,
@@ -904,21 +1009,8 @@ PSOutput PS(PSInput psInput)
                                   hable_shoulderSegment_offsetY,
                                   hable_shoulderSegment_lnA,
                                   hable_shoulderSegment_B,
-                                  hable_invScale);
-            //TODO: make function template
-            midGrayOut = Hable_Inverse(midGrayIn.xxx,
-                                  hable_params_y0,
-                                  hable_params_y1,
-                                  hable_dstParams_W,
-                                  hable_toeSegment_lnA,
-                                  hable_toeSegment_B,
-                                  hable_midSegment_offsetX,
-                                  hable_midSegment_lnA,
-                                  hable_shoulderSegment_offsetX,
-                                  hable_shoulderSegment_offsetY,
-                                  hable_shoulderSegment_lnA,
-                                  hable_shoulderSegment_B,
-                                  hable_invScale).x;
+                                  hable_invScale,
+                                  onlyInvertHighlights);
             tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
             postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
         } break;
@@ -927,6 +1019,12 @@ PSOutput PS(PSInput psInput)
             // Any luminance lost by this tonemap case would have already been restored above with "tonemapLostLuminance".
             break;
     }
+    
+#if INVERT_TONEMAP_BY_LUMINANCE
+    color *= preInverseTonemapColorLuminance > 0.f ? (inverseTonemapColor / preInverseTonemapColorLuminance) : 1.f;
+#else
+    color = inverseTonemapColor;
+#endif
     
     const float midGrayScale = midGrayOut / midGrayIn;
     
@@ -946,7 +1044,8 @@ PSOutput PS(PSInput psInput)
     color *= FindLuminanceToRestoreScale(color, tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
 #endif // ENABLE_LUMINANCE_RESTORE
 
-    color *= paperWhite;
+    // Bring back the color to the same range as SDR by dividing by the mid gray change.
+    color *= paperWhite / midGrayScale;
     
 #if !ENABLE_AUTOHDR
     
