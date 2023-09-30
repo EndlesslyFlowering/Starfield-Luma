@@ -2,7 +2,7 @@
 #include "../color.hlsl"
 #include "../math.hlsl"
 
-#define FORCE_SDR_RANGE_LUTS 0
+#define FORCE_SDR_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
@@ -176,7 +176,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         }
 #endif
         
-#if 0 // TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift. This fix up might not be necessary as later we raise blacks anyway.
+#if 1 // TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift. This fix up might not be necessary as later we raise blacks anyway.
         // Color may have gone negative
         // For example, if black is (3,3,3) and another value is (0,0,4), that
         // may result in (-3,-3,1)
@@ -191,6 +191,9 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
         const float currentY = Luminance(color); // In case this was negative, the shadows raise pass should bring it back to the >= 0 range
         
+        // Magic number to decide by how much to scale the new shadow area
+        const float shadowCompensationPercentage = 1.f - analysis.blackY;
+        
         // Brightness multiplier from shadows:
         // Because the amount the black level was raised is proportional to
         // the harshness of a linear gradient, a compensation must be made
@@ -204,7 +207,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
             min(currentY, analysis.blackY),
             0.f,
             analysis.blackY,
-            1.f + analysis.blackY, // Shadow compensation percentage ramp factor
+            1.f + shadowCompensationPercentage,
             1.f);
         // TODO: Analyze grayscale for shadow raise. For example, if black shadow was raised
         // by 5%, then analyze the ramping from 5%-10% and apply that to
@@ -235,7 +238,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
             // Or, still target full white for (1,1,1), but scale others relative to whiteY
             // Or, don't adjust unless white point
         }
-        else
+        else if (currentY != 0.f)
         {
             color *= max(targetY, 0.f) / max(currentY, 0.f); // Clamp luminances to avoid a double negative creating a positive number
         }
@@ -279,7 +282,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
     LUT4Color = gamma_sRGB_to_linear(LUT4Color);
 #endif // LUT_IMPROVEMENT_TYPE
     
-    const bool SDRRange = !((bool)ENABLE_HDR) || (bool)FORCE_SDR_RANGE_LUTS;
+    const bool SDRRange = !((bool)ENABLE_HDR) || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
     float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
     float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);
