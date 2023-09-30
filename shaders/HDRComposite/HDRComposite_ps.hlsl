@@ -205,8 +205,7 @@ float3 Hable(
 {
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
-    // 2.2 is probably based on perceptual gamma, but we don't know why it's applied here
-    const float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
+    const float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3. Pow 2.2 is just so that the user doesn't have to input tiny numbers (it's not gamma related).
     const float toeStrength      = saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
     const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
     const float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
@@ -926,7 +925,12 @@ PSOutput PS(PSInput psInput)
     LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
 
 #if ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-    const float3 LUTColorShift = LUTColor / color;
+    float3 LUTColorShift = LUTColor / color;
+    for (uint channel = 0; channel < 3; channel++)
+    {
+        if (color[channel] == 0.f)
+            LUTColorShift[channel] = 1.f;
+    }
 #else
     color = LUTColor;
 #endif
@@ -1061,7 +1065,7 @@ PSOutput PS(PSInput psInput)
     color *= LUTColorShift;
 #if LUT_IMPROVEMENT_TYPE == 3
     const float postLUTShiftedColorLuminance = Luminance(color);
-    color *= postLUTShiftedColorLuminance > 0.f ? (Luminance(preLUTShiftedColor) / postLUTShiftedColorLuminance) : 1.f;
+    color *= postLUTShiftedColorLuminance > 0.f ? lerp(1.f, Luminance(preLUTShiftedColor) / postLUTShiftedColorLuminance, LUTCorrectionPercentage) : 1.f;
 #endif // LUT_IMPROVEMENT_TYPE == 3
 #endif // ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP
 
