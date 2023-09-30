@@ -181,35 +181,56 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         const float whiteDistance = hypot3(1.f - neutralLUTColor);
         const float totalRange = (blackDistance + whiteDistance);
 
+        // Color may have gone negative
+        // For example, if black is (3,3,3) and another value is (0,0,4), that
+        // may result in (-3,-3,1)
+        color = clamp(color, 0.f, FLT_MAX);
+
         const float currentY = Luminance(color);
         if (currentY > 0.f) { // Skip if black
-            float shadowRaise = 1.f; // Brightness multiplier from shadow
+            // Because the amount the black level was raised is proportional to
+            // the harshness of a linear gradient, a compensation must be made
+            // to avoid black crushing, and maintain visibility at certain
+            // points in the LUT. The scaling used will be relative to the
+            // raised black floor level to ensure proportional consistency per
+            // LUT. This is only done to the newly created shadow section (if any).
+            // Simplified, if black started raised, a new shadow section was
+            // created, and that needs extra luminance for visibility.
+            float shadowRaise = 1.f;
             if (currentY < analysis.blackY) {
+                float shadowCompensationPercentage = 1.f - analysis.blackY;
+                // TODO: Analyze grayscale. For example, if black shadow was raised
+                // by 5%, then analyze the ramping from 5%-10% and apply that to
+                // the new 0% - 5% raise.
                 shadowRaise = linearNormalization(
                     currentY,
                     0.f,
                     analysis.blackY,
-                    1.f + (1.f - analysis.blackY),
+                    1.f + shadowCompensationPercentage, // Ramp factor
                     1.f);
             }
+            // Boost luminance of all texels relative to their distance to white
+            // and how much white is to be raised.
+            // (ie: white drags everything towards it)
             const float highlightsRaise = linearNormalization(
-                whiteDistance, 
-                0.f, 
-                totalRange, 
+                whiteDistance,
+                0.f,
+                totalRange,
                 1.f / analysis.whiteY,
-                1.f); // Brightness multiplier from highlight
-            const float targetY = currentY * highlightsRaise * shadowRaise;
+                1.f);
 
-            // TODO: why are we clamping to full white here? luminance 1 (or beyond) might not match a white color at all, should we instead try to conserve the hue? Though that's much harder as we'd need hue mapping.
-            if (SDRRange && targetY >= 1.f) {
-                color = 1.f; // Clamp
+            const float targetY = currentY
+                * highlightsRaise
+                * shadowRaise;
+
+            if (SDRRange && targetY >= 0.9995f) {
+                color = 1.f; // Clip to full white (for external AutoHDR)
+                // Or, limit to max luminance while maintaining hue, though may result in LUT max Y being below 1
+                // Or, still target full white for (1,1,1), but scale others relative to whiteY
+                // Or, don't adjust unless white point
             } else {
-                // targetY could be on LUTs (raised black point and dark blues)
-                color *= max(targetY, 0.f) / currentY;
+                color *= targetY / currentY;
             }
-        } else {
-            // TODO: Consider removal since no longer scaling
-            color = 0; // Color may have gone below 0 when scaling
         }
 
         // Optional step to keep colors in the SDR range.
