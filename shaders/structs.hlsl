@@ -129,6 +129,49 @@ struct HDRCompositeData
     float  ContrastIntensity;
     int    i_0; //unused
 };
+
+//HDRComposite shader structs start
+struct Hable_params
+{
+    float y0;
+    float y1;
+};
+
+struct Hable_dstParams
+{
+    float W;
+};
+
+struct Hable_toeSegment
+{
+    float lnA;
+    float B;
+};
+
+struct Hable_midSigment
+{
+    float offsetX;
+    float lnA;
+};
+
+struct Hable_shoulderSegment
+{
+    float offsetX;
+    float offsetY;
+    float lnA;
+    float B;
+};
+
+struct HableParamters
+{
+    Hable_params          params;
+    Hable_dstParams       dstParams;
+    Hable_toeSegment      toeSegment;
+    Hable_midSigment      midSegment;
+    Hable_shoulderSegment shoulderSegment;
+    float                 invScale;
+};
+//HDRComposite shader structs end
 //HDRComposite end
 
 //ColorGradingMerge start
