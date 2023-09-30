@@ -116,17 +116,6 @@ static const float ACES_d = 0.59f;
 static const float ACES_e = 0.14f;
 
 
-static const float3x3 Bt709ToXYZ = float3x3(
-    0.412135323426798,  0.357675002654190, 0.180356796374193,
-    0.212507276141942,  0.715350005308380, 0.0721427185496773,
-    0.0193188432856311, 0.119225000884730, 0.949879127570751);
-
-static const float3x3 XYZToBt709 = float3x3(
-     3.24297896532120,   -1.53833617585749,  -0.498919840818647,
-    -0.968997952917093,   1.87549198225861,   0.0415445240532242,
-     0.0556683243682128, -0.204117189350113,  1.05769816299604);
-
-
 float3 ACES(float3 Color, bool Clamp, float modE, float modA)
 {
     Color = (Color * (modA * Color + ACES_b)) / ((Color * (ACES_c * Color + ACES_d)) + modE);
@@ -189,19 +178,8 @@ T ACESParametric_Inverse(T Color, float modE, float modA)
 // http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/
 // This is NOT the Uncharted 2 tonemapper, which was also by Hable.
 float3 Hable(
-  in  float3 InputColor,
-  out float  params_y0,
-  out float  params_y1,
-  out float  dstParams_W,
-  out float  toeSegment_lnA,
-  out float  toeSegment_B,
-  out float  midSegment_offsetX,
-  out float  midSegment_lnA,
-  out float  shoulderSegment_offsetX,
-  out float  shoulderSegment_offsetY,
-  out float  shoulderSegment_lnA,
-  out float  shoulderSegment_B,
-  out float  invScale)
+  in  float3         InputColor,
+  out HableParamters hableParams)
 {
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
@@ -211,6 +189,7 @@ float3 Hable(
     const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
     const float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
     const float shoulderAngle    = saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
+
 #if ENABLE_TONEMAP_IMPROVEMENTS
     //TODO: fix highlights
 #endif
@@ -228,7 +207,7 @@ float3 Hable(
 
     float extraW = exp2(shoulderStrength) - LFLT1;
     float initialW = dstParams_x0 + remainingY;
-    dstParams_W = initialW + extraW;
+    hableParams.dstParams.W = initialW + extraW;
 
     // "W * " was optimised away by DXIL->SPIRV->HLSL conversion as down the line there is a "/ W"
     float dstParams_overshootX = 2.f * shoulderAngle * shoulderStrength;
@@ -237,13 +216,14 @@ float3 Hable(
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L87
 
     //dstCurve
-    float dstCurve_invW = 1.f / dstParams_W;
+    float dstCurve_invW = 1.f / hableParams.dstParams.W;
+
     //params
-    float params_x0 = dstParams_x0 / dstParams_W;
-    float params_x1 = dstParams_x1 / dstParams_W;
-    //float params_overshootX = dstParams_overshootX / dstParams_W; // this step was optimised away
-    float params_overshootX = dstParams_overshootX;
-    float dx = y1_offset / dstParams_W;
+    float params_x0 = dstParams_x0 / hableParams.dstParams.W;
+    float params_x1 = dstParams_x1 / hableParams.dstParams.W;
+    //float params_overshootX = dstParams_overshootX / hableParams.dstParams.W; // this step was optimised away
+    const float params_overshootX = dstParams_overshootX;
+    float dx = y1_offset / hableParams.dstParams.W;
 
     // mid section
     // AsSlopeIntercept https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L67
@@ -251,9 +231,9 @@ float3 Hable(
     m += EPSILON;
     float b = dstParams_y0 - (m * params_x0);
 
-    midSegment_offsetX = (b / m); //no minus
+    hableParams.midSegment.offsetX = (b / m); //no minus
     float midSegment_lnA_optimised = log2(m);
-    midSegment_lnA = RCP_LOG2_E * midSegment_lnA_optimised;
+    hableParams.midSegment.lnA = RCP_LOG2_E * midSegment_lnA_optimised;
     // mid section end
 
     // toeM and shoulderM are missing because EvalDerivativeLinearGamma (https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L81-L85)
@@ -264,33 +244,33 @@ float3 Hable(
 
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L137-L138
     // max(EPSILON, pow(params_yX, gamma))
-    params_y0 = max(EPSILON, dstParams_y0); // is pow(x, gamma) with gamma = 1
-    //OLD: params_y0 = max(EPSILON, exp2(log2(dstParams_y0)));
-    params_y1 = max(EPSILON, dstParams_y1); // is pow(x, gamma) with gamma = 1
-    //OLD: params_y1 = max(EPSILON, exp2(log2(dstParams_y1)));
+    hableParams.params.y0 = max(EPSILON, dstParams_y0); // is pow(x, gamma) with gamma = 1
+    //OLD: hableParams.params.y0 = max(EPSILON, exp2(log2(dstParams_y0)));
+    hableParams.params.y1 = max(EPSILON, dstParams_y1); // is pow(x, gamma) with gamma = 1
+    //OLD: hableParams.params.y1 = max(EPSILON, exp2(log2(dstParams_y1)));
 
     // pow(1.f + dstParams_overshootY, gamma) - 1.f
-    // -1 was optimised away as shoulderSegment_offsetY is "params_overshootY + 1"
+    // -1 was optimised away as hableParams.shoulderSegment.offsetY is "params_overshootY + 1"
     float params_overshootY = 1.f + dstParams_overshootY; // is pow(x, gamma) with gamma = 1
     //OLD: float params_overshootY = exp2(log2(1.f + dstParams_overshootY));
 
     // toe section
     // SolveAB https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L60
-    toeSegment_B = (toeM * params_x0) / (params_y0 + EPSILON);
-    float _410 = log2(params_y0); //doesn't belong to SolveAB (it might does)
-    float toeSegment_lnA_optimised = -toeSegment_B * log(params_x0);
-    toeSegment_lnA = _410 * RCP_LOG2_E + toeSegment_lnA_optimised;
+    hableParams.toeSegment.B = (toeM * params_x0) / (hableParams.params.y0 + EPSILON);
+    float _410 = log2(hableParams.params.y0); //doesn't belong to SolveAB (it might does)
+    float toeSegment_lnA_optimised = -hableParams.toeSegment.B * log(params_x0);
+    hableParams.toeSegment.lnA = _410 * RCP_LOG2_E + toeSegment_lnA_optimised;
     // toe section end
 
     // shoulder section
     float shoulderSection_x0 = 1.f + params_overshootX - params_x1;
-    float shoulderSection_y0 = params_overshootY - params_y1; // 1 + x was optimised away
-    shoulderSegment_offsetX = 1.f + params_overshootX;
-    shoulderSegment_offsetY = params_overshootY; // x + 1 was optimised away
+    float shoulderSection_y0 = params_overshootY - hableParams.params.y1; // 1 + x was optimised away
+    hableParams.shoulderSegment.offsetX = 1.f + params_overshootX;
+    hableParams.shoulderSegment.offsetY = params_overshootY; // x + 1 was optimised away
     // SolveAB
-    shoulderSegment_B = ((shoulderM * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
-    float shoulderSegment_B_optimised = shoulderSegment_B * RCP_LOG2_E;
-    shoulderSegment_lnA = (log2(shoulderSection_y0) * RCP_LOG2_E) - (shoulderSegment_B_optimised * log2(shoulderSection_x0));
+    hableParams.shoulderSegment.B = ((shoulderM * shoulderSection_x0) / (shoulderSection_y0 + EPSILON));
+    float shoulderSegment_B_optimised = hableParams.shoulderSegment.B * RCP_LOG2_E;
+    hableParams.shoulderSegment.lnA = (log2(shoulderSection_y0) * RCP_LOG2_E) - (shoulderSegment_B_optimised * log2(shoulderSection_x0));
     // shoulder section end
 
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L6
@@ -298,10 +278,10 @@ float3 Hable(
     float evalY0 = 0.f;
     if (params_overshootX > 0.f)
     {
-        evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + shoulderSegment_lnA) * LOG2_E) + params_overshootY;
+        evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + hableParams.shoulderSegment.lnA) * LOG2_E) + params_overshootY;
     }
     // Eval end
-    invScale = 1.f / evalY0;
+    hableParams.invScale = 1.f / evalY0;
 
     float3 toneMapped;
 
@@ -313,11 +293,11 @@ float3 Hable(
 
         if (isToeSegment && normX > 0.f)
         {
-            returnChannel = exp2(((((log2(normX) * toeSegment_B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
+            returnChannel = exp2(((((log2(normX) * hableParams.toeSegment.B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
         }
         else if (normX < params_x1)
         {
-            float evalMidSegment_y0 = normX + midSegment_offsetX; // was -(-midSegment_offsetX)
+            float evalMidSegment_y0 = normX + hableParams.midSegment.offsetX; // was -(-hableParams.midSegment.offsetX)
             if (evalMidSegment_y0 > 0.f)
             {
                 returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA_optimised);
@@ -330,11 +310,11 @@ float3 Hable(
             float evalShoulderReturn = 0.f;
             if (evalShoulderSegment_y0 > 0.f)
             {
-                evalShoulderReturn = exp2(((shoulderSegment_B_optimised * log2(evalShoulderSegment_y0)) + shoulderSegment_lnA) * LOG2_E);
+                evalShoulderReturn = exp2(((shoulderSegment_B_optimised * log2(evalShoulderSegment_y0)) + hableParams.shoulderSegment.lnA) * LOG2_E);
             }
             returnChannel = params_overshootY - evalShoulderReturn;
         }
-        toneMapped[channel] = returnChannel * invScale;
+        toneMapped[channel] = returnChannel * hableParams.invScale;
     }
     return toneMapped;
 }
@@ -368,58 +348,47 @@ float HableEval_Inverse(
 }
 
 void Hable_Inverse_Channel(
-  inout float ColorChannel,
-        float  params_y0,
-        float  params_y1,
-        float  dstParams_W,
-        float  toeSegment_lnA,
-        float  toeSegment_B,
-        float  midSegment_offsetX,
-        float  midSegment_lnA,
-        float  shoulderSegment_offsetX,
-        float  shoulderSegment_offsetY,
-        float  shoulderSegment_lnA,
-        float  shoulderSegment_B,
-        float  invScale,
-        bool   onlyInvertHighlights = false)
+  inout float          ColorChannel,
+  in    HableParamters hableParams,
+  in    bool           onlyInvertHighlights = false)
 {
     // Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
-    const float minHighlightsColor = max(params_y0, params_y1); // Check both toe and mid params for extra safety
+    const float minHighlightsColor = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
     if (onlyInvertHighlights && ColorChannel < minHighlightsColor)
     {
         ColorChannel *= HableEval_Inverse(minHighlightsColor,
-                                          shoulderSegment_offsetX,
-                                          shoulderSegment_offsetY * invScale,
+                                          hableParams.shoulderSegment.offsetX,
+                                          hableParams.shoulderSegment.offsetY * hableParams.invScale,
                                           -1.f,
-                                          -1.f * invScale,
-                                          shoulderSegment_lnA,
-                                          shoulderSegment_B) / minHighlightsColor;
+                                          -1.f * hableParams.invScale,
+                                          hableParams.shoulderSegment.lnA,
+                                          hableParams.shoulderSegment.B) / minHighlightsColor;
         return;
     }
 
     // scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
     // toe
-    if (ColorChannel < params_y0)
+    if (ColorChannel < hableParams.params.y0)
     {
         // scaleXY and offsetXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L151-L154
         ColorChannel = HableEval_Inverse(ColorChannel,
                                          0.f,
-                                         0.f, // * invScale
+                                         0.f, // * hableParams.invScale
                                          1.f,
-                                         1.f * invScale,
-                                         toeSegment_lnA,
-                                         toeSegment_B);
+                                         1.f * hableParams.invScale,
+                                         hableParams.toeSegment.lnA,
+                                         hableParams.toeSegment.B);
     }
     // mid (linear segment)
-    else if (ColorChannel < params_y1)
+    else if (ColorChannel < hableParams.params.y1)
     {
         // scaleXY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L125-L127
         ColorChannel = HableEval_Inverse(ColorChannel,
-                                         -midSegment_offsetX, // minus was optimised away
-                                         0.f, // * invScale
+                                         -hableParams.midSegment.offsetX, // minus was optimised away
+                                         0.f, // * hableParams.invScale
                                          1.f,
-                                         1.f * invScale,
-                                         midSegment_lnA,
+                                         1.f * hableParams.invScale,
+                                         hableParams.midSegment.lnA,
                                          1.f);
     }
     // shoulder
@@ -431,33 +400,22 @@ void Hable_Inverse_Channel(
 
         // scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
         ColorChannel = HableEval_Inverse(ColorChannel,
-                                         shoulderSegment_offsetX,
-                                         shoulderSegment_offsetY * invScale,
+                                         hableParams.shoulderSegment.offsetX,
+                                         hableParams.shoulderSegment.offsetY * hableParams.invScale,
                                          -1.f,
-                                         -1.f * invScale,
-                                         shoulderSegment_lnA,
-                                         shoulderSegment_B);
+                                         -1.f * hableParams.invScale,
+                                         hableParams.shoulderSegment.lnA,
+                                         hableParams.shoulderSegment.B);
     }
 }
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L45-L52
 template<class T>
 T Hable_Inverse(
-  T      InputColor,
-  uint   Channels /*1 to 3*/, //there has to be better solution than this
-  float  params_y0,
-  float  params_y1,
-  float  dstParams_W,
-  float  toeSegment_lnA,
-  float  toeSegment_B,
-  float  midSegment_offsetX,
-  float  midSegment_lnA,
-  float  shoulderSegment_offsetX,
-  float  shoulderSegment_offsetY,
-  float  shoulderSegment_lnA,
-  float  shoulderSegment_B,
-  float  invScale,
-  bool   onlyInvertHighlights = false)
+  T              InputColor,
+  uint           Channels /*1 to 3*/, //there has to be better solution than this
+  HableParamters hableParams,
+  bool           onlyInvertHighlights = false)
 {
     // There's no inverse formula for colors beyond the 0-1 range
     InputColor = saturate(InputColor);
@@ -467,18 +425,7 @@ T Hable_Inverse(
     if (Channels <= 1) // InputColor[channel] won't compile if T is float(1)
     {
         Hable_Inverse_Channel(itmColor.x,
-                              params_y0,
-                              params_y1,
-                              dstParams_W,
-                              toeSegment_lnA,
-                              toeSegment_B,
-                              midSegment_offsetX,
-                              midSegment_lnA,
-                              shoulderSegment_offsetX,
-                              shoulderSegment_offsetY,
-                              shoulderSegment_lnA,
-                              shoulderSegment_B,
-                              invScale,
+                              hableParams,
                               onlyInvertHighlights);
     }
     else
@@ -486,23 +433,12 @@ T Hable_Inverse(
         for (uint channel = 0; channel < Channels; channel++)
         {
             Hable_Inverse_Channel(itmColor[channel],
-                                  params_y0,
-                                  params_y1,
-                                  dstParams_W,
-                                  toeSegment_lnA,
-                                  toeSegment_B,
-                                  midSegment_offsetX,
-                                  midSegment_lnA,
-                                  shoulderSegment_offsetX,
-                                  shoulderSegment_offsetY,
-                                  shoulderSegment_lnA,
-                                  shoulderSegment_B,
-                                  invScale,
+                                  hableParams,
                                   onlyInvertHighlights);
         }
     }
 
-    return (T)itmColor * dstParams_W;
+    return (T)itmColor * hableParams.dstParams.W;
 }
 
 // Tonemapper inspired from DICE. Works on luminance to maintain hue, not per channel.
@@ -535,6 +471,7 @@ float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
     const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
     const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, AutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
     const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
+
     return Color * (AutoHDRTotalRatio / SDRRatio);
 }
 
@@ -577,13 +514,13 @@ float FindLuminanceToRestoreScale(float3 color, float tonemapLostLuminance, floa
 // "MidGrayScale" is how much the mid gray shifted from the originally intended tonemapped input (e.g. if we run this function on the untonemapped image, we can remap the mid gray)
 float3 PostProcess(float3 Color, inout float ColorLuminance, float MidGrayScale = 1.f)
 {
-    const uint hdrCmpDatIndex = PcwHdrComposite.HdrCmpDatIndex;
+    const uint   hdrCmpDatIndex        = PcwHdrComposite.HdrCmpDatIndex;
     const float4 highlightsColorFilter = HdrCmpDat[hdrCmpDatIndex].HighlightsColorFilter;
-    const float4 colorFilter = HdrCmpDat[hdrCmpDatIndex].ColorFilter;
-    const float hableSaturation = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
-    const float brightnessMultiplier = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
-    const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
-    const float contrastMidPoint = PerSceneConstants[316u].z * MidGrayScale; // Game usually has this around 0.18 (mid gray)
+    const float4 colorFilter           = HdrCmpDat[hdrCmpDatIndex].ColorFilter;
+    const float  hableSaturation       = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
+    const float  brightnessMultiplier  = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
+    const float  contrastIntensity     = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
+    const float  contrastMidPoint      = PerSceneConstants[316u].z * MidGrayScale; // Game usually has this around 0.18 (mid gray)
 
     ColorLuminance = Luminance(Color);
 
@@ -610,8 +547,8 @@ float3 PostProcess(float3 Color, inout float ColorLuminance, float MidGrayScale 
     // https://www.imagemagick.org/Usage/color_mods/#sigmoidal
 
     // Multiplier to somewhat match the original contrast adjustment
-    static const float SigmoidalContrastAdjustment = 2.5f; //TODO: we could probably find an even better default multiplication
-    float c = max(contrastIntensity * SigmoidalContrastAdjustment, EPSILON); // protect against division by zero
+    static const float sigmoidalContrastAdjustment = 2.5f; //TODO: we could probably find an even better default multiplication
+    float c = max(contrastIntensity * sigmoidalContrastAdjustment, EPSILON); // protect against division by zero
     float s = contrastMidPoint; // can be set to 0.5 for better darkening of shadows
 
     float minus = -1 / (1 + exp(c * s));
@@ -628,13 +565,13 @@ float3 PostProcess(float3 Color, inout float ColorLuminance, float MidGrayScale 
 
 float3 PostProcess_Inverse(float3 Color, float ColorLuminance, float MidGrayScale = 1.f)
 {
-    const uint hdrCmpDatIndex = PcwHdrComposite.HdrCmpDatIndex;
+    const uint   hdrCmpDatIndex        = PcwHdrComposite.HdrCmpDatIndex;
     const float4 highlightsColorFilter = HdrCmpDat[hdrCmpDatIndex].HighlightsColorFilter;
-    const float4 colorFilter = HdrCmpDat[hdrCmpDatIndex].ColorFilter;
-    const float hableSaturation = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
-    const float brightnessMultiplier = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
-    const float contrastIntensity = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
-    const float contrastMidPoint = PerSceneConstants[316u].z * MidGrayScale;
+    const float4 colorFilter           = HdrCmpDat[hdrCmpDatIndex].ColorFilter;
+    const float  hableSaturation       = HdrCmpDat[hdrCmpDatIndex].HableSaturation;
+    const float  brightnessMultiplier  = HdrCmpDat[hdrCmpDatIndex].BrightnessMultiplier; // Neutral at 1
+    const float  contrastIntensity     = HdrCmpDat[hdrCmpDatIndex].ContrastIntensity; // Neutral at 1
+    const float  contrastMidPoint      = PerSceneConstants[316u].z * MidGrayScale;
 
     // We can't invert the color filter, so we will only inverse the post process by the unfiltered amount
     const float colorFilterInverse = 1.f - colorFilter.a;
@@ -811,18 +748,7 @@ PSOutput PS(PSInput psInput)
     float acesParam_modE;
     float acesParam_modA;
 
-    float hable_params_y0;
-    float hable_params_y1;
-    float hable_dstParams_W;
-    float hable_toeSegment_lnA;
-    float hable_toeSegment_B;
-    float hable_midSegment_offsetX;
-    float hable_midSegment_lnA;
-    float hable_shoulderSegment_offsetX;
-    float hable_shoulderSegment_offsetY;
-    float hable_shoulderSegment_lnA;
-    float hable_shoulderSegment_B;
-    float hable_invScale;
+    HableParamters hableParams;
 
     const bool clampACES = false;
 
@@ -844,19 +770,7 @@ PSOutput PS(PSInput psInput)
 
         case 3:
         {
-            tonemappedUnclampedColor = Hable(inputColor,
-                                             hable_params_y0,
-                                             hable_params_y1,
-                                             hable_dstParams_W,
-                                             hable_toeSegment_lnA,
-                                             hable_toeSegment_B,
-                                             hable_midSegment_offsetX,
-                                             hable_midSegment_lnA,
-                                             hable_shoulderSegment_offsetX,
-                                             hable_shoulderSegment_offsetY,
-                                             hable_shoulderSegment_lnA,
-                                             hable_shoulderSegment_B,
-                                             hable_invScale);
+            tonemappedUnclampedColor = Hable(inputColor, hableParams);
             tonemappedColor = tonemappedUnclampedColor; // Hable was never clamped
         } break;
 
@@ -1004,33 +918,11 @@ PSOutput PS(PSInput psInput)
             const bool onlyInvertHighlights = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY;
             inverseTonemapColor = Hable_Inverse(inverseTonemapColor,
                                                 inverseTonemapColorComponents,
-                                                hable_params_y0,
-                                                hable_params_y1,
-                                                hable_dstParams_W,
-                                                hable_toeSegment_lnA,
-                                                hable_toeSegment_B,
-                                                hable_midSegment_offsetX,
-                                                hable_midSegment_lnA,
-                                                hable_shoulderSegment_offsetX,
-                                                hable_shoulderSegment_offsetY,
-                                                hable_shoulderSegment_lnA,
-                                                hable_shoulderSegment_B,
-                                                hable_invScale,
+                                                hableParams,
                                                 onlyInvertHighlights);
             midGrayOut = Hable_Inverse(midGrayIn,
                                        1,
-                                       hable_params_y0,
-                                       hable_params_y1,
-                                       hable_dstParams_W,
-                                       hable_toeSegment_lnA,
-                                       hable_toeSegment_B,
-                                       hable_midSegment_offsetX,
-                                       hable_midSegment_lnA,
-                                       hable_shoulderSegment_offsetX,
-                                       hable_shoulderSegment_offsetY,
-                                       hable_shoulderSegment_lnA,
-                                       hable_shoulderSegment_B,
-                                       hable_invScale,
+                                       hableParams,
                                        onlyInvertHighlights);
             tonemapLostLuminance *= colorCorrectionHDRClippedLuminanceChange;
             postColorCorrectionLuminance = postColorCorrectionClampedLuminance;
