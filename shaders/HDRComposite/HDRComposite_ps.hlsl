@@ -249,9 +249,9 @@ float3 Hable(
     // toeM and shoulderM are missing because EvalDerivativeLinearGamma (https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L81-L85)
     // evaluates to gamma * m * pow(m * x + b, gamma - 1) with gamma being 1
     // this just returns m
-    #define toeM m
-    #define shoulderM m
-
+    const float toeM = m;
+    const float shoulderM = m;
+    
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L137-L138
     // max(EPSILON, pow(params_yX, gamma))
     params_y0 = max(EPSILON, dstParams_y0); // is pow(x, gamma) with gamma = 1
