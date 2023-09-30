@@ -63,7 +63,7 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
-    Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0)).rgb);
+    Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
     Analysis.blackY = Luminance(Analysis.black);
     Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
     Analysis.whiteY = Luminance(Analysis.white);
@@ -142,33 +142,24 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
     float3 color = gamma_sRGB_to_linear(LUT.Load(UVW));
     const float3 originalColor = color;
 
+    // TODO: do we need these branches? Shaders are best without branches, especially when they could be replaced by min/max math.
+    // Is the branch to prevent weird LUTs from being adjusted?
     if ((analysis.whiteY > analysis.blackY)
-        && ((analysis.whiteY - analysis.blackY) < 1.f)) {
-        // LUT is clamped and not inversed
-
+        && ((analysis.whiteY - analysis.blackY) < 1.f))
+    {
         // Lower black floor (shadow pass):
         // In 3D space, drags all points towards 0 relative to how much black
-        // point has moved (eg: -4, -10, -5)
+        // point has moved (eg (on 256): -4, -10, -5)
         // Distance from 0 is factor to decide how much each pixel should move,
         // with (1) (white) not moving at all.
         // *Applying to each channel individually also removes tint
-        const float3 reduceFactor = linearNormalization<float3>(
-            neutralLUTColor, 
-            0.f,
-            1.f,
-            1.f / (1.f - analysis.black),
-            1.f);
+        const float3 reduceFactor = lerp(1.f / (1.f - analysis.black), 1.f, pow(neutralLUTColor, 2.f)); //TODO: test pow
 
         // Reapply tint without raising black floor:
         // In 3D space, shift points away from black **per channel** to
         // reintroduce tint back to the pixels. Use multiplication to avoid
         // raised black floor.
-        const float3 increaseFactor = linearNormalization<float3>(
-            neutralLUTColor,
-            0.f,
-            1.f,
-            1.f + analysis.black,
-            1.f);
+        const float3 increaseFactor = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
 
         // color * reduce = [0,1] relative to XYZ:
         // result *= black tint
@@ -176,45 +167,67 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         // (1,1,1) must remain unchanged
         // Scaling is strongest at 0, and weakest at 1 (none)
         color = (1.f - ((1.f - color) * reduceFactor)) * increaseFactor;
+        // TODO: this introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift
+        
+#if 0 // HDR range analysis
+        if (any(color > 1))
+        {
+            return 0;
+        }
+        else if (any(color < 0))
+        {
+            return 1;
+        }
+#endif
+        
+        static const float cubeNormalization = sqrt(3.f); // Normalize to 0-1 range
+        // How distant are our LUT coordinates from black or white in 3D cube space?
+        const float blackDistance = hypot3(neutralLUTColor) / cubeNormalization;
+        const float whiteDistance = hypot3(1.f - neutralLUTColor) / cubeNormalization;
+        const float totalRange = blackDistance + whiteDistance;
 
-        const float blackDistance = hypot3(neutralLUTColor);
-        const float whiteDistance = hypot3(1.f - neutralLUTColor);
-        const float totalRange = (blackDistance + whiteDistance);
+        const float currentY = Luminance(color); // In case this was negative, the shadows raise pass should bring it back to the >= 0 range
+        
+        // Brightness multiplier from shadows
+        const float shadowsRaise = linearNormalization(
+            min(currentY, analysis.blackY),
+            0.f,
+            analysis.blackY,
+            1.f + analysis.blackY,
+            1.f);
+        
+        // Brightness multiplier from highlights
+        float highlightsRaise = linearNormalization(
+            whiteDistance,
+            0.f,
+            totalRange,
+            1.f / analysis.whiteY,
+            1.f);
+        // Scale by the maximum value this could ever have, so it's normalized and we are guaranteed target luminance doesn't go beyond 1.
+        highlightsRaise *= SDRRange ? analysis.whiteY : 1.f;
+        const float targetY = currentY * highlightsRaise * shadowsRaise;
 
-        const float currentY = Luminance(color);
-        if (currentY > 0.f) { // Skip if black
-            float shadowRaise = 1.f; // Brightness multiplier from shadow
-            if (currentY < analysis.blackY) {
-                shadowRaise = linearNormalization(
-                    currentY,
-                    0.f,
-                    analysis.blackY,
-                    1.f + (1.f - analysis.blackY),
-                    1.f);
-            }
-            const float highlightsRaise = linearNormalization(
-                whiteDistance, 
-                0.f, 
-                totalRange, 
-                1.f / analysis.whiteY,
-                1.f); // Brightness multiplier from highlight
-            const float targetY = currentY * highlightsRaise * shadowRaise;
-
-            // TODO: why are we clamping to full white here? luminance 1 (or beyond) might not match a white color at all, should we instead try to conserve the hue? Though that's much harder as we'd need hue mapping.
-            if (SDRRange && targetY >= 1.f) {
-                color = 1.f; // Clamp
-            } else {
-                // targetY could be on LUTs (raised black point and dark blues)
-                color *= max(targetY, 0.f) / currentY;
-            }
-        } else {
-            // TODO: Consider removal since no longer scaling
-            color = 0; // Color may have gone below 0 when scaling
+        // TODO: why are we clamping to full white here? luminance 1 (or beyond) might not match a white color at all, should we instead try to conserve the hue? Though that's much harder as we'd need to analyze more LUT pixels.
+        if (SDRRange && targetY >= 1.f)
+        {
+            color = 1.f; // Clamp
+        }
+        else
+        {
+            // targetY could be on LUTs (raised black point and dark blues)
+            color *= max(targetY, 0.f) / currentY;
         }
 
         // Optional step to keep colors in the SDR range.
-        if (SDRRange) {
+        if (SDRRange)
+        {
             color = saturate(color);
+        }
+        // TODO: consider removing this if it's proven unnecessary on all LUTs
+        // Some protection against invalid colors
+        else if (Luminance(color) < 0.f)
+        {
+            color = 0.f;
         }
     }
 
@@ -222,7 +235,6 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
     return color;
 }
-
 
 // Dispatch size is 1 1 16 (x and y have one thread and one thread group, while z has 16 thread groups with a thread each)
 [numthreads(LUT_SIZE_UINT, LUT_SIZE_UINT, 1)]
