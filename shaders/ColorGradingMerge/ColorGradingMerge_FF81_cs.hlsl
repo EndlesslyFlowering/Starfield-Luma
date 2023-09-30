@@ -164,7 +164,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         // (1,1,1) must remain unchanged
         // Scaling is strongest at 0, and weakest at 1 (none)
         color = (1.f - ((1.f - color) * reduceFactor)) * increaseFactor;
-                
+
 #if 0 // "Invalid" range analysis
         if (any(color > 1))
         {
@@ -175,14 +175,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
             return 1;
         }
 #endif
-        
+
 #if 1 // TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift. This fix up might not be necessary as later we raise blacks anyway.
         // Color may have gone negative
         // For example, if black is (3,3,3) and another value is (0,0,4), that
         // may result in (-3,-3,1)
         color = max(color, 0.f);
 #endif
-        
+
         static const float cubeNormalization = sqrt(3.f); // Normalize to 0-1 range
         // How distant are our LUT coordinates from black or white in 3D cube space?
         const float blackDistance = hypot3(neutralLUTColor) / cubeNormalization;
@@ -190,10 +190,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         const float totalRange = blackDistance + whiteDistance;
 
         const float currentY = Luminance(color); // In case this was negative, the shadows raise pass should bring it back to the >= 0 range
-        
+
         // Magic number to decide by how much to scale the new shadow area
         const float shadowCompensationPercentage = 1.f - analysis.blackY;
-        
+
         // Brightness multiplier from shadows:
         // Because the amount the black level was raised is proportional to
         // the harshness of a linear gradient, a compensation must be made
@@ -212,10 +212,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         // TODO: Analyze grayscale for shadow raise. For example, if black shadow was raised
         // by 5%, then analyze the ramping from 5%-10% and apply that to
         // the new 0% - 5% raise.
-        
+
         // TODO: apply both shadow and highlight raise to the whole image range, instead of a portion of it, to make its gradient smoother? Or maybe apply it in perceptual (gamma) space.
         // The functions could also be simplified a lot.
-        
+
         // Brightness multiplier from highlights:
         // Boost luminance of all texels relative to their distance to white
         // and how much white is to be raised.
@@ -281,7 +281,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
     LUT3Color = gamma_sRGB_to_linear(LUT3Color);
     LUT4Color = gamma_sRGB_to_linear(LUT4Color);
 #endif // LUT_IMPROVEMENT_TYPE
-    
+
     const bool SDRRange = !((bool)ENABLE_HDR) || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
     float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
