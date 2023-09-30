@@ -179,7 +179,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
         }
 #endif
         
-#if 0 // TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift
+#if 1 // TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift
         // Color may have gone negative
         // For example, if black is (3,3,3) and another value is (0,0,4), that
         // may result in (-3,-3,1)
@@ -226,8 +226,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
             totalRange,
             1.f / analysis.whiteY,
             1.f);
+#if 1 // This destroys luminance
         // Scale by the maximum value this could ever have, so it's normalized and we are guaranteed target luminance doesn't go beyond 1.
         highlightsRaise *= SDRRange ? analysis.whiteY : 1.f;
+#endif
         const float targetY = currentY * highlightsRaise * shadowsRaise;
 
         // TODO: why are we clamping to full white here? luminance 1 (or beyond) might not match a white color at all, should we instead try to conserve the hue? Though that's much harder as we'd need to analyze more LUT pixels.
