@@ -304,32 +304,32 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 		LUT1Color *= lerp(1.f, neutralLUTLuminance / LUT1Luminance, LUTCorrectionPercentage);
 		if (SDRRange)
 		{
-			LUT1Color = saturate(LUT1Color)
-		};
+			LUT1Color = saturate(LUT1Color);
+		}
 	}
 	if (LUT2Luminance != 0.f)
 	{
 		LUT2Color *= lerp(1.f, neutralLUTLuminance / LUT2Luminance, LUTCorrectionPercentage);
 		if (SDRRange)
 		{
-			LUT2Color = saturate(LUT2Color)
-		};
+			LUT2Color = saturate(LUT2Color);
+		}
 	}
 	if (LUT3Luminance != 0.f)
 	{
 		LUT3Color *= lerp(1.f, neutralLUTLuminance / LUT3Luminance, LUTCorrectionPercentage);
 		if (SDRRange)
 		{
-			LUT3Color = saturate(LUT3Color)
-		};
+			LUT3Color = saturate(LUT3Color);
+		}
 	}
 	if (LUT4Luminance != 0.f)
 	{
 		LUT4Color *= lerp(1.f, neutralLUTLuminance / LUT4Luminance, LUTCorrectionPercentage);
 		if (SDRRange)
 		{
-			LUT4Color = saturate(LUT4Color)
-		};
+			LUT4Color = saturate(LUT4Color);
+		}
 	}
 #endif // LUT_IMPROVEMENT_TYPE
 
