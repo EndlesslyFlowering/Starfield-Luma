@@ -15,14 +15,17 @@
 
 // This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
+// Tweak the OG tonemappers to either look better in general, or simply be more compatible with HDR
+#define ENABLE_TONEMAP_IMPROVEMENTS 1
 #define ENABLE_POST_PROCESS 1
 // 0 original (weak, generates values beyond 0-1 which then get clipped), 1 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks), 2 Sigmoidal (smoothest looking, but harder to match)
 #define POST_PROCESS_CONTRAST_TYPE 1
 #define ENABLE_LUT 1
+// LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
 #define ENABLE_REPLACED_TONEMAP 1
 // Use AutoHDR as "inverse tonemapper" (maintains a look closer to the original)
-#define ENABLE_AUTOHDR 1
+#define ENABLE_AUTOHDR 0
 #define ENABLE_INVERSE_POST_PROCESS 0
 #define ENABLE_LUMINANCE_RESTORE 1
 #define CLAMP_INPUT_OUTPUT 1
@@ -174,6 +177,8 @@ float3 ACESParametric_Inverse(float3 Color, float modE, float modA)
 }
 
 // https://github.com/johnhable/fw-public
+// http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/
+// This is NOT the Uncharted 2 tonemapper, which was also by Hable.
 float3 Hable(
   in  float3 InputColor,
   out float  params_y0,
@@ -191,11 +196,14 @@ float3 Hable(
 {
     // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
-    float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f);
+    float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // 2.2 is probably based on perceptual gamma, but we don't know why it's applied here
     float toeStrength      = saturate(PerSceneConstants[3266u].z);
     float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST);
     float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f);
     float shoulderAngle    = saturate(PerSceneConstants[3267u].z);
+#if ENABLE_TONEMAP_IMPROVEMENTS
+    
+#endif
 
     //dstParams
     float dstParams_x0 = toeLength * 0.5f;
@@ -224,7 +232,7 @@ float3 Hable(
     float params_x0 = dstParams_x0 / dstParams_W;
     float params_x1 = dstParams_x1 / dstParams_W;
     //float params_overshootX = dstParams_overshootX / dstParams_W; // this step was optimised away
-    #define params_overshootX dstParams_overshootX
+    float params_overshootX = dstParams_overshootX;
     float dx = y1_offset / dstParams_W;
 
     // mid section
@@ -252,7 +260,7 @@ float3 Hable(
     //OLD: params_y1 = max(EPSILON, exp2(log2(dstParams_y1)));
 
     // pow(1.f + dstParams_overshootY, gamma) - 1.f
-    // -1 was optimised away as shoulderSegment_offsetY is params_overshootY + 1
+    // -1 was optimised away as shoulderSegment_offsetY is "params_overshootY + 1"
     float params_overshootY = 1.f + dstParams_overshootY; // is pow(x, gamma) with gamma = 1
     //OLD: float params_overshootY = exp2(log2(1.f + dstParams_overshootY));
 
@@ -283,7 +291,7 @@ float3 Hable(
         evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + shoulderSegment_lnA) * LOG2_E) + params_overshootY;
     }
     // Eval end
-    invScale = 1.f / (evalY0);
+    invScale = 1.f / evalY0;
 
     float3 toneMapped;
 
@@ -299,7 +307,7 @@ float3 Hable(
         }
         else if (normX < params_x1)
         {
-            float evalMidSegment_y0 = normX + midSegment_offsetX; //is -(-midSegment_offsetX)
+            float evalMidSegment_y0 = normX + midSegment_offsetX; // was -(-midSegment_offsetX)
             if (evalMidSegment_y0 > 0.f)
             {
                 returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA_optimised);
@@ -307,8 +315,7 @@ float3 Hable(
         }
         else
         {
-            //float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX;
-            // small optimisation from the original decompilation
+            //float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX; // small optimisation from the original decompilation
             float evalShoulderSegment_y0 = (1.f + params_overshootX) - normX;
             float evalShoulderReturn = 0.f;
             if (evalShoulderSegment_y0 > 0.f)
@@ -332,15 +339,22 @@ float HableEval_Inverse(
   float lnA,
   float B)
 {
+#if 0 // This version might work better on Nvidia (to be investigated more before deleting the alternative branch)
+    float y0 = max((Channel - offsetY) / scaleY, EPSILON);
+    float x0 = exp((log(y0) - lnA) / B);
+
+    return x0 / scaleX + offsetX;
+#else
     float y0 = (Channel - offsetY) / scaleY;
     float x0 = 0.f;
 
-    if (y0 > 0.f)
+    if (y0 > 0.f) // log(0) is invalid
     {
         x0 = exp((log(y0) - lnA) / B);
     }
 
     return x0 / scaleX + offsetX;
+#endif
 }
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L45-L52
@@ -366,6 +380,8 @@ float3 Hable_Inverse(
 
     for (uint channel = 0; channel < 3; channel++)
     {
+        InputColor[channel] = min(InputColor[channel], 0.995f); //TODO: remove... temp workaround for broken shoulder
+        
         // scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
         // toe
         if (InputColor[channel] < params_y0)
@@ -889,6 +905,7 @@ PSOutput PS(PSInput psInput)
                                   hable_shoulderSegment_lnA,
                                   hable_shoulderSegment_B,
                                   hable_invScale);
+            //TODO: make function template
             midGrayOut = Hable_Inverse(midGrayIn.xxx,
                                   hable_params_y0,
                                   hable_params_y1,
