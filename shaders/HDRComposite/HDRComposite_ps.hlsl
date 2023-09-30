@@ -16,16 +16,18 @@
 // This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
 // Tweak the OG tonemappers to either look better in general, or simply be more compatible with HDR
-#define ENABLE_TONEMAP_IMPROVEMENTS 0
+#define ENABLE_TONEMAP_IMPROVEMENTS 1
 #define ENABLE_POST_PROCESS 1
 // 0 original (weak, generates values beyond 0-1 which then get clipped), 1 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks), 2 Sigmoidal (smoothest looking, but harder to match)
 #define POST_PROCESS_CONTRAST_TYPE 1
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
+// Applies LUTs after inverse tonemap, so we have HDR values in them (inv tonemappers only take 0-1 range)
+#define ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP 1
 #define ENABLE_REPLACED_TONEMAP 1
-// Invert tonemap by luminance (conserves SDR hue)
-#define INVERT_TONEMAP_BY_LUMINANCE 1
+// Invert tonemap by luminance (conserves SDR hue (and damped saturation look))
+#define INVERT_TONEMAP_BY_LUMINANCE 0
 // Only invert highlights, which helps conserve the SDR filmic look (shadow crush)
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
 // Use AutoHDR as "inverse tonemapper" (maintains a look closer to the original)
@@ -423,8 +425,8 @@ void Hable_Inverse_Channel(
     // shoulder
     else
     {
-#if ENABLE_TONEMAP_IMPROVEMENTS && 0 //TODO: remove... temp workaround for broken shoulder
-        ColorChannel = min(ColorChannel, 0.995f);
+#if ENABLE_TONEMAP_IMPROVEMENTS //TODO: remove... temp workaround for broken shoulder
+        ColorChannel = min(ColorChannel, 0.99999f);
 #endif
         
         // scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
@@ -536,7 +538,7 @@ float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
     return Color * (AutoHDRTotalRatio / SDRRatio);
 }
 
-float FindLuminanceToRestoreScale(float3 color, float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance)
+float FindLuminanceToRestoreScale(float3 color, float tonemapLostLuminance, float preColorCorrectionLuminance, float postColorCorrectionLuminance, float midGrayScale = 1.f)
 {
     // Try to restore any luminance that would have been lost during tone mapping (e.g. tonemapping, post process, LUTs, ... can all clip values).
     //
@@ -552,12 +554,20 @@ float FindLuminanceToRestoreScale(float3 color, float tonemapLostLuminance, floa
     const float currentLum = Luminance(color);
     if (currentLum > 0.f)
     {
-        tonemapLostLuminance = isnan(tonemapLostLuminance) ? 0.f : tonemapLostLuminance;
+        // Change the "tonemapLostLuminance" from being in the tonemapped SDR (0-1) range to the untonemapped HDR image range (by scaling it by the mid gray change, which is the best we can do).
+        // This will also acknowledge any clipped luminance from the range beyond 0-1.
+        tonemapLostLuminance = isnan(tonemapLostLuminance) ? 0.f : (tonemapLostLuminance * midGrayScale);
+
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT && !ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && LUT_IMPROVEMENT_TYPE == 3 // Restore any luminance lost by the LUT
+        float scale = 1.f;
+        scale *= postColorCorrectionLuminance > 0.f ? lerp(1.f, preColorCorrectionLuminance / postColorCorrectionLuminance, LUTCorrectionPercentage) : 1.f;
+#else
         const float luminanceCCInvChange = max(1.f - (preColorCorrectionLuminance - postColorCorrectionLuminance), 0.f);
-        //const float luminanceCCInvChange = clamp(postColorCorrectionLuminance / preColorCorrectionLuminance, 0.f, 2.f); //TODO: try this
-        
-        const float targetLum = max(currentLum + tonemapLostLuminance, 0.f);
+        //const float luminanceCCInvChange = clamp(postColorCorrectionLuminance / preColorCorrectionLuminance, 0.f, 2.f); //TODO: try this, especially if brightness goes crazy high
         float scale = luminanceCCInvChange;
+#endif
+        
+        const float targetLum = max(currentLum + tonemapLostLuminance, 0.f); //TODO: review max() math
         scale *= targetLum / currentLum;
         return scale;
     }
@@ -874,9 +884,9 @@ PSOutput PS(PSInput psInput)
     // This is the luminance lost by clamping SDR tonemappers to the 0-1 range, and again by the fact that LUTs only take 0-1 range input.
     float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor);
 
-    const float preColorCorrectionLuminance = Luminance(tonemappedColor);
-
     float3 color = tonemappedColor;
+
+    const float preColorCorrectionLuminance = Luminance(color);
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 
@@ -895,11 +905,11 @@ PSOutput PS(PSInput psInput)
 
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
-    float3 lutColor = TetrahedralInterpolation(Lut, LUTCoordinates);
+    float3 LUTColor = TetrahedralInterpolation(Lut, LUTCoordinates);
 
 #else
 
-    float3 lutColor = Lut.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+    float3 LUTColor = Lut.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
@@ -907,13 +917,19 @@ PSOutput PS(PSInput psInput)
 
     // We always work in linear space so convert to it.
     // We never acknowledge the original wrong gamma function here (we don't really care).
-    lutColor = gamma_sRGB_to_linear(lutColor);
+    LUTColor = gamma_sRGB_to_linear(LUTColor);
 
 #endif // !LUT_FIX_GAMMA_MAPPING
 
-    const float LutMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
+    const float LUTMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
 
-    color = lerp(lutColor, color, LutMaskAlpha);
+    LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
+
+#if ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+    const float3 LUTColorShift = LUTColor / color;
+#else
+    color = LUTColor;
+#endif
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
@@ -955,7 +971,7 @@ PSOutput PS(PSInput psInput)
 #else
     float3 inverseTonemapColor = color;
     const uint inverseTonemapColorComponents = 3;
-#endif
+#endif // INVERT_TONEMAP_BY_LUMINANCE
     
     // Restore a color very close to the original linear one, but with all the other post process and LUT transformations baked in
     switch (tonemapperIndex)
@@ -1035,18 +1051,23 @@ PSOutput PS(PSInput psInput)
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
 #if ENABLE_LUMINANCE_RESTORE //TODO: this will go beyond the max output nits if "ENABLE_AUTOHDR" is true, we need to fix a way to make them work together (maybe re-tonemap always at the end?)
-    // Change the "tonemapLostLuminance" from being in the tonemapped SDR (0-1) range to the untonemapped HDR image range (by scaling it by the mid gray change, which is the best we can do).
-    // This will also acknowledge any clipped luminance from the range beyond 0-1.
-    tonemapLostLuminance *= midGrayScale;
-    
     // Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation.
     // It's important to do these after the inverse tonemappers, as they can't handle values beyond 0-1.
-    color *= FindLuminanceToRestoreScale(color, tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance);
+    color *= FindLuminanceToRestoreScale(color, tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance, midGrayScale);
 #endif // ENABLE_LUMINANCE_RESTORE
+
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT && ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP
+    const float3 preLUTShiftedColor = color;
+    color *= LUTColorShift;
+#if LUT_IMPROVEMENT_TYPE == 3
+    const float postLUTShiftedColorLuminance = Luminance(color);
+    color *= postLUTShiftedColorLuminance > 0.f ? (Luminance(preLUTShiftedColor) / postLUTShiftedColorLuminance) : 1.f;
+#endif // LUT_IMPROVEMENT_TYPE == 3
+#endif // ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP
 
     // Bring back the color to the same range as SDR by dividing by the mid gray change.
     color *= paperWhite / midGrayScale;
-    
+
 #if !ENABLE_AUTOHDR
     
     //TODO: find a tonemapper that looks more like Hable?
