@@ -150,7 +150,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		// Distance from 0 is factor to decide how much each pixel should move,
 		// with (1) (white) not moving at all.
 		// *Applying to each channel individually also removes tint
-		const float3 reduceFactor = lerp(1.f / (1.f - analysis.black), 1.f, pow(neutralLUTColor, 2.f)); //TODO: test pow
+		static const float shadowCrushingModulation = 2.2f; // Defines the gradient with which shadow are shifted to zero //TODO: find best value
+		const float3 reduceFactor = lerp(1.f / (1.f - analysis.black), 1.f, pow(neutralLUTColor, shadowCrushingModulation));
 
 		// Reapply tint without raising black floor:
 		// In 3D space, shift points away from black **per channel** to

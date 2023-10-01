@@ -4,7 +4,8 @@
 static const float WhiteNits_BT709 = 80.f;
 static const float ReferenceWhiteNits_BT2408 = 203.f;
 
-// SDR mid gray
+// SDR mid gray.
+// This is based on the commonly used value, though perception space mid gray in sRGB or Gamma 2.2 would theoretically be ~0.2155
 static const float MidGray = 0.18f;
 
 // SMPTE ST 2084 (Perceptual Quantization) is only defined until this amount of nits.
