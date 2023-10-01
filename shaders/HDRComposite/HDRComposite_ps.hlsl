@@ -15,8 +15,6 @@
 
 // This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
-// Tweak the OG tonemappers to either look better in general, or simply be more compatible with HDR
-#define ENABLE_TONEMAP_IMPROVEMENTS 1
 #define ENABLE_POST_PROCESS 1
 // 0 original (weak, generates values beyond 0-1 which then get clipped), 1 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks), 2 Sigmoidal (smoothest looking, but harder to match)
 #define POST_PROCESS_CONTRAST_TYPE 1
@@ -30,8 +28,6 @@
 #define INVERT_TONEMAP_BY_LUMINANCE 0
 // Only invert highlights, which helps conserve the SDR filmic look (shadow crush)
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
-// Use AutoHDR as "inverse tonemapper" (maintains a look closer to the original)
-#define ENABLE_AUTOHDR 0
 #define ENABLE_INVERSE_POST_PROCESS 0
 #define ENABLE_LUMINANCE_RESTORE 1
 #define CLAMP_INPUT_OUTPUT 1
@@ -159,9 +155,7 @@ T ACES_Inverse(
 	float modE,
 	float modA)
 {
-	//TODO: does this apply for `ACESParametric` as well? Probably
-	//TODO: figure out if we could still use the unclamped color. There should be a way to invert it.
-	// ACES is not defined for any values beyond 0-1
+    // ACES is not defined for any values beyond 0-1, as they already represent the 0-INF range.
 	Color = saturate(Color);
 
 	T fixed0 = (-ACES_d * Color) + ACES_b;
@@ -207,10 +201,6 @@ float3 Hable(
 	const float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
 	const float shoulderAngle    = saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
-#if ENABLE_TONEMAP_IMPROVEMENTS
-	//TODO: fix highlights
-#endif
-
 	//dstParams
 	float dstParams_x0 = toeLength * 0.5f;
 	float dstParams_y0 = (1.f - toeStrength) * dstParams_x0;
@@ -226,7 +216,7 @@ float3 Hable(
 	float initialW = dstParams_x0 + remainingY;
 	hableParams.dstParams.W = initialW + extraW;
 
-	// "W * " was optimised away by DXIL->SPIRV->HLSL conversion as down the line there is a "/ W"
+	// "W * " was optimised away by DXIL->SPIRV->HLSL conversion as down the line there was a "/ W"
 	float dstParams_overshootX = 2.f * shoulderAngle * shoulderStrength;
 	float dstParams_overshootY = 0.5f * shoulderAngle * shoulderStrength;
 
@@ -308,10 +298,12 @@ float3 Hable(
 		bool isToeSegment = normX < params_x0;
 		float returnChannel = 0.f;
 
+		// Toe
 		if (isToeSegment && normX > 0.f)
 		{
 			returnChannel = exp2(((((log2(normX) * hableParams.toeSegment.B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
 		}
+		// Mid
 		else if (normX < params_x1)
 		{
 			float evalMidSegment_y0 = normX + hableParams.midSegment.offsetX; // was -(-hableParams.midSegment.offsetX)
@@ -320,8 +312,11 @@ float3 Hable(
 				returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA_optimised);
 			}
 		}
+		// Highlight
 		else
 		{
+			// Note that this will "clip" to 1 way before +INF
+
 			//float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX; // small optimisation from the original decompilation
 			float evalShoulderSegment_y0 = (1.f + params_overshootX) - normX;
 			float evalShoulderReturn = 0.f;
@@ -346,12 +341,6 @@ float HableEval_Inverse(
 	float lnA,
 	float B)
 {
-#if 0 //TODO: delete. This version might work better on Nvidia (to be investigated more before deleting the alternative branch)
-	float y0 = max((Channel - offsetY) / scaleY, EPSILON);
-	float x0 = exp((log(y0) - lnA) / B);
-
-	return x0 / scaleX + offsetX;
-#else
 	float y0 = (Channel - offsetY) / scaleY;
 	float x0 = 0.f;
 
@@ -361,26 +350,27 @@ float HableEval_Inverse(
 	}
 
 	return x0 / scaleX + offsetX;
-#endif
 }
 
 void Hable_Inverse_Channel(
 	inout float          ColorChannel,
 	in    HableParamters hableParams,
+	inout float          minHighlightsColor,
 	in    bool           onlyInvertHighlights = false)
 {
 	// Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
-	const float minHighlightsColor = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
-
-	if (onlyInvertHighlights && ColorChannel < minHighlightsColor)
+	const float targetMinHighlightsColor = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
+	if (onlyInvertHighlights && ColorChannel < targetMinHighlightsColor)
 	{
-		ColorChannel *= HableEval_Inverse(minHighlightsColor,
-		                                  hableParams.shoulderSegment.offsetX,
-		                                  hableParams.shoulderSegment.offsetY * hableParams.invScale,
-		                                  -1.f,
-		                                  -1.f * hableParams.invScale,
-		                                  hableParams.shoulderSegment.lnA,
-		                                  hableParams.shoulderSegment.B) / minHighlightsColor;
+		const float remappedMinHighlightsColor = HableEval_Inverse(targetMinHighlightsColor,
+		                                                           hableParams.shoulderSegment.offsetX,
+		                                                           hableParams.shoulderSegment.offsetY * hableParams.invScale,
+		                                                           -1.f,
+		                                                           -1.f * hableParams.invScale,
+		                                                           hableParams.shoulderSegment.lnA,
+		                                                           hableParams.shoulderSegment.B);
+        ColorChannel *= remappedMinHighlightsColor / targetMinHighlightsColor;
+        minHighlightsColor = remappedMinHighlightsColor;
 		return;
 	}
 
@@ -412,13 +402,6 @@ void Hable_Inverse_Channel(
 	// shoulder
 	else
 	{
-#if ENABLE_TONEMAP_IMPROVEMENTS //TODO: remove... temp workaround for broken shoulder
-		// seems to be Nvidia specific workaround?
-		// maybe use BTHCNST
-		ColorChannel = min(ColorChannel, 0.99999f);
-
-#endif
-
 		// scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
 		ColorChannel = HableEval_Inverse(ColorChannel,
 		                                 hableParams.shoulderSegment.offsetX,
@@ -436,6 +419,7 @@ T Hable_Inverse(
 	T              InputColor,
 	uint           Channels /*1 to 3*/, //there has to be better solution than this
 	HableParamters hableParams,
+	inout float    minHighlightsColor,
 	bool           onlyInvertHighlights = false)
 {
 	// There's no inverse formula for colors beyond the 0-1 range
@@ -447,6 +431,7 @@ T Hable_Inverse(
 	{
 		Hable_Inverse_Channel(itmColor.x,
 		                      hableParams,
+		                      minHighlightsColor,
 		                      onlyInvertHighlights);
 	}
 	else
@@ -455,6 +440,7 @@ T Hable_Inverse(
 		{
 			Hable_Inverse_Channel(itmColor[channel],
 		                        hableParams,
+		                        minHighlightsColor,
 		                        onlyInvertHighlights);
 		}
 	}
@@ -463,42 +449,20 @@ T Hable_Inverse(
 }
 
 // Tonemapper inspired from DICE. Works on luminance to maintain hue, not per channel.
+// "HighlightsShoulderStart" should be between 0 and 1. Determines where the highlights curve (shoulder) starts. Leaving at zero for now as it's a simple and good looking default.
 float3 DICETonemap(
 	float3 Color,
-	float  MaxOutputLuminance)
+	float  MaxOutputLuminance,
+	float  HighlightsShoulderStart = 0.f)
 {
-	// Between 0 and 1. Determines where the highlights curve (shoulder) starts.
-	// Leaving at zero for now as it's a simple and good looking default.
-	const float highlightsShoulderStart = 0.f;
-
+	//TODO: try "per channel" option given all other tm is per channel
 	const float sourceLuminance = Luminance(Color);
 	if (sourceLuminance > 0.0f)
 	{
-		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, highlightsShoulderStart);
+		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, HighlightsShoulderStart);
 		Color *= compressedLuminance / sourceLuminance;
 	}
 	return Color;
-}
-
-// AutoHDR pass to generate some HDR brightess out of an SDR signal (it has no effect if HDR is not engaged).
-// This is hue conserving and only really affects highlights.
-// https://github.com/Filoppi/PumboAutoHDR
-float3 PumboAutoHDR(
-	float3 Color,
-	float  MaxOutputNits,
-	float  PaperWhite)
-{
-	static const float AutoHDRShoulderPow = 3.5f; //TODO: exposure to user?
-
-	const float SDRRatio = Luminance(Color);
-	// Limit AutoHDR brightness, it won't look good beyond a certain level.
-	// The paper white multiplier is applied later so we account for that.
-	const float AutoHDRMaxWhite = max(MaxOutputNits / PaperWhite, WhiteNits_BT709) / WhiteNits_BT709;
-	const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
-	const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, AutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
-	const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
-
-	return Color * (AutoHDRTotalRatio / SDRRatio);
 }
 
 float FindLuminanceToRestoreScale(
@@ -535,7 +499,7 @@ float FindLuminanceToRestoreScale(
 		float scale = luminanceCCInvChange;
 #endif
 
-		const float targetLum = max(currentLum + tonemapLostLuminance, 0.f); //TODO: review max() math
+		const float targetLum = max(currentLum + tonemapLostLuminance, 0.f);
 		scale *= targetLum / currentLum;
 		return scale;
 	}
@@ -885,7 +849,7 @@ PSOutput PS(PSInput psInput)
 
 	LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
 
-#if ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+#if ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP && ENABLE_HDR //TODO: try this with the post process pass as well
 
 	float3 LUTColorShift = LUTColor / color;
 
@@ -925,19 +889,8 @@ PSOutput PS(PSInput psInput)
 
 	const float paperWhite = HDR_GAME_PAPER_WHITE;
 
-	const float midGrayIn = MidGray;
+	const float midGrayIn = MidGray; //TODO: try to increase this to ~0.21
 	float midGrayOut = midGrayIn;
-
-#if ENABLE_AUTOHDR
-
-	if (tonemapperIndex == 1 || tonemapperIndex == 2 || tonemapperIndex == 3)
-	{
-		tonemapperIndex = 0;
-		color = PumboAutoHDR(color, HDR_MAX_OUTPUT_NITS, paperWhite);
-		midGrayOut = PumboAutoHDR(midGrayIn.xxx, HDR_MAX_OUTPUT_NITS, paperWhite).x;
-	}
-
-#endif // ENABLE_AUTOHDR
 
 #if INVERT_TONEMAP_BY_LUMINANCE
 
@@ -952,15 +905,17 @@ PSOutput PS(PSInput psInput)
 
 #endif // INVERT_TONEMAP_BY_LUMINANCE
 
+	float minHighlightsColor = pow(2.f / 3.f, 2.2f); // We consider highlight the last ~33% of perception space
+	const bool onlyInvertHighlights = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY;
+
 	// Restore a color very close to the original linear one, but with all the other post process and LUT transformations baked in
 	switch (tonemapperIndex)
 	{
-		//TODO: implement INVERT_TONEMAP_HIGHLIGHTS_ONLY for ACES
-
 		case 1:
 		{
 			inverseTonemapColor           = ACESReference_Inverse(inverseTonemapColor);
 			midGrayOut                    = ACESReference_Inverse(midGrayIn);
+			minHighlightsColor            = ACESReference_Inverse(minHighlightsColor);
 			tonemapLostLuminance         *= colorCorrectionHDRClippedLuminanceChange;
 			postColorCorrectionLuminance  = postColorCorrectionClampedLuminance;
 		} break;
@@ -969,21 +924,22 @@ PSOutput PS(PSInput psInput)
 		{
 			inverseTonemapColor           = ACESParametric_Inverse(inverseTonemapColor, acesParam_modE, acesParam_modA);
 			midGrayOut                    = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
+			minHighlightsColor            = ACESParametric_Inverse(minHighlightsColor, acesParam_modE, acesParam_modA);
 			tonemapLostLuminance         *= colorCorrectionHDRClippedLuminanceChange;
 			postColorCorrectionLuminance  = postColorCorrectionClampedLuminance;
 		} break;
 
 		case 3:
 		{
-			const bool onlyInvertHighlights = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY;
-
 			inverseTonemapColor = Hable_Inverse(inverseTonemapColor,
 			                                    inverseTonemapColorComponents,
 			                                    hableParams,
+												minHighlightsColor,
 			                                    onlyInvertHighlights);
 			midGrayOut          = Hable_Inverse(midGrayIn,
 			                                    1,
 			                                    hableParams,
+												minHighlightsColor,
 			                                    onlyInvertHighlights);
 
 			tonemapLostLuminance         *= colorCorrectionHDRClippedLuminanceChange;
@@ -1013,7 +969,7 @@ PSOutput PS(PSInput psInput)
 
 #endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
 
-#if ENABLE_LUMINANCE_RESTORE //TODO: this will go beyond the max output nits if "ENABLE_AUTOHDR" is true, we need to fix a way to make them work together (maybe re-tonemap always at the end?)
+#if ENABLE_LUMINANCE_RESTORE
 
 	// Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation.
 	// It's important to do these after the inverse tonemappers, as they can't handle values beyond 0-1.
@@ -1036,18 +992,15 @@ PSOutput PS(PSInput psInput)
 
 	// Bring back the color to the same range as SDR by dividing by the mid gray change.
 	color *= paperWhite / midGrayScale;
+	minHighlightsColor *= paperWhite / midGrayScale;
 
-#if !ENABLE_AUTOHDR
-
-	//TODO: find a tonemapper that looks more like Hable?
 	const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
-	color = DICETonemap(color, maxOutputLuminance);
-
-#endif // !ENABLE_AUTOHDR
+	const float highlightsShoulderStart = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY ? minHighlightsColor : 0.f;
+    color = DICETonemap(color, maxOutputLuminance, highlightsShoulderStart);
 
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-	color *= HDR_GAME_PAPER_WHITE;
+	color *= HDR_GAME_PAPER_WHITE_MULTIPLIER;
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
