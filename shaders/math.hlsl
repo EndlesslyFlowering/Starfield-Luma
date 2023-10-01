@@ -43,7 +43,7 @@ float rangeCompressPow(float x, float fMax = FLT_MAX, float fPow = 1.f)
 	return (1.f - pow(exp(-x), fPow)) * fRestoreRangeScale;
 }
 
-// Refurbished DICE HDR tonemapper
+// Refurbished DICE HDR tonemapper (per channel or luminance)
 float luminanceCompress(float fInValue, float fOutMaxValue, float fShoulderStart = 0.f, float fInMaxValue = FLT_MAX, float fModulationPow = 1.f)
 {
 	float fCompressableValue = fInValue - fShoulderStart;
