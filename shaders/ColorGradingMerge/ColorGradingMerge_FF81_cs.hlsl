@@ -9,6 +9,12 @@
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
 #define UNUSED_PARAMS 0
+#define LUT__DEBUG_VALUES true
+
+// Enum: {0: AS_IS, 1: ORIGINAL, 2:WHITE, 3: MAX_HUE, 4: CLAMP }
+#define LUT__SDR__ON_CLIP 1
+#define LUT__HDR__ON_CLIP 0
+
 
 static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
 static float LUTCorrectionPercentage = 1.f;
@@ -30,6 +36,7 @@ struct LUTAnalysis
 	float blackY;
 	float3 white;
 	float whiteY;
+	float whiteL;
 #if UNUSED_PARAMS
 	float minChannel;
 	float maxChannel;
@@ -67,6 +74,7 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 	Analysis.blackY = Luminance(Analysis.black);
 	Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
 	Analysis.whiteY = Luminance(Analysis.white);
+	Analysis.whiteL = linear_srgb_to_oklab(Analysis.white)[0];
 #if UNUSED_PARAMS
 	Analysis.minY = FLT_MAX;
 	Analysis.maxY = -FLT_MAX;
@@ -142,121 +150,147 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	float3 color = gamma_sRGB_to_linear(LUT.Load(UVW));
 	const float3 originalColor = color;
 
-	// TODO: do we need these branches? Shaders are best without branches, especially when they could be replaced by min/max math.
-	// Is the branch to prevent weird LUTs from being adjusted?
-	if ((analysis.whiteY > analysis.blackY)
-		&& ((analysis.whiteY - analysis.blackY) < 1.f))
-	{
-		// Lower black floor (shadow pass):
-		// In 3D space, drags all points towards 0 relative to how much black
-		// point has moved (eg (on 256): -4, -10, -5)
-		// Distance from 0 is factor to decide how much each pixel should move,
-		// with (1) (white) not moving at all.
-		// *Applying to each channel individually also removes tint
-		static const float shadowCrushingModulation = 2.2f; // Defines the gradient with which shadow are shifted to zero //TODO: find best value
-		const float3 reduceFactor = lerp(1.f / (1.f - analysis.black), 1.f, pow(neutralLUTColor, shadowCrushingModulation));
+	// TODO: Remove if branching
 
-		// Reapply tint without raising black floor:
-		// In 3D space, shift points away from black **per channel** to
-		// reintroduce tint back to the pixels. Use multiplication to avoid
-		// raised black floor.
-		const float3 increaseFactor = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
+	// If LUT is inversed (eg: photo negative) don't do anything
+	if (analysis.whiteY < analysis.blackY) return originalColor; // Inversed LUT
+	
+	// If LUT is full range already nothing to do
+	if (analysis.whiteY - analysis.blackY >= 1.f) return lerp(originalColor, color, LUTCorrectionPercentage);
 
-		// color * reduce = [0,1] relative to XYZ:
-		// result *= black tint
-		// (0,0,0) must always compute to 0
-		// (1,1,1) must remain unchanged
-		// Scaling is strongest at 0, and weakest at 1 (none)
-		color = (1.f - ((1.f - color) * reduceFactor)) * increaseFactor;
+	// Return black on (0,0,0)
+	if (!any(originalColor)) return float3(0.f, 0.f, 0.f);
 
-#if 0 // "Invalid" range analysis
-		if (any(color > 1))
-		{
-			return 0;
-		}
-		else if (any(color < 0))
-		{
-			return 1;
-		}
+	// Return white on (1,1,1)
+	const float3 white = float3(1.f,1.f,1.f);
+	if (dot(originalColor, white) >= 3.f) return white;
+
+#if LUT__DEBUG_VALUES
+	float3 DEBUG_COLOR = float3(1.f,0,1.f); // Magenta
 #endif
 
-		// TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift. This fix up might not be necessary as later we raise blacks anyway.
-		// Color may have gone negative
-		// For example, if black is (3,3,3) and another value is (0,0,4), that
-		// may result in (-3,-3,1)
-		color = max(color, 0.f);
+	// While it unclear how exactly the floor was raised, remove the tint to floor
+	// the values to 0. This will remove the haze and tint giving a fuller chroma
+	// Sample and hold targetChroma
+	const float3 reduceFactor = linearNormalization<float3>(
+		neutralLUTColor, 
+		0.f,
+		1.f,
+		1.f / (1.f - analysis.black),
+		1.f);
 
-		static const float cubeNormalization = sqrt(3.f); // Normalize to 0-1 range
-		// How distant are our LUT coordinates from black or white in 3D cube space?
-		const float blackDistance = hypot3(neutralLUTColor) / cubeNormalization;
-		const float whiteDistance = hypot3(1.f - neutralLUTColor) / cubeNormalization;
-		const float totalRange = blackDistance + whiteDistance;
+	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
-		const float currentY = Luminance(color); // In case this was negative, the shadows raise pass should bring it back to the >= 0 range
+	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1];
 
-		// Magic number to decide by how much to scale the new shadow area
-		const float shadowCompensationPercentage = 1.f - analysis.blackY;
-
-		// Brightness multiplier from shadows:
-		// Because the amount the black level was raised is proportional to
-		// the harshness of a linear gradient, a compensation must be made
-		// to avoid black crushing, and maintain visibility at certain
-		// points in the LUT. The scaling used will be relative to the
-		// raised black floor level to ensure proportional consistency per
-		// LUT. This is only done to the newly created shadow section (if any).
-		// Simplified, if black started raised, a new shadow section was
-		// created, and that needs extra luminance for visibility.
-		const float shadowsRaise = linearNormalization(
-			min(currentY, analysis.blackY),
+	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
+	// Sample and hold targetL  
+	
+	const float3 increaseFactor = linearNormalization<float3>(
+			neutralLUTColor,
 			0.f,
-			analysis.blackY,
-			1.f + shadowCompensationPercentage,
+			1.f,
+			1.f + analysis.black,
 			1.f);
-		// TODO: Analyze grayscale for shadow raise. For example, if black shadow was raised
-		// by 5%, then analyze the ramping from 5%-10% and apply that to
-		// the new 0% - 5% raise.
 
-		// TODO: apply both shadow and highlight raise to the whole image range, instead of a portion of it, to make its gradient smoother? Or maybe apply it in perceptual (gamma) space.
-		// The functions could also be simplified a lot.
+	const float3 retintedColor = detintedColor * increaseFactor;
 
-		// Brightness multiplier from highlights:
-		// Boost luminance of all texels relative to their distance to white
-		// and how much white is to be raised.
-		// (ie: white drags everything towards it)
-		float highlightsRaise = linearNormalization(
-			whiteDistance,
-			0.f,
-			totalRange,
-			1.f / analysis.whiteY,
-			1.f);
-		// Scale by the maximum value this could ever have, so it's normalized and we are guaranteed target luminance doesn't go beyond 1. Note that this can literally destroy luminance.
-		highlightsRaise *= SDRRange ? analysis.whiteY : 1.f;
-		const float targetY = currentY * highlightsRaise * shadowsRaise;
+	float targetL = linear_srgb_to_oklch(retintedColor)[0];
 
-		// TODO: why are we clamping to full white here? luminance 1 (or beyond) might not match a white color at all, should we instead try to conserve the hue? Though that's much harder as we'd need to analyze more LUT pixels.
-		if (SDRRange && targetY >= 1.f)
-		{
-			color = 1.f; // Clamp (clip to full white, it also looks great with external AutoHDR)
-			// Or, limit to max luminance while maintaining hue, though may result in LUT max Y being below 1
-			// Or, still target full white for (1,1,1), but scale others relative to whiteY
-			// Or, don't adjust unless white point
-		}
-		else if (currentY != 0.f)
-		{
-			color *= max(targetY, 0.f) / max(currentY, 0.f); // Clamp luminances to avoid a double negative creating a positive number
-		}
+#if LUT__DEBUG_VALUES
+	if (targetL < 0) return DEBUG_COLOR;
+#endif
 
-		// Optional step to keep colors in the SDR range.
-		if (SDRRange)
-		{
-			color = saturate(color);
+	// Texels exista as points in 3D cube. We are moving two heavily weighted
+	// points and need to compute the net force to be applied.
+	// Black texel is 0 from itself and sqrt(3) from white
+	// White texel is 0 from itself and sqrt(3) from black
+	// Values in between can be closer to one than the other.
+	// This can also be represented as [-1 to 1] or [-B to +W].
+	// For interpolation between 0 and a maximum, it become [0, ..., W, ..., W+B]
+	// Distances do not always add up to sqrt(3) (eg: 1,0,0)
+	
+	const float blackDistance = hypot3(neutralLUTColor);
+	const float whiteDistance = hypot3(1.f - neutralLUTColor);
+	const float totalRange = blackDistance + whiteDistance;
+
+#if LUT__DEBUG_VALUES
+  // whiteY most always be > 0
+	if (analysis.whiteL <= 0) return DEBUG_COLOR;
+#endif
+
+
+	// Boost lightness by how much white was reduced
+	const float raiseL = linearNormalization(
+		whiteDistance, 
+		0.f, 
+		totalRange, 
+		1.f / analysis.whiteL, 
+		1.f);
+
+#if LUT__DEBUG_VALUES
+  // increaseY must always be >= 1
+	if (raiseL < 1) return DEBUG_COLOR;
+#endif
+
+	targetL *= raiseL;
+
+	// Use hue from LUT cube color
+	const float targetHue = linear_srgb_to_oklch(color)[2];
+
+#if LUT__SDR__ON_CLIP > 0 || LUT__HDR__ON_CLIP > 0
+	if (targetL >= 1.f) {
+	#if LUT__SDR__ON_CLIP > 0 && LUT__SDR__ON_CLIP != LUT__HDR__ON_CLIP 
+		if (SDRRange) {
+	#endif
+
+	#if LUT__SDR__ON_CLIP == 1
+		// Original (do nothing)
+	#elif LUT__SDR__ON_CLIP == 2
+		// White
+		color = white;
+	#elif LUT__SDR__ON_CLIP == 3
+		// TODO
+	#elif LUT__SDR__ON_CLIP == 4
+		color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
+	#endif
+
+	#if LUT__SDR__ON_CLIP > 0 && LUT__SDR__ON_CLIP != LUT__HDR__ON_CLIP 
 		}
-		// TODO: consider removing this if it's proven unnecessary on all LUTs
-		// Some protection against invalid colors
-		else if (Luminance(color) < 0.f)
-		{
-			color = 0.f;
+		#if LUT__HDR__ON_CLIP > 0
+		else {
+		#endif
+	#endif
+
+	#if LUT__SDR__ON_CLIP == 0 && LUT__HDR__ON_CLIP > 0
+		if (!SDRRange) {
+	#endif
+
+	#if LUT__HDR__ON_CLIP != LUT__SDR_ON_CLIP
+		#if LUT__HDR__ON_CLIP == 1
+			// Original (do nothing)
+		#elif LUT__HDR__ON_CLIP == 2
+			// White
+			color = white;
+		#elif LUT__HDR__ON_CLIP == 3
+ 			// TODO
+		#elif LUT__HDR__ON_CLIP == 4
+			color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
+		#endif
+	#endif
+	#if LUT__HDR__ON_CLIP > 0 && LUT__SDR__ON_CLIP != LUT__HDR__ON_CLIP
 		}
+	#endif
+	} else {
+		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
+	}
+#elif
+		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
+#endif
+
+	// Optional step to keep colors in the SDR range.
+	if (SDRRange) {
+		color = saturate(color);
 	}
 
 	color = lerp(originalColor, color, LUTCorrectionPercentage);
