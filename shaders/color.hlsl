@@ -8,6 +8,10 @@ static const float ReferenceWhiteNits_BT2408 = 203.f;
 // This is based on the commonly used value, though perception space mid gray in sRGB or Gamma 2.2 would theoretically be ~0.2155
 static const float MidGray = 0.18f;
 
+// Start of the highlights shoulder (empirical)
+static const float MinHighlightsColor = pow(2.f / 3.f, 2.2f);
+static const float MaxShadowsColor = pow(1.f / 3.f, 2.2f);
+
 // SMPTE ST 2084 (Perceptual Quantization) is only defined until this amount of nits.
 // This is also the max each color channel can have in HDR10.
 static const float PQMaxNits = 10000.0f;
