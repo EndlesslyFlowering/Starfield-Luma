@@ -21,15 +21,9 @@
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
-// Applies LUTs after inverse tonemap, so we have HDR values in them (inv tonemappers only take 0-1 range)
-#define ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP 1
 #define ENABLE_REPLACED_TONEMAP 1
-// Invert tonemap by luminance (conserves SDR hue (and damped saturation look))
-#define INVERT_TONEMAP_BY_LUMINANCE 0
 // Only invert highlights, which helps conserve the SDR filmic look (shadow crush)
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
-#define ENABLE_INVERSE_POST_PROCESS 0
-#define ENABLE_LUMINANCE_RESTORE 1
 #define CLAMP_INPUT_OUTPUT 1
 
 
@@ -53,8 +47,8 @@ Texture2D<float3> InputColor : register(t0, space9);
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 
-Texture2D<float3> LutMask : register(t1, space9);
-Texture3D<float3> Lut     : register(t3, space9);
+Texture2D<float3> LUTMaskTexture : register(t1, space9);
+Texture3D<float3> LUTTexture     : register(t3, space9);
 
 #endif
 
@@ -100,8 +94,10 @@ struct PSOutput
 
 // exp2(x * 1.44269502162933349609375f) is the same as exp(x)
 
-static const float LUTStrength = 1.f;
-static const float RestorePreLUTLuminance = 1.f;
+static const float TonemapStrength = 1.f; //TODO: implement
+static const float PostProcessStrength = 1.f; //TODO: implement
+// Similar to "AdditionalNeutralLUTPercentage" in the LUT shader, though this is more precise as it skips the precision loss induced by a neutral LUT
+static const float GradingLUTStrength = 1.f;
 // 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
 
@@ -328,7 +324,7 @@ float3 Hable(
 		}
 		toneMapped[channel] = returnChannel * hableParams.invScale;
 	}
-	return toneMapped;
+	return toneMapped; // Note: this color needs no clamping, it's already implied to be between 0-1
 }
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L21-L34
@@ -354,26 +350,8 @@ float HableEval_Inverse(
 
 void Hable_Inverse_Channel(
 	inout float          ColorChannel,
-	in    HableParamters hableParams,
-	inout float          minHighlightsColor,
-	in    bool           onlyInvertHighlights = false)
+	in    HableParamters hableParams)
 {
-	// Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
-	const float targetMinHighlightsColor = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
-	if (onlyInvertHighlights && ColorChannel < targetMinHighlightsColor)
-	{
-		const float remappedMinHighlightsColor = HableEval_Inverse(targetMinHighlightsColor,
-		                                                           hableParams.shoulderSegment.offsetX,
-		                                                           hableParams.shoulderSegment.offsetY * hableParams.invScale,
-		                                                           -1.f,
-		                                                           -1.f * hableParams.invScale,
-		                                                           hableParams.shoulderSegment.lnA,
-		                                                           hableParams.shoulderSegment.B);
-        ColorChannel *= remappedMinHighlightsColor / targetMinHighlightsColor;
-        minHighlightsColor = remappedMinHighlightsColor;
-		return;
-	}
-
 	// scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
 	// toe
 	if (ColorChannel < hableParams.params.y0)
@@ -418,9 +396,7 @@ template<class T>
 T Hable_Inverse(
 	T              InputColor,
 	uint           Channels /*1 to 3*/, //there has to be better solution than this
-	HableParamters hableParams,
-	inout float    minHighlightsColor,
-	bool           onlyInvertHighlights = false)
+	HableParamters hableParams)
 {
 	// There's no inverse formula for colors beyond the 0-1 range
 	InputColor = saturate(InputColor);
@@ -429,19 +405,13 @@ T Hable_Inverse(
 
 	if (Channels <= 1) // InputColor[channel] won't compile if T is float(1)
 	{
-		Hable_Inverse_Channel(itmColor.x,
-		                      hableParams,
-		                      minHighlightsColor,
-		                      onlyInvertHighlights);
+		Hable_Inverse_Channel(itmColor.x, hableParams);
 	}
 	else
 	{
 		for (uint channel = 0; channel < Channels; channel++)
 		{
-			Hable_Inverse_Channel(itmColor[channel],
-		                        hableParams,
-		                        minHighlightsColor,
-		                        onlyInvertHighlights);
+			Hable_Inverse_Channel(itmColor[channel], hableParams);
 		}
 	}
 
@@ -463,47 +433,6 @@ float3 DICETonemap(
 		Color *= compressedLuminance / sourceLuminance;
 	}
 	return Color;
-}
-
-float FindLuminanceToRestoreScale(
-	float3 color,
-	float  tonemapLostLuminance,
-	float  preColorCorrectionLuminance,
-	float  postColorCorrectionLuminance,
-	float  midGrayScale = 1.f)
-{
-	// Try to restore any luminance that would have been lost during tone mapping (e.g. tonemapping, post process, LUTs, ... can all clip values).
-	//
-	// To achieve this, we re-apply the lost luminance, but only by the inverse amount the luminance changed during the color correction.
-	// e.g. if the color correction fully changed the luminance, then we don't change it any further,
-	// but if the color correction changed the luminance only by 25%, then we re-apply apply 75% of the lost luminance on top.
-	// This will be "accurate" as long as the color correction scaled the luminance linearly in the output as it grew in the input,
-	// but even if it didn't, it should still look fine.
-
-	// This will re-apply an amount of lost luminance based on how much the CC (LUT) reduced it:
-	// the more the CC reduced the luminance, the less we will apply.
-	// If the CC increased the luminance though, we will apply even more than the base lost amount.
-	const float currentLum = Luminance(color);
-	if (currentLum > 0.f)
-	{
-		// Change the "tonemapLostLuminance" from being in the tonemapped SDR (0-1) range to the untonemapped HDR image range (by scaling it by the mid gray change, which is the best we can do).
-		// This will also acknowledge any clipped luminance from the range beyond 0-1.
-		tonemapLostLuminance = isnan(tonemapLostLuminance) ? 0.f : (tonemapLostLuminance * midGrayScale);
-
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT && !ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && LUT_IMPROVEMENT_TYPE == 3 // Restore any luminance lost by the LUT
-		float scale = 1.f;
-		scale *= postColorCorrectionLuminance > 0.f ? lerp(1.f, preColorCorrectionLuminance / postColorCorrectionLuminance, LUTCorrectionPercentage) : 1.f;
-#else
-		const float luminanceCCInvChange = max(1.f - (preColorCorrectionLuminance - postColorCorrectionLuminance), 0.f);
-		//const float luminanceCCInvChange = clamp(postColorCorrectionLuminance / preColorCorrectionLuminance, 0.f, 2.f); //TODO: try this, especially if brightness goes crazy high
-		float scale = luminanceCCInvChange;
-#endif
-
-		const float targetLum = max(currentLum + tonemapLostLuminance, 0.f);
-		scale *= targetLum / currentLum;
-		return scale;
-	}
-	return 1.f;
 }
 
 // "MidGrayScale" is how much the mid gray shifted from the originally intended tonemapped input (e.g. if we run this function on the untonemapped image, we can remap the mid gray)
@@ -565,7 +494,7 @@ float3 PostProcess(
 
 float3 PostProcess_Inverse(
 	float3 Color,
-	float  ColorLuminance,
+	float  OriginalColorLuminance,
 	float  MidGrayScale = 1.f)
 {
 	const uint   hdrCmpDatIndex        = PcwHdrComposite.HdrCmpDatIndex;
@@ -595,16 +524,16 @@ float3 PostProcess_Inverse(
 
 	Color /= brightnessMultiplier;
 
-	Color -= lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
+	Color -= lerp(float3(0.f, 0.f, 0.f), OriginalColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
 
-	Color = ((Color - ColorLuminance) / hableSaturation) + ColorLuminance;
+	Color = ((Color - OriginalColorLuminance) / hableSaturation) + OriginalColorLuminance;
 
 	return Color;
 }
 
 // Takes input coordinates. Returns output color in linear space (also works in sRGB but it's not ideal).
 float3 TetrahedralInterpolation(
-	Texture3D<float3> Lut,
+	Texture3D<float3> LUTTextureIn,
 	float3            LUTCoordinates)
 {
 	// We need to clip the input coordinates as LUT texure samples below are not clamped.
@@ -620,18 +549,18 @@ float3 TetrahedralInterpolation(
 
 	float3 f1, f4;
 
-	float3 v1 = Lut.Load(int4(baseInd, 0)).rgb;
-	float3 v4 = Lut.Load(int4(nextInd, 0)).rgb;
+	float3 v1 = LUTTextureIn.Load(int4(baseInd, 0)).rgb;
+	float3 v4 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 	if (fract.r >= fract.g)
 	{
 		if (fract.g >= fract.b)  // R > G > B
 		{
 			nextInd = baseInd + int3(1, 0, 0);
-			float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			nextInd = baseInd + int3(1, 1, 0);
-			float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			f1 = 1.f - fract.r;
 			f4 = fract.b;
@@ -643,10 +572,10 @@ float3 TetrahedralInterpolation(
 		else if (fract.r >= fract.b)  // R > B > G
 		{
 			nextInd = baseInd + int3(1, 0, 0);
-			float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			nextInd = baseInd + int3(1, 0, 1);
-			float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			f1 = 1.f - fract.r;
 			f4 = fract.g;
@@ -658,10 +587,10 @@ float3 TetrahedralInterpolation(
 		else  // B > R > G
 		{
 			nextInd = baseInd + int3(0, 0, 1);
-			float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			nextInd = baseInd + int3(1, 0, 1);
-			float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			f1 = 1.f - fract.b;
 			f4 = fract.g;
@@ -676,10 +605,10 @@ float3 TetrahedralInterpolation(
 		if (fract.g <= fract.b)  // B > G > R
 		{
 			nextInd = baseInd + int3(0, 0, 1);
-			float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			nextInd = baseInd + int3(0, 1, 1);
-			float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			f1 = 1.f - fract.b;
 			f4 = fract.r;
@@ -691,10 +620,10 @@ float3 TetrahedralInterpolation(
 		else if (fract.r >= fract.b)  // G > R > B
 		{
 			nextInd = baseInd + int3(0, 1, 0);
-			float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			nextInd = baseInd + int3(1, 1, 0);
-			float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			f1 = 1.f - fract.g;
 			f4 = fract.b;
@@ -706,10 +635,10 @@ float3 TetrahedralInterpolation(
 		else  // G > B > R
 		{
 			nextInd = baseInd + int3(0, 1, 0);
-			float3 v2 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			nextInd = baseInd + int3(0, 1, 1);
-			float3 v3 = Lut.Load(int4(nextInd, 0)).rgb;
+			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
 
 			f1 = 1.f - fract.g;
 			f4 = fract.r;
@@ -723,9 +652,54 @@ float3 TetrahedralInterpolation(
 	return color + (f1 * v1) + (f4 * v4);
 }
 
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+// In/Out linear space
+float3 GradingLUT(float3 color, float2 uv)
+{
+#if FIX_WRONG_SRGB_GAMMA_FORMULA
+	const float3 LUTCoordinates = gamma_linear_to_sRGB(color);
+#else
+	// Read gamma ini value, defaulting at 2.4 (makes little sense)
+	float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
+	// Weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
+	const float3 LUTCoordinates = max((pow(color, inverseGamma) * 1.055f) - 0.055f, 0.f); // Does "max()" is probably unnecessary as LUT sampling is already clamped.
+#endif // FIX_WRONG_SRGB_GAMMA_FORMULA
+
+#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+	float3 LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
+#else
+	float3 LUTColor = LUTTexture.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+
+#if !LUT_FIX_GAMMA_MAPPING
+	// We always work in linear space so convert to it.
+	// We never acknowledge the original wrong gamma function here (we don't really care).
+	LUTColor = gamma_sRGB_to_linear(LUTColor);
+#endif // !LUT_FIX_GAMMA_MAPPING
+
+	const float LUTMaskAlpha = saturate(LUTMaskTexture.Sample(Sampler0, uv).x + (1.f - GradingLUTStrength));
+	LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
+
+	return LUTColor;
+}
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
+
+// Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
+// "midGrayScale" is how much mid gray shifted when doing tm->inv_tm.
+float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColorRatio, float3 postProcessColorOffset, float3 tonemappedColor, float midGrayScale)
+{
+	float3 postProcessedRatioColor = inverseTonemappedColor;
+	float3 postProcessedOffsetColor = inverseTonemappedColor;
+	postProcessedRatioColor *= postProcessColorRatio;
+	postProcessedOffsetColor += postProcessColorOffset * midGrayScale;
+	// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
+	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift.
+	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
+}
 
 PSOutput PS(PSInput psInput)
 {
+	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
 	float3 inputColor = InputColor.Load(int3(int2(psInput.SV_Position.xy), 0));
 
 #if CLAMP_INPUT_OUTPUT
@@ -740,18 +714,15 @@ PSOutput PS(PSInput psInput)
 
 	float3 bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD);
 	float bloomMultiplier = PcwHdrComposite.BloomMultiplier;
-	inputColor = (bloomMultiplier * bloom) + inputColor;
+	inputColor += bloomMultiplier * bloom;
 
 #endif // APPLY_BLOOM
 
 	float3 tonemappedColor;
-	float3 tonemappedUnclampedColor;
 
 #if !ENABLE_TONEMAP
-
 	tonemappedColor = inputColor;
-	tonemappedUnclampedColor = inputColor;
-
+	float3 tonemappedPostProcessedColor = tonemappedColor;
 #else
 
 	float acesParam_modE;
@@ -767,272 +738,153 @@ PSOutput PS(PSInput psInput)
 	{
 		case 1:
 		{
-			tonemappedUnclampedColor = ACESReference(inputColor, clampACES);
-			tonemappedColor = saturate(tonemappedUnclampedColor);
+			tonemappedColor = ACESReference(inputColor, clampACES);
 		} break;
 
 		case 2:
 		{
-			tonemappedUnclampedColor = ACESParametric(inputColor, clampACES, acesParam_modE, acesParam_modA);
-			tonemappedColor = saturate(tonemappedUnclampedColor);
+			tonemappedColor = ACESParametric(inputColor, clampACES, acesParam_modE, acesParam_modA);
 		} break;
 
 		case 3:
 		{
-			tonemappedUnclampedColor = Hable(inputColor, hableParams);
-			tonemappedColor = tonemappedUnclampedColor; // Hable was never clamped
+			tonemappedColor = Hable(inputColor, hableParams);
 		} break;
 
 		default:
 		{
-			tonemappedUnclampedColor = inputColor;
-			tonemappedColor = saturate(tonemappedUnclampedColor);
+			tonemappedColor = inputColor;
 		} break;
 	}
 
 #if ENABLE_POST_PROCESS
-
 	float prePostProcessColorLuminance;
-	float prePostProcessUnclampedColorLuminance;
-
-	tonemappedColor = PostProcess(tonemappedColor, prePostProcessColorLuminance);
-	// Repeat on unclamped tonemapped color to later retrieve the lost luminance
-	tonemappedUnclampedColor = PostProcess(tonemappedUnclampedColor, prePostProcessUnclampedColorLuminance);
-
+	float3 tonemappedPostProcessedColor = PostProcess(tonemappedColor, prePostProcessColorLuminance);
+#else
+	float3 tonemappedPostProcessedColor = tonemappedColor; // No need to do anything (not even a saturate here)
 #endif //ENABLE_POST_PROCESS
-
-	tonemappedColor = saturate(tonemappedColor);
 
 #endif // ENABLE_TONEMAP
 
-	// This is the luminance lost by clamping SDR tonemappers to the 0-1 range, and again by the fact that LUTs only take 0-1 range input.
-	float tonemapLostLuminance = Luminance(tonemappedUnclampedColor - tonemappedColor);
-
-	float3 color = tonemappedColor;
-
-	const float preColorCorrectionLuminance = Luminance(color);
+	float3 tonemappedPostProcessedGradedColor = tonemappedPostProcessedColor;
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
-
-#if FIX_WRONG_SRGB_GAMMA_FORMULA
-
-	const float3 LUTCoordinates = gamma_linear_to_sRGB(color);
-
-#else
-
-	// Read gamma ini value, defaulting at 2.4 (makes little sense)
-	float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
-	// Weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
-	const float3 LUTCoordinates = max((pow(color, inverseGamma) * 1.055f) - 0.055f, 0.f); // Does "max()" is unnecessary as LUT sampling is already clamped.
-
-#endif // FIX_WRONG_SRGB_GAMMA_FORMULA
-
-#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-
-	float3 LUTColor = TetrahedralInterpolation(Lut, LUTCoordinates);
-
-#else
-
-	float3 LUTColor = Lut.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
-
-#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-
-#if !LUT_FIX_GAMMA_MAPPING
-
-	// We always work in linear space so convert to it.
-	// We never acknowledge the original wrong gamma function here (we don't really care).
-	LUTColor = gamma_sRGB_to_linear(LUTColor);
-
-#endif // !LUT_FIX_GAMMA_MAPPING
-
-	const float LUTMaskAlpha = saturate(LutMask.Sample(Sampler0, psInput.TEXCOORD).x + (1.f - LUTStrength));
-
-	LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
-
-#if ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP && ENABLE_HDR //TODO: try this with the post process pass as well
-
-	float3 LUTColorShift = LUTColor / color;
-
-	for (uint channel = 0; channel < 3; channel++)
-	{
-		if (color[channel] == 0.f)
-		{
-			LUTColorShift[channel] = 1.f;
-		}
-	}
-
-#else
-
-	color = LUTColor;
-
-#endif
-
+	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD);
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
+
+	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
+
+#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP && ENABLE_HDR //TODO: try this with the post process pass as well
+	const float3 postProcessColorRatio = safeDivision(finalOriginalColor, tonemappedColor);
+	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
+#endif
 
 #if ENABLE_HDR
 
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-	float postColorCorrectionLuminance = Luminance(color);
-	//TODO: this isn't hue conserving, though we don't really have a way of doing it in a hue conserving way, as then it would break the brightness mapping.
-	const float postColorCorrectionClampedLuminance = Luminance(saturate(color));
-	// Some inverse tonemapper formulas can't take any values beyond 0-1, so we'll need to clip them and restore their luminance.
-	const float colorCorrectionHDRClippedLuminanceChange = postColorCorrectionClampedLuminance > 0.f ? (postColorCorrectionLuminance / postColorCorrectionClampedLuminance) : 1.f;
-
-#if ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
-
-	//TODO: passing in the previous luminance might not be the best, though is there any other way really?
-	//Should we at least shift it by how much the LUT shifted the luminance? To invert it more correctly.
-	color = PostProcess_Inverse(color, prePostProcessColorLuminance);
-
-#endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
-
 	const float paperWhite = HDR_GAME_PAPER_WHITE;
 
-	const float midGrayIn = MidGray; //TODO: try to increase this to ~0.21
+	const float midGrayIn = MidGray; //TODO: try to increase this to ~0.21?
 	float midGrayOut = midGrayIn;
 
-#if INVERT_TONEMAP_BY_LUMINANCE
+	float3 inverseTonemappedColor = tonemappedColor;
 
-	float preInverseTonemapColorLuminance = Luminance(color);
-	float inverseTonemapColor = preInverseTonemapColorLuminance;
-	const uint inverseTonemapColorComponents = 1;
-
-#else
-
-	float3 inverseTonemapColor = color;
-	const uint inverseTonemapColorComponents = 3;
-
-#endif // INVERT_TONEMAP_BY_LUMINANCE
-
-	float minHighlightsColor = pow(2.f / 3.f, 2.2f); // We consider highlight the last ~33% of perception space
+	float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception space
+	float minHighlightsColorOut = minHighlightsColorIn;
 	const bool onlyInvertHighlights = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY;
 
-	// Restore a color very close to the original linear one, but with all the other post process and LUT transformations baked in
+	// Restore a color very close to the original linear one (some information might get close in the direct tonemapper)
 	switch (tonemapperIndex)
 	{
 		case 1:
 		{
-			inverseTonemapColor           = ACESReference_Inverse(inverseTonemapColor);
+			inverseTonemappedColor        = ACESReference_Inverse(inverseTonemappedColor);
 			midGrayOut                    = ACESReference_Inverse(midGrayIn);
-			minHighlightsColor            = ACESReference_Inverse(minHighlightsColor);
-			tonemapLostLuminance         *= colorCorrectionHDRClippedLuminanceChange;
-			postColorCorrectionLuminance  = postColorCorrectionClampedLuminance;
+			minHighlightsColorOut         = ACESReference_Inverse(minHighlightsColorIn);
 		} break;
 
 		case 2:
 		{
-			inverseTonemapColor           = ACESParametric_Inverse(inverseTonemapColor, acesParam_modE, acesParam_modA);
+			inverseTonemappedColor        = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
 			midGrayOut                    = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
-			minHighlightsColor            = ACESParametric_Inverse(minHighlightsColor, acesParam_modE, acesParam_modA);
-			tonemapLostLuminance         *= colorCorrectionHDRClippedLuminanceChange;
-			postColorCorrectionLuminance  = postColorCorrectionClampedLuminance;
+			minHighlightsColorOut         = ACESParametric_Inverse(minHighlightsColorIn, acesParam_modE, acesParam_modA);
 		} break;
 
 		case 3:
 		{
-			inverseTonemapColor = Hable_Inverse(inverseTonemapColor,
-			                                    inverseTonemapColorComponents,
-			                                    hableParams,
-												minHighlightsColor,
-			                                    onlyInvertHighlights);
-			midGrayOut          = Hable_Inverse(midGrayIn,
-			                                    1,
-			                                    hableParams,
-												minHighlightsColor,
-			                                    onlyInvertHighlights);
+			// Setup highlights for Hable, we use the official param based highlights shoulder start for it
+			minHighlightsColorIn = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
 
-			tonemapLostLuminance         *= colorCorrectionHDRClippedLuminanceChange;
-			postColorCorrectionLuminance  = postColorCorrectionClampedLuminance;
+			inverseTonemappedColor = Hable_Inverse(inverseTonemappedColor, 3, hableParams);
+			midGrayOut             = Hable_Inverse(midGrayIn, 1, hableParams);
+			minHighlightsColorOut  = Hable_Inverse(minHighlightsColorIn, 1, hableParams);
 		} break;
 
 		default:
-			// Any luminance lost by this tonemap case would have already been restored above with "tonemapLostLuminance".
 			break;
 	}
 
-#if INVERT_TONEMAP_BY_LUMINANCE
-
-	color *= preInverseTonemapColorLuminance > 0.f ? (inverseTonemapColor / preInverseTonemapColorLuminance) : 1.f;
-
-#else
-
-	color = inverseTonemapColor;
-
-#endif
+	for (uint channel = 0; channel < 3; channel++)
+	{
+		// Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
+		if (onlyInvertHighlights && inverseTonemappedColor[channel] < minHighlightsColorOut)
+		{
+			inverseTonemappedColor[channel] = tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn);
+		}
+		// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that)
+		if (inverseTonemappedColor[channel] >= minHighlightsColorOut)
+		{
+			inverseTonemappedColor[channel] = inputColor[channel];
+		}
+	}
+	if (onlyInvertHighlights && midGrayOut < minHighlightsColorOut) // This is probably always true
+	{
+		midGrayOut = midGrayIn * (minHighlightsColorOut / minHighlightsColorIn);
+	}
 
 	const float midGrayScale = midGrayOut / midGrayIn;
 
-#if ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
-
-	color = PostProcess(color, prePostProcessColorLuminance, midGrayScale);
-
-#endif // ENABLE_POST_PROCESS && ENABLE_INVERSE_POST_PROCESS
-
-#if ENABLE_LUMINANCE_RESTORE
-
-	// Restore any luminance beyond 1 that ended up clipped by HDR->SDR tonemappers and any subsequent image manipulation.
-	// It's important to do these after the inverse tonemappers, as they can't handle values beyond 0-1.
-	color *= FindLuminanceToRestoreScale(color, tonemapLostLuminance, preColorCorrectionLuminance, postColorCorrectionLuminance, midGrayScale);
-
-#endif // ENABLE_LUMINANCE_RESTORE
-
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT && ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP
-
-	const float3 preLUTShiftedColor = color;
-	color *= LUTColorShift;
-
-#if LUT_IMPROVEMENT_TYPE == 3
-
-	const float postLUTShiftedColorLuminance = Luminance(color);
-	color *= postLUTShiftedColorLuminance > 0.f ? lerp(1.f, Luminance(preLUTShiftedColor) / postLUTShiftedColorLuminance, LUTCorrectionPercentage) : 1.f;
-
-#endif // LUT_IMPROVEMENT_TYPE == 3
-#endif // ENABLE_APPLY_LUT_AFTER_INVERSE_TONEMAP
+	float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale);
+	//minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale); //TODO: should we even do this?
 
 	// Bring back the color to the same range as SDR by dividing by the mid gray change.
-	color *= paperWhite / midGrayScale;
-	minHighlightsColor *= paperWhite / midGrayScale;
+	inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
+	minHighlightsColorOut *= paperWhite / midGrayScale;
 
 	const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
-	const float highlightsShoulderStart = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY ? minHighlightsColor : 0.f;
-    color = DICETonemap(color, maxOutputLuminance, highlightsShoulderStart);
+	const float highlightsShoulderStart = onlyInvertHighlights ? minHighlightsColorOut : 0.f;
+    float3 outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart);
 
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-	color *= HDR_GAME_PAPER_WHITE_MULTIPLIER;
+	float3 outputColor = finalOriginalColor * HDR_GAME_PAPER_WHITE_MULTIPLIER; // Don't use "HDR_GAME_PAPER_WHITE" as it'd be too bright on an untonemapped image
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 #if CLAMP_INPUT_OUTPUT
-
-	color = clamp(color, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
-
+	outputColor = clamp(outputColor, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
 #endif // CLAMP_INPUT_OUTPUT
 
 #else // ENABLE_HDR
 
+	float3 outputColor = finalOriginalColor;
+
 #if SDR_USE_GAMMA_2_2
-
-	color = pow(color, 1.f / 2.2f);
-
+	outputColor = pow(outputColor, 1.f / 2.2f);
 #else
-
 	// Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
-	color = gamma_linear_to_sRGB(color);
-
+	outputColor = gamma_linear_to_sRGB(outputColor);
 #endif // SDR_USE_GAMMA_2_2
 
 #if CLAMP_INPUT_OUTPUT
-
-	color = saturate(color);
-
+	outputColor = saturate(outputColor);
 #endif // CLAMP_INPUT_OUTPUT
 
 #endif // ENABLE_HDR
 
 	PSOutput psOutput;
-	psOutput.SV_Target.rgb = color;
+	psOutput.SV_Target.rgb = outputColor;
 	psOutput.SV_Target.a = 1.f;
 
 	return psOutput;

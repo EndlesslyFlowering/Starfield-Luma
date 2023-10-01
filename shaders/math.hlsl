@@ -18,6 +18,26 @@ T linearNormalization(T input, T min, T max, T newMin, T newMax)
 	return ((input - min) * ((newMax - newMin) / (max - min))) + newMin;
 }
 
+// Returns 1 if "dividend" is 0
+float safeDivision(float quotient, float dividend)
+{
+	return dividend == 0.f ? 1.f : (quotient / dividend);
+}
+
+// Returns 1 if "dividend" is 0
+float3 safeDivision(float3 quotient, float3 dividend)
+{
+	float3 result = quotient / dividend;
+	for (uint channel = 0; channel < 3; channel++)
+	{
+		if (dividend[channel] == 0.f)
+		{
+			result = 1.f;
+		}
+	}
+	return result;
+}
+
 // Aplies exponential ("Photographic") luma compression.
 // The pow can modulate the curve without changing the values around the edges.
 float rangeCompressPow(float x, float fMax = FLT_MAX, float fPow = 1.f)

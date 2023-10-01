@@ -2,13 +2,16 @@
 #include "../color.hlsl"
 #include "../math.hlsl"
 
+// 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good and it's kinda broken in SDR)
+#define LUT_IMPROVEMENT_TYPE 1
 #define FORCE_SDR_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
 #define UNUSED_PARAMS 0
 
-static float additionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
+static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
+static float LUTCorrectionPercentage = 1.f;
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
@@ -19,7 +22,7 @@ Texture2D<float3> LUT1 : register(t0, space8);
 Texture2D<float3> LUT2 : register(t1, space8);
 Texture2D<float3> LUT3 : register(t2, space8);
 Texture2D<float3> LUT4 : register(t3, space8);
-RWTexture3D<float4> OutMixetLUT : register(u0, space8);
+RWTexture3D<float4> OutMixedLUT : register(u0, space8);
 
 struct LUTAnalysis
 {
@@ -334,11 +337,11 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	}
 #endif // LUT_IMPROVEMENT_TYPE
 
-	float adjustedNeutralLUTPercentage = lerp(PcwColorGradingMerge.neutralLUTPercentage, 1.f, additionalNeutralLUTPercentage);
-	float adjustedLUT1Percentage = lerp(PcwColorGradingMerge.LUT1Percentage, 0.f, additionalNeutralLUTPercentage);
-	float adjustedLUT2Percentage = lerp(PcwColorGradingMerge.LUT2Percentage, 0.f, additionalNeutralLUTPercentage);
-	float adjustedLUT3Percentage = lerp(PcwColorGradingMerge.LUT3Percentage, 0.f, additionalNeutralLUTPercentage);
-	float adjustedLUT4Percentage = lerp(PcwColorGradingMerge.LUT4Percentage, 0.f, additionalNeutralLUTPercentage);
+	float adjustedNeutralLUTPercentage = lerp(PcwColorGradingMerge.neutralLUTPercentage, 1.f, AdditionalNeutralLUTPercentage);
+	float adjustedLUT1Percentage = lerp(PcwColorGradingMerge.LUT1Percentage, 0.f, AdditionalNeutralLUTPercentage);
+	float adjustedLUT2Percentage = lerp(PcwColorGradingMerge.LUT2Percentage, 0.f, AdditionalNeutralLUTPercentage);
+	float adjustedLUT3Percentage = lerp(PcwColorGradingMerge.LUT3Percentage, 0.f, AdditionalNeutralLUTPercentage);
+	float adjustedLUT4Percentage = lerp(PcwColorGradingMerge.LUT4Percentage, 0.f, AdditionalNeutralLUTPercentage);
 
 	float3 mixedLUT = (adjustedNeutralLUTPercentage * neutralLUTColor)
 	                + (adjustedLUT1Percentage * LUT1Color)
@@ -353,5 +356,5 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 
 #endif // !LUT_FIX_GAMMA_MAPPING
 
-	OutMixetLUT[outUVW] = float4(mixedLUT, 1.f);
+	OutMixedLUT[outUVW] = float4(mixedLUT, 1.f);
 }
