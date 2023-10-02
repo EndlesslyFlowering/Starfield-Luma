@@ -1,0 +1,22 @@
+[HDR]
+GamePaperWhite = 200.0
+PeakBrightness = 1000.0
+UIPaperWhite = 200.0
+
+[Main]
+DisplayMode = 2
+
+[RenderTargets]
+RenderTargetsToUpgrade = [
+    'ImageSpaceBuffer',
+    'ScaleformCompositeBuffer',
+    'SF_ColorBuffer',
+    'HDRImagespaceBuffer',
+    'ImageSpaceHalfResBuffer',
+    'ImageProcessColorTarget',
+    'ImageSpaceBufferB10G11R11',
+    'ImageSpaceBufferE5B9G9R9',
+    'TAA_idTech7HistoryColorTarget',
+    'EnvBRDF',
+    'ImageSpaceBufferR10G10B10A2'
+]
