@@ -36,29 +36,6 @@ namespace Hooks
         Utils::SetBufferFormat(a_buffer, a_newFormat);
     }
 
-    void Hooks::RecreateSwapChain(RE::BGSSwapChainObject* a_bgsSwapchainObject, RE::BS_DXGI_FORMAT a_newFormat)
-    {
-		if (a_bgsSwapchainObject->format != a_newFormat) {
-			a_bgsSwapchainObject->format = a_newFormat;
-			Offsets::RecreateSwapChain(*reinterpret_cast<void**>(*Offsets::unkRecreateSwapChainArg1Ptr + 0x28), a_bgsSwapchainObject, a_bgsSwapchainObject->width, a_bgsSwapchainObject->height, *Offsets::unkRecreateSwapChainArg5);
-
-			// set correct color space
-			DXGI_COLOR_SPACE_TYPE newColorSpace;
-			switch (a_newFormat) {
-			case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_B8G8R8A8_UNORM:
-			default:
-				newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
-				break;
-			case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM:
-				newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
-			    break;
-			case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT:
-				newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
-			}
-			a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(newColorSpace);
-		}
-    }
-
     void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable)
     {
 		if (const auto maxLuminanceSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kMaxLuminance))) {
@@ -105,6 +82,25 @@ namespace Hooks
 		}
 		
         return _TakeSnapshot(a1);
+    }
+
+    void Hooks::Hook_RecreateSwapchain(void* a1, RE::BGSSwapChainObject* a_bgsSwapChainObject, uint32_t a_width, uint32_t a_height, uint8_t a5)
+    {
+		_RecreateSwapchain(a1, a_bgsSwapChainObject, a_width, a_height, a5);
+
+		DXGI_COLOR_SPACE_TYPE newColorSpace;
+		switch (Utils::GetBufferFormat(RE::Buffers::FrameBuffer)) {
+		case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_B8G8R8A8_UNORM:
+		default:
+			newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+			break;
+		case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM:
+			newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+			break;
+		case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT:
+			newColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+		}
+		a_bgsSwapChainObject->swapChainInterface->SetColorSpace1(newColorSpace);
     }
 
     void Hooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
@@ -194,7 +190,6 @@ namespace Hooks
 					break;
 				}
 
-				// the value in the buffer definition is not going to be read by the game anymore by this point, but changing it anyway in case something else tries to read it
 				Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
 
 				if (prevValue == 0) {
@@ -202,8 +197,11 @@ namespace Hooks
 				} else if (newValue == 0) {
 					ToggleEnableHDRSubSettings(EventData.m_Model, false);
 				}
-				
-				RecreateSwapChain(swapChainObject, newFormat);
+
+				if (swapChainObject->format != newFormat) {
+					swapChainObject->format = newFormat;
+					Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
+				}
 			}
 		}
 

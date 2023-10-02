@@ -13,4 +13,5 @@ namespace Utils
 
 	void SetBufferFormat(RE::BufferDefinition* a_buffer, RE::BS_DXGI_FORMAT a_format);
 	void SetBufferFormat(RE::Buffers a_buffer, RE::BS_DXGI_FORMAT a_format);
+	RE::BS_DXGI_FORMAT GetBufferFormat(RE::Buffers a_buffer);
 }

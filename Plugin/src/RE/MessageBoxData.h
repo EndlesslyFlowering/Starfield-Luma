@@ -9,7 +9,7 @@ namespace RE
 
 		MessageBoxData(const char* a_messageTitle, const char* a_messageText, void* a4, int32_t a5)
 		{
-			auto addr = dku::Hook::Module::get().base() + 0x13F5BC8;
+			auto addr = dku::Hook::IDToAbs(81979);
 			auto func = reinterpret_cast<void (*)(MessageBoxData*, const char*, const char*, void*, int32_t)>(addr);
 			func(this, a_messageTitle, a_messageText, a4, a5);
 		}
@@ -18,7 +18,7 @@ namespace RE
 
 		~MessageBoxData()
 		{
-			auto addr = dku::Hook::Module::get().base() + 0x13F701C;
+			auto addr = dku::Hook::IDToAbs(82034);
 			auto func = reinterpret_cast<void (*)(MessageBoxData*)>(addr);
 			func(this);
 		}
