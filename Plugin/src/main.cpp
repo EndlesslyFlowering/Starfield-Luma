@@ -10,10 +10,16 @@ DLLEXPORT constinit auto SFSEPlugin_Version = []() noexcept {
 	data.PluginVersion(Plugin::Version);
 	data.PluginName(Plugin::NAME);
 	data.AuthorName(Plugin::AUTHOR);
-	data.UsesSigScanning(true);
-	//data.UsesAddressLibrary(true);
-	data.HasNoStructUse(true);
+
+	// Address Library v1 (https://www.nexusmods.com/starfield/mods/3256)
+	data.UsesAddressLibrary(true);
+	// Version independent signature scanning
+	//data.UsesSigScanning(true);
+
+	// Uses version specific structure definitions
 	//data.IsLayoutDependent(true);
+	//data.HasNoStructUse(true);
+
 	data.CompatibleVersions({ RUNTIME_VERSION_1_7_33 });
 
 	return data;
@@ -24,8 +30,14 @@ DLLEXPORT constinit auto SFSEPlugin_Version = []() noexcept {
 void SFSEPlugin_Preload(SFSE::LoadInterface* a_sfse);
 /**/
 
+static inline bool bIsLoaded = false;
+
 DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
 {
+	if (bIsLoaded) {
+	    return true;
+	}
+
 #ifndef NDEBUG
 	while (!IsDebuggerPresent()) {
 		Sleep(100);
@@ -34,10 +46,8 @@ DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
 
 	SFSE::Init(a_sfse);
 
-	DKUtil::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));
-
-	INFO("{} v{} loaded", Plugin::NAME, Plugin::Version);
-	INFO("base address : {:X}", dku::Hook::Module::get().base())
+	dku::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));
+	INFO("{} v{} loaded", Plugin::NAME, Plugin::Version)
 
 	// do stuff
 	Settings::Main::GetSingleton()->Load();
@@ -46,5 +56,36 @@ DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
 	Offsets::Initialize();
 	Hooks::Install();
 
+	bIsLoaded = true;
+
 	return true;
+}
+
+// for non sfse plugin loaders
+BOOL APIENTRY DllMain(HMODULE a_hModule, DWORD a_ul_reason_for_call, LPVOID a_lpReserved)
+{
+	if (bIsLoaded) {
+	    return TRUE;
+	}
+
+	if (a_ul_reason_for_call == DLL_PROCESS_ATTACH) {
+#ifndef NDEBUG
+		while (!IsDebuggerPresent()) {
+			Sleep(100);
+		}
+#endif
+
+		dku::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));
+		INFO("{} v{} loaded", Plugin::NAME, Plugin::Version)
+
+		Settings::Main::GetSingleton()->Load();
+
+		dku::Hook::Trampoline::AllocTrampoline(1 << 7);
+		Offsets::Initialize();
+		Hooks::Install();
+
+		bIsLoaded = true;
+	}
+
+	return TRUE;
 }

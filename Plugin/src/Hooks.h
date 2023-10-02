@@ -62,31 +62,37 @@ namespace Hooks
 	public:
 		static void Hook()
 		{
-			const auto scan = static_cast<uint8_t*>(dku::Hook::Assembly::search_pattern<"E8 ?? ?? ?? ?? 8B 4D A8 8B 45 AC">());
-			if (!scan) {
-				ERROR("Failed to find color space hook")
-			}
-			const auto callsiteOffset = *reinterpret_cast<int32_t*>(scan + 1);
-			const auto UnkFuncCallsite = AsAddress(scan + 5 + callsiteOffset + 0x3EA);
+			// set color space and save swapchain object pointer
+			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x3EA), Hook_UnkFunc);
 
-			_UnkFunc = dku::Hook::write_call<5>(UnkFuncCallsite, Hook_UnkFunc);  // 32E7856
+			// disable photo mode screenshots with HDR
+			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(415473);
+			auto _Hook_TakeSnapshot = dku::Hook::AddVMTHook(&takeSnapshotVtbl, 1, FUNC_INFO(Hook_TakeSnapshot));
+			_TakeSnapshot = reinterpret_cast<std::add_pointer_t<decltype(Hook_TakeSnapshot)>>(_Hook_TakeSnapshot->OldAddress);
+			_Hook_TakeSnapshot->Enable();
 
-			INFO("Found color space hook callsite at {:X}", UnkFuncCallsite)
+			// Settings UI
+			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::IDToAbs(135915, 0x89), Hook_CreateDataModelOptions);
+			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelBoolEvent);
+			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelIntEvent);
+			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136130, 0x37), Hook_SettingsDataModelFloatEvent);
 
-			_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BD2F9, Hook_CreateDataModelOptions);
-			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB63E, Hook_SettingsDataModelBoolEvent);
-			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB937, Hook_SettingsDataModelIntEvent);
-			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB8EB, Hook_SettingsDataModelFloatEvent);
+			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x89), Hook_RecreateSwapchain);
 		}
 
 	private:
 	    static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
 
-		static void RecreateSwapChain(RE::BGSSwapChainObject* a_bgsSwapchainObject, RE::BS_DXGI_FORMAT a_newFormat);
 		static void ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable);
 
 		static void Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;
+
+		static bool Hook_TakeSnapshot(uintptr_t a1);
+		static inline std::add_pointer_t<decltype(Hook_TakeSnapshot)> _TakeSnapshot;
+
+		static void Hook_RecreateSwapchain(void* a1, RE::BGSSwapChainObject* a_bgsSwapChainObject, uint32_t a_width, uint32_t a_height, uint8_t a5);
+		static inline std::add_pointer_t<decltype(Hook_RecreateSwapchain)> _RecreateSwapchain;
 
 		static void Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList);
 		static inline std::add_pointer_t<decltype(Hook_CreateDataModelOptions)> _CreateDataModelOptions;
@@ -104,9 +110,9 @@ namespace Hooks
 		static void Hook()
 		{
 			//_CreateDataModelOptions = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20BD2F9, Hook_CreateDataModelOptions);
-			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB63E, Hook_SettingsDataModelBoolEvent);
-			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB937, Hook_SettingsDataModelIntEvent);
-			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB8EB, Hook_SettingsDataModelFloatEvent);
+			//_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB63E, Hook_SettingsDataModelBoolEvent);
+			//_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB937, Hook_SettingsDataModelIntEvent);
+			//_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::Module::get().base() + 0x20CB8EB, Hook_SettingsDataModelFloatEvent);
 
 #if 0
 			const auto callsite1 = AsAddress(dku::Hook::Module::get().base() + 0x32ED294);
