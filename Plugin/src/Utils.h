@@ -1,8 +1,6 @@
 #pragma once
 #include "RE/Buffers.h"
 
-#include <d3d12.h>
-
 namespace Utils
 {
 	std::unordered_map<DXGI_FORMAT, std::string> GetDXGIFormatNameMap();
