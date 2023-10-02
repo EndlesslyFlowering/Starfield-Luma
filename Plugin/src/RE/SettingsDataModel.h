@@ -69,14 +69,14 @@ namespace RE
 
 			GeneralSetting()
 			{
-				auto addr = dku::Hook::Module::get().base() + 0x20B986C;
+				auto addr = dku::Hook::IDToAbs(135831);
 				auto func = reinterpret_cast<void (*)(GeneralSetting&)>(addr);
 				func(*this);
 			}
 
 			~GeneralSetting()
 			{
-				auto addr = dku::Hook::Module::get().base() + 0x20BAA70;
+				auto addr = dku::Hook::IDToAbs(135898);
 				auto func = reinterpret_cast<void (*)(GeneralSetting&)>(addr);
 				func(*this);
 			}

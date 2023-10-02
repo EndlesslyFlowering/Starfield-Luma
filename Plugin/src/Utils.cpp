@@ -176,4 +176,10 @@ namespace Utils
 		const auto buffer = (*Offsets::bufferArray)[static_cast<uint32_t>(a_buffer)];
 		SetBufferFormat(buffer, a_format);
     }
+
+    RE::BS_DXGI_FORMAT GetBufferFormat(RE::Buffers a_buffer)
+    {
+		const auto buffer = (*Offsets::bufferArray)[static_cast<uint32_t>(a_buffer)];
+		return buffer->format;
+    }
 }

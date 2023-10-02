@@ -45,6 +45,6 @@ namespace Settings
         static inline constexpr float paperwhiteSliderMin = 80.f;
         static inline constexpr float paperwhiteSliderMax = 500.f;
 
-		TomlConfig config = COMPILE_PROXY("Data/SFSE/Plugins/NativeHDR.toml"sv);
+		TomlConfig config = COMPILE_PROXY("NativeHDR.toml"sv);
     };
 }

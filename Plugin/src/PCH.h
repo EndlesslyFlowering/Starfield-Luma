@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // c
 #include <cassert>
@@ -106,6 +106,8 @@
 using namespace std::literals;
 
 #define DLLEXPORT extern "C" [[maybe_unused]] __declspec(dllexport)
+#define SFSEAPI __cdecl
+#define PLUGIN_MODE
 
 // Plugin
 #include "Plugin.h"
