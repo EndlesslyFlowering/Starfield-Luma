@@ -1,8 +1,6 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
 
-#define HDR_USE_GAMMA_2_2 1
-
 Texture2D<float> _8 : register(t0, space8);
 Texture2D<float> _9 : register(t1, space8);
 Texture2D<float> _10 : register(t2, space8);
@@ -31,7 +29,7 @@ float4 PS(PSInputs inputs) : SV_Target
 	color = max(color, 0.f);
 
 #if ENABLE_HDR
-#if HDR_USE_GAMMA_2_2
+#if SDR_USE_GAMMA_2_2
 	color = pow(color, 2.2f);
 #else
 	color = gamma_sRGB_to_linear(color);
