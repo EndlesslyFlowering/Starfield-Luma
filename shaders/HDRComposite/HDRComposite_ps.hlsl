@@ -8,8 +8,6 @@
 //#define APPLY_CINEMATICS
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
-// This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping, though the SDR tonemapper had still been developed with sRGB<->2.2 mismatch.
-#define SDR_USE_GAMMA_2_2 1
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
 #define FIX_WRONG_SRGB_GAMMA_FORMULA 1
 
@@ -707,6 +705,17 @@ float3 TetrahedralInterpolation(
 }
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+
+float3 gamma_linear_to_sRGB_Bethesda_Optimized(float3 Color, float InverseGamma = 1.f / 2.4f)
+{
+	return (pow(Color, InverseGamma) * 1.055f) - 0.055f;
+}
+
+float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
+{
+	return (pow(Color, Gamma) / 1.055f) + 0.055f;
+}
+
 // In/Out linear space
 float3 GradingLUT(float3 color, float2 uv)
 {
@@ -716,7 +725,7 @@ float3 GradingLUT(float3 color, float2 uv)
 	// Read gamma ini value, defaulting at 2.4 (makes little sense)
 	float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
 	// Weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
-	const float3 LUTCoordinates = max((pow(color, inverseGamma) * 1.055f) - 0.055f, 0.f); // Does "max()" is probably unnecessary as LUT sampling is already clamped.
+	const float3 LUTCoordinates = max(gamma_linear_to_sRGB_Bethesda_Optimized(color, inverseGamma), 0.f); // Does "max()" is probably unnecessary as LUT sampling is already clamped.
 #endif // FIX_WRONG_SRGB_GAMMA_FORMULA
 
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
@@ -736,6 +745,7 @@ float3 GradingLUT(float3 color, float2 uv)
 
 	return LUTColor;
 }
+
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
 // Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
@@ -822,9 +832,24 @@ PSOutput PS(PSInput psInput)
 
 	float3 tonemappedPostProcessedGradedColor = tonemappedPostProcessedColor;
 
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP
+
+#if ENABLE_LUT
 	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD);
+#endif // ENABLE_LUT
+
+#if CORRECT_LUT_GAMMA_CHANGES_TYPE == 1 // Do this even if "ENABLE_LUT" is false, for consistency
+#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimize sRGB function doesn't even stay in the 0-1 range
+	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
+	tonemappedPostProcessedGradedColor = gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor));
+#endif
+#if SDR_USE_GAMMA_2_2
+	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays
+	tonemappedPostProcessedGradedColor = pow(gamma_linear_to_sRGB_Bethesda_Optimized(tonemappedPostProcessedGradedColor), 2.2f);
+#endif
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
+
+#endif // CORRECT_LUT_GAMMA_CHANGES_TYPE
 
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
@@ -924,6 +949,7 @@ PSOutput PS(PSInput psInput)
 
 	float3 outputColor = finalOriginalColor;
 
+// Note that gamma was never applied if LUTs were disabled, but we don't care about that as the affected shaders permutations were never used
 #if SDR_USE_GAMMA_2_2
 	outputColor = pow(outputColor, 1.f / 2.2f);
 #else
