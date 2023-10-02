@@ -88,6 +88,25 @@ namespace Hooks
 		return _UnkFunc(a1, a_bgsSwapchainObject);		
     }
 
+    bool Hooks::Hook_TakeSnapshot(uintptr_t a1)
+    {
+		const auto settings = Settings::Main::GetSingleton();
+		//if (settings->IsHDREnabled()) {
+		if (true) {  // actually it's always going to be the case because we're always going to update the image space buffer format
+			auto  hack = alloca(sizeof(RE::MessageBoxData));
+			auto& message = *(new (hack) RE::MessageBoxData("Photo Mode", "Taking screenshots with Photo Mode is not supported with Native HDR. Use an external tool (e.g. Xbox Game Bar) to take a screenshot.", nullptr, 0));
+			Offsets::ShowMessageBox(*Offsets::MessageMenuManagerPtr, message, false);
+
+			// hack to refresh the UI visibility after the snapshot
+			Offsets::PhotoMode_ToggleUI(a1 + 0x8);
+			Offsets::PhotoMode_ToggleUI(a1 + 0x8);
+
+			return true;
+		}
+		
+        return _TakeSnapshot(a1);
+    }
+
     void Hooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
     {
 		const auto settings = Settings::Main::GetSingleton();
@@ -98,14 +117,14 @@ namespace Hooks
 			constexpr auto id = static_cast<unsigned int>(Settings::SettingID::kHDR);
 
 			s.m_Text.SetStringValue("HDR");
-			s.m_Description.SetStringValue("Sets the game's output mode between SDR, HDR10 PQ, or HDR10 scRGB.");
+			s.m_Description.SetStringValue("Sets the game's output mode between SDR, HDR10 PQ, or HDR scRGB.");
 			s.m_ID.SetValue(id);
 			s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Stepper);
 			s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
 			s.m_Enabled.SetValue(true);
 			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("OFF");
 			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("HDR10 PQ");
-			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("HDR10 scRGB");
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem("HDR scRGB");
 			s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(*settings->FrameBufferFormat);
 			a_SettingList.AddItem(s);
 		}
@@ -183,7 +202,7 @@ namespace Hooks
 				} else if (newValue == 0) {
 					ToggleEnableHDRSubSettings(EventData.m_Model, false);
 				}
-
+				
 				RecreateSwapChain(swapChainObject, newFormat);
 			}
 		}
@@ -210,6 +229,8 @@ namespace Hooks
 				setting->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(settings->GetPaperwhiteText().data());
 			}
 		}
+
+		_SettingsDataModelFloatEvent(a_arg1, EventData);
     }
 
     void DebugHooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_SettingList)
