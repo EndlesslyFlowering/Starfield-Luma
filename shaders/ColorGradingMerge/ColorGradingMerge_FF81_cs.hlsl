@@ -188,12 +188,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		}
 #endif
 
-#if 1 // TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift. This fix up might not be necessary as later we raise blacks anyway.
+		// TODO: the above code introduces a lot of colors beyond the 0-1 range, which will then get clipped, causing a hue shift. This fix up might not be necessary as later we raise blacks anyway.
 		// Color may have gone negative
 		// For example, if black is (3,3,3) and another value is (0,0,4), that
 		// may result in (-3,-3,1)
 		color = max(color, 0.f);
-#endif
 
 		static const float cubeNormalization = sqrt(3.f); // Normalize to 0-1 range
 		// How distant are our LUT coordinates from black or white in 3D cube space?
