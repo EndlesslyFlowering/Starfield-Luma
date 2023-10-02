@@ -16,8 +16,12 @@
 // This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
 #define ENABLE_POST_PROCESS 1
-// 0 original (weak, generates values beyond 0-1 which then get clipped), 1 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks), 2 Sigmoidal (smoothest looking, but harder to match)
-#define POST_PROCESS_CONTRAST_TYPE 1
+// 0 disable contrast adjustment
+// 1 original (weak, generates values beyond 0-1 which then get clipped)
+// 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
+// 3 Sigmoidal (smoothest looking, but harder to match)
+// 4 Sigmoidal inspired
+#define POST_PROCESS_CONTRAST_TYPE 4
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
@@ -435,6 +439,34 @@ float3 DICETonemap(
 	return Color;
 }
 
+// sigmoidal inspired contrast adjustment using 2 power curves
+// normalizes both lower and upper part which is divided by contrastMidPoint
+// and then applies a power curve based off of contrastIntensity
+// power curve for lower is just pow(x, contrastIntensity)
+// while for upper it's pow(x, 1 / contrastIntensity)
+float SigmoidalContrastAdjustment(
+	float Channel,
+	float contrastMidPoint,
+	float contrastIntensityLower,
+	float contrastIntensityUpper,
+	float normalizationFactorLower,
+	float normalizationFactorUpper)
+{
+	[flatten]
+	if (Channel <= contrastMidPoint)
+	{
+		Channel = pow(Channel * normalizationFactorLower, contrastIntensityLower)
+		        / normalizationFactorLower;
+	}
+	else
+	{
+		Channel = pow((Channel - contrastMidPoint) * normalizationFactorUpper, contrastIntensityUpper)
+		        / normalizationFactorUpper + contrastMidPoint;
+	}
+
+	return Channel;
+}
+
 // "MidGrayScale" is how much the mid gray shifted from the originally intended tonemapped input (e.g. if we run this function on the untonemapped image, we can remap the mid gray)
 float3 PostProcess(
 	      float3 Color,
@@ -459,17 +491,17 @@ float3 PostProcess(
 	Color += lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
 	Color *= brightnessMultiplier;
 
-#if POST_PROCESS_CONTRAST_TYPE == 0
+#if POST_PROCESS_CONTRAST_TYPE == 1
 
 	// Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
 	// The higher the distance from the contrast middle point, the more contrast will change the color.
 	Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
 
-#elif POST_PROCESS_CONTRAST_TYPE == 1
+#elif POST_PROCESS_CONTRAST_TYPE == 2
 
 	Color = pow(Color / contrastMidPoint, contrastIntensity) * contrastMidPoint;
 
-#elif POST_PROCESS_CONTRAST_TYPE == 2
+#elif POST_PROCESS_CONTRAST_TYPE == 3
 
 	// sigmoidal contrast adjustment doesn't clip colors
 	// https://www.imagemagick.org/Usage/color_mods/#sigmoidal
@@ -485,6 +517,28 @@ float3 PostProcess(
 	// there should be some optimisation left here
 	Color = (1 / (1 + exp(c * (s - Color))) + minus)
 	      / (1 / (1 + exp(c * (s - 1)))     + minus);
+
+#elif POST_PROCESS_CONTRAST_TYPE == 4
+
+	float cInLower = contrastIntensity;
+	float cInUpper = 1.f / contrastIntensity;
+	// adjustments to match native better
+	// only do them when contrastIntensity is above 1 because 1 is neutral (no adjustment)
+	// below 1 it matches native nicely (though idk if contrast is ever lowered)
+	if (contrastIntensity > 1.f)
+	{
+		cInLower = cInLower * (4.f / 3.f);
+		cInUpper = cInUpper * (1.f / 1.02f); // this an optimisation. actual factor is 1.02
+	}
+	float cMid = contrastMidPoint * (2.f / 3.f);
+
+	// normalization factors for lower and upper power curve
+	float normalizationFactorLower = 1.f / cMid;
+	float normalizationFactorUpper = 1.f / (1.f - cMid);
+
+	Color.r = SigmoidalContrastAdjustment(Color.r, cMid, cInLower, cInUpper, normalizationFactorLower, normalizationFactorUpper);
+	Color.g = SigmoidalContrastAdjustment(Color.g, cMid, cInLower, cInUpper, normalizationFactorLower, normalizationFactorUpper);
+	Color.b = SigmoidalContrastAdjustment(Color.b, cMid, cInLower, cInUpper, normalizationFactorLower, normalizationFactorUpper);
 
 #endif
 
