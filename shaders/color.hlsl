@@ -85,3 +85,9 @@ float Luminance(float3 color)
 	// Fixed from "wrong" values: 0.2125 0.7154 0.0721f
 	return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
+
+float3 saturation(float3 color, float saturation)
+{
+    float3 luminance = Luminance(color);
+    return lerp(luminance, color, saturation);
+}
