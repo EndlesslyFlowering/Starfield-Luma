@@ -18,5 +18,6 @@
 // Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
 // This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
 #define LUT_FIX_GAMMA_MAPPING 1
+#define LUT_USE_GAMMA_2_2_FOR_LINEARIZATION 0
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE

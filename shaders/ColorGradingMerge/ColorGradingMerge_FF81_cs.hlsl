@@ -10,6 +10,14 @@
 // For future development
 #define UNUSED_PARAMS 0
 
+#if LUT_USE_GAMMA_2_2_FOR_LINEARIZATION
+	#define LINEARIZE(x) \
+	        	pow(x, 2.2f)
+#else
+	#define LINEARIZE(x) \
+          	gamma_sRGB_to_linear(x)
+#endif
+
 static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
 static float LUTCorrectionPercentage = 1.f;
 
@@ -63,9 +71,9 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
-	Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
+	Analysis.black = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
 	Analysis.blackY = Luminance(Analysis.black);
-	Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
+	Analysis.white = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
 	Analysis.whiteY = Luminance(Analysis.white);
 #if UNUSED_PARAMS
 	Analysis.minY = FLT_MAX;
@@ -93,7 +101,7 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 		{
 			for (uint z = 0; z < LUT_SIZE_UINT; z += analyzeTexelFrequency)
 			{
-				float3 LUTColor = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(uint3(x, y, z))).rgb);
+				float3 LUTColor = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(uint3(x, y, z))).rgb);
 
 				minColor = min(minColor, LUTColor);
 				maxColor = max(maxColor, LUTColor);
@@ -139,7 +147,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	LUTAnalysis analysis;
 	AnalyzeLUT(LUT, analysis);
 
-	float3 color = gamma_sRGB_to_linear(LUT.Load(UVW));
+	float3 color = LINEARIZE(LUT.Load(UVW));
 	const float3 originalColor = color;
 
 	// TODO: do we need these branches? Shaders are best without branches, especially when they could be replaced by min/max math.
@@ -281,10 +289,10 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	float3 LUT2Color = LUT2.Load(inUVW);
 	float3 LUT3Color = LUT3.Load(inUVW);
 	float3 LUT4Color = LUT4.Load(inUVW);
-	LUT1Color = gamma_sRGB_to_linear(LUT1Color);
-	LUT2Color = gamma_sRGB_to_linear(LUT2Color);
-	LUT3Color = gamma_sRGB_to_linear(LUT3Color);
-	LUT4Color = gamma_sRGB_to_linear(LUT4Color);
+	LUT1Color = LINEARIZE(LUT1Color);
+	LUT2Color = LINEARIZE(LUT2Color);
+	LUT3Color = LINEARIZE(LUT3Color);
+	LUT4Color = LINEARIZE(LUT4Color);
 
 #endif // LUT_IMPROVEMENT_TYPE
 
