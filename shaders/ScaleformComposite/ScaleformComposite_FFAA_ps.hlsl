@@ -3,7 +3,6 @@
 
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 #define HDR_UI_BLEND_POW 0.775f
-#define HDR_GAMMA_CORRECTION 1
 
 struct PushConstantWrapper_ScaleformCompositeLayout
 {
@@ -36,7 +35,7 @@ float4 PS(PSInputs inputs) : SV_Target
 #if !ENABLE_HDR
 	UIColor.xyz = gamma_linear_to_sRGB(UIColor.xyz);
 #else
-#if HDR_GAMMA_CORRECTION
+#if SDR_USE_GAMMA_2_2
 	UIColor.xyz = pow(gamma_linear_to_sRGB(UIColor.xyz), 2.2f);
 #endif // HDR_GAMMA_CORRECTION
 	UIColor.xyz *= HDR_UI_PAPER_WHITE;

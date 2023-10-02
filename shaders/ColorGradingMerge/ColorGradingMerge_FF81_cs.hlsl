@@ -10,7 +10,7 @@
 // For future development
 #define UNUSED_PARAMS 0
 
-#if LUT_USE_GAMMA_2_2_FOR_LINEARIZATION
+#if CORRECT_LUT_GAMMA_CHANGES_TYPE == 2
 	#define LINEARIZE(x) \
 	        	pow(x, 2.2f)
 #else
