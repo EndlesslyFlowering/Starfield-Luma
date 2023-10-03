@@ -580,15 +580,15 @@ float3 PostProcess_Inverse(
 	// We can't invert the color filter, so we will only inverse the post process by the unfiltered amount
 	const float colorFilterInverse = 1.f - colorFilter.a;
 
-#if POST_PROCESS_CONTRAST_TYPE == 0
+#if POST_PROCESS_CONTRAST_TYPE == 1
 
 	Color = ((Color - contrastMidPoint) / contrastIntensity) + contrastMidPoint;
 
-#elif POST_PROCESS_CONTRAST_TYPE == 1
+#elif POST_PROCESS_CONTRAST_TYPE == 2
 
 	Color = pow(Color / contrastMidPoint, 1.f / contrastIntensity) * contrastMidPoint;
 
-#elif POST_PROCESS_CONTRAST_TYPE == 2 || POST_PROCESS_CONTRAST_TYPE == 3
+#elif POST_PROCESS_CONTRAST_TYPE == 3
 
 	//TODO: implement
 
