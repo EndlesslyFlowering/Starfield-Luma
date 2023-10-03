@@ -17,9 +17,9 @@
 // 0 disable contrast adjustment
 // 1 original (weak, generates values beyond 0-1 which then get clipped)
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
-// 3 Sigmoidal (smoothest looking, but harder to match)
-// 4 Sigmoidal inspired
-#define POST_PROCESS_CONTRAST_TYPE 4
+// 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
+//   (optimisation left if contrastIntensity doesn't go below 1)
+#define POST_PROCESS_CONTRAST_TYPE 3
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
@@ -443,28 +443,61 @@ float3 DICETonemap(
 #endif
 }
 
+// don't set this above 1 as it will break the curve (turns into a double S curve instead of a single one)
+// below 1 it increases the amount of additional contrast being applied
+// only change this for testing
+#define C 1
+
+static const float den = log2(C + 1.f);
+
+// bias towards smaller numbers
+void Log2Adjust(inout float Channel)
+{
+#if (C != 1)
+	Channel = log2(Channel * c + 1.f)
+	        / den;
+	return;
+#else
+	Channel = log2(Channel + 1.f);
+	return;
+#endif
+}
+
 // sigmoidal inspired contrast adjustment using 2 power curves
 // normalizes both lower and upper part which is divided by contrastMidPoint
 // and then applies a power curve based off of contrastIntensity
-// power curve for lower is just pow(x, contrastIntensity)
-// while for upper it's pow(x, 1 / contrastIntensity)
 float SigmoidalContrastAdjustment(
 	float Channel,
 	float contrastMidPoint,
-	float contrastIntensityLower,
-	float contrastIntensityUpper,
+	float contrastIntensity,
 	float normalizationFactorLower,
 	float normalizationFactorUpper)
 {
 	[flatten]
 	if (Channel <= contrastMidPoint)
 	{
-		Channel = pow(Channel * normalizationFactorLower, contrastIntensityLower)
+		Channel *= normalizationFactorLower;
+		// doing this for contrastIntensity below 1 greatly desaturates compared to not doing this
+		// look into if contrastIntensity ever goes below 1
+		// and remove this check if it does not
+		if (contrastIntensity > 1.f)
+		{
+			Log2Adjust(Channel);
+		}
+		Channel = pow(Channel, contrastIntensity)
 		        / normalizationFactorLower;
 	}
 	else
 	{
-		Channel = pow((Channel - contrastMidPoint) * normalizationFactorUpper, contrastIntensityUpper)
+		Channel = 1.f - ((Channel - contrastMidPoint) * normalizationFactorUpper);
+		// doing this for contrastIntensity below 1 greatly desaturates compared to not doing this
+		// look into if contrastIntensity ever goes below 1
+		// and remove this check if it does not
+		if (contrastIntensity > 1.f)
+		{
+			Log2Adjust(Channel);
+		}
+		Channel = (1.f - pow(Channel, contrastIntensity))
 		        / normalizationFactorUpper + contrastMidPoint;
 	}
 
@@ -507,42 +540,23 @@ float3 PostProcess(
 
 #elif POST_PROCESS_CONTRAST_TYPE == 3
 
-	// sigmoidal contrast adjustment doesn't clip colors
-	// https://www.imagemagick.org/Usage/color_mods/#sigmoidal
-
-	// Multiplier to somewhat match the original contrast adjustment
-	static const float sigmoidalContrastAdjustment = 2.5f; //TODO: we could probably find an even better default multiplication
-
-	float c = max(contrastIntensity * sigmoidalContrastAdjustment, EPSILON); // protect against division by zero
-	float s = contrastMidPoint; // can be set to 0.5 for better darkening of shadows
-
-	float minus = -1 / (1 + exp(c * s));
-
-	// there should be some optimisation left here
-	Color = (1 / (1 + exp(c * (s - Color))) + minus)
-	      / (1 / (1 + exp(c * (s - 1)))     + minus);
-
-#elif POST_PROCESS_CONTRAST_TYPE == 4
-
-	float cInLower = contrastIntensity;
-	float cInUpper = 1.f / contrastIntensity;
-	// adjustments to match native better
+	float cIn = contrastIntensity;
+	// adjustment to match native better
 	// only do them when contrastIntensity is above 1 because 1 is neutral (no adjustment)
 	// below 1 it matches native nicely (though idk if contrast is ever lowered)
 	if (contrastIntensity > 1.f)
 	{
-		cInLower = cInLower * (4.f / 3.f);
-		cInUpper = cInUpper * (1.f / 1.02f); // this an optimisation. actual factor is 1.02
+		cIn = contrastIntensity * (4.f / 3.f);
 	}
-	float cMid = contrastMidPoint * (2.f / 3.f);
+	float cMid = contrastMidPoint;
 
 	// normalization factors for lower and upper power curve
 	float normalizationFactorLower = 1.f / cMid;
 	float normalizationFactorUpper = 1.f / (1.f - cMid);
 
-	Color.r = SigmoidalContrastAdjustment(Color.r, cMid, cInLower, cInUpper, normalizationFactorLower, normalizationFactorUpper);
-	Color.g = SigmoidalContrastAdjustment(Color.g, cMid, cInLower, cInUpper, normalizationFactorLower, normalizationFactorUpper);
-	Color.b = SigmoidalContrastAdjustment(Color.b, cMid, cInLower, cInUpper, normalizationFactorLower, normalizationFactorUpper);
+	Color.r = SigmoidalContrastAdjustment(Color.r, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
+	Color.g = SigmoidalContrastAdjustment(Color.g, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
+	Color.b = SigmoidalContrastAdjustment(Color.b, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
 
 #endif
 
