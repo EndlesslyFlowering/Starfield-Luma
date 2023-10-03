@@ -427,7 +427,12 @@ float3 DICETonemap(
 	float  MaxOutputLuminance,
 	float  HighlightsShoulderStart = 0.f)
 {
-	//TODO: try "per channel" option given all other tm is per channel
+#if 1 // Do by channel for now, to match all other tonemappers, especially when "INVERT_TONEMAP_HIGHLIGHTS_ONLY" is on
+	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart);
+	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart);
+	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart);
+	return Color;
+#else //TODO: try "per channel" option given all other tm is per channel
 	const float sourceLuminance = Luminance(Color);
 	if (sourceLuminance > 0.0f)
 	{
@@ -435,6 +440,7 @@ float3 DICETonemap(
 		Color *= compressedLuminance / sourceLuminance;
 	}
 	return Color;
+#endif
 }
 
 // sigmoidal inspired contrast adjustment using 2 power curves
@@ -568,7 +574,7 @@ float3 PostProcess_Inverse(
 
 	Color = pow(Color / contrastMidPoint, 1.f / contrastIntensity) * contrastMidPoint;
 
-#elif POST_PROCESS_CONTRAST_TYPE == 2
+#elif POST_PROCESS_CONTRAST_TYPE == 2 || POST_PROCESS_CONTRAST_TYPE == 3
 
 	//TODO: implement
 
@@ -845,7 +851,7 @@ PSOutput PS(PSInput psInput)
 #endif
 #if SDR_USE_GAMMA_2_2
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays
-	tonemappedPostProcessedGradedColor = pow(gamma_linear_to_sRGB_Bethesda_Optimized(tonemappedPostProcessedGradedColor), 2.2f);
+	tonemappedPostProcessedGradedColor = pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f);
 #endif
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 

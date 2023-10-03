@@ -10,7 +10,7 @@
 // For future development
 #define UNUSED_PARAMS 0
 
-#if CORRECT_LUT_GAMMA_CHANGES_TYPE == 2
+#if CORRECT_LUT_GAMMA_CHANGES_TYPE == 2 && SDR_USE_GAMMA_2_2
 	#define LINEARIZE(x) \
 	        	pow(x, 2.2f)
 #else
