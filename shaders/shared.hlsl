@@ -23,8 +23,8 @@
 // Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
 // This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
 #define LUT_FIX_GAMMA_MAPPING 1
-// Try to compensate for any technical gamma fixes we made.
-// 0 none, 1 correct it in the tonemapper, 2 correct it in the LUT mixer
-#define CORRECT_LUT_GAMMA_CHANGES_TYPE 2
+// Emulates the SDR look of the game on an SDR display using gamma 2.2.
+// Which by our best guesses should be the creative intent.
+#define EMULATE_SDR_GAMMA_APPEARANCE 1
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
