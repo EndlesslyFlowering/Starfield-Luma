@@ -432,7 +432,7 @@ float3 DICETonemap(
 	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart);
 	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart);
 	return Color;
-#else //TODO: try "per channel" option given all other tm is per channel
+#else //TODO: try "per channel" option given all other tm is per channel. If not, restore the "luminance based" inverse tonemapping, to keep the SDR colors more.
 	const float sourceLuminance = Luminance(Color);
 	if (sourceLuminance > 0.0f)
 	{
@@ -764,7 +764,8 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 	postProcessedOffsetColor += postProcessColorOffset * midGrayScale;
 	// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
 	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift.
-	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
+	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor)); //TODO: test and improve.
+	//return select(tonemappedColor == 0, postProcessedOffsetColor, postProcessedRatioColor); //TODO: improve. This causes flickering sometimes.
 }
 
 PSOutput PS(PSInput psInput)
@@ -845,7 +846,7 @@ PSOutput PS(PSInput psInput)
 #endif // ENABLE_LUT
 
 #if CORRECT_LUT_GAMMA_CHANGES_TYPE == 1 // Do this even if "ENABLE_LUT" is false, for consistency
-#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimize sRGB function doesn't even stay in the 0-1 range
+#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 //TODO: Disabled as this looks awful, probably because the Bethesda optimize sRGB function doesn't even stay in the 0-1 range
 	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
 	tonemappedPostProcessedGradedColor = gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor));
 #endif
@@ -859,8 +860,8 @@ PSOutput PS(PSInput psInput)
 
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
-#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP && ENABLE_HDR //TODO: try this with the post process pass as well
-	const float3 postProcessColorRatio = safeDivision(finalOriginalColor, tonemappedColor);
+#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP && ENABLE_HDR
+	const float3 postProcessColorRatio = finalOriginalColor / tonemappedColor;
 	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
 #endif
 
@@ -909,6 +910,8 @@ PSOutput PS(PSInput psInput)
 		default:
 			break;
 	}
+
+	//TODO: improve inverse tonemapped look. Are mid tones too "raised"?
 
 	for (uint channel = 0; channel < 3; channel++)
 	{
