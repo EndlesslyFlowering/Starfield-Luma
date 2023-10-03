@@ -9,12 +9,11 @@
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
 #define UNUSED_PARAMS 0
-#define LUT__DEBUG_VALUES true
+#define LUT_DEBUG_VALUES true
 
 // Enum: {0: AS_IS, 1: ORIGINAL, 2:WHITE, 3: MAX_HUE, 4: CLAMP }
-#define LUT__SDR__ON_CLIP 1
-#define LUT__HDR__ON_CLIP 0
-
+#define LUT_SDR_ON_CLIP 1
+#define LUT_HDR_ON_CLIP 0
 
 static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
 static float LUTCorrectionPercentage = 1.f;
@@ -68,6 +67,7 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 	return uint3(U, UVW.y, 0);
 }
 
+//TODO: try to do the LUT analysys in linear from gamma 2.2 instead of sRGB, but then convert back to linear from sRGB at the end 
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
 	Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
@@ -140,7 +140,7 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 #endif // UNUSED_PARAMS
 }
 
-// Analyzes each LUT texel and normalize their range.
+// Analyzes each LUT texel and normalizes their range.
 // Slow but effective.
 float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, bool SDRRange = false)
 {
@@ -150,24 +150,15 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	float3 color = gamma_sRGB_to_linear(LUT.Load(UVW));
 	const float3 originalColor = color;
 
-	// TODO: Remove if branching
-
-	// If LUT is inversed (eg: photo negative) don't do anything
-	if (analysis.whiteY < analysis.blackY) return originalColor; // Inversed LUT
+	if (analysis.whiteY < analysis.blackY // If LUT is inversed (eg: photo negative) don't do anything
+		|| analysis.whiteY - analysis.blackY >= 1.f) // If LUT is full range already nothing to do
+	{
+		return color;
+	}
 	
-	// If LUT is full range already nothing to do
-	if (analysis.whiteY - analysis.blackY >= 1.f) return lerp(originalColor, color, LUTCorrectionPercentage);
-
-	// Return black on (0,0,0)
-	if (!any(originalColor)) return float3(0.f, 0.f, 0.f);
-
-	// Return white on (1,1,1)
-	const float3 white = float3(1.f,1.f,1.f);
-	if (dot(originalColor, white) >= 3.f) return white;
-
-#if LUT__DEBUG_VALUES
-	float3 DEBUG_COLOR = float3(1.f,0,1.f); // Magenta
-#endif
+#if LUT_DEBUG_VALUES
+	float3 DEBUG_COLOR = float3(1.f, 0.f, 1.f); // Magenta
+#endif // LUT_DEBUG_VALUES
 
 	// While it unclear how exactly the floor was raised, remove the tint to floor
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
@@ -197,9 +188,9 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	float targetL = linear_srgb_to_oklch(retintedColor)[0];
 
-#if LUT__DEBUG_VALUES
+#if LUT_DEBUG_VALUES
 	if (targetL < 0) return DEBUG_COLOR;
-#endif
+#endif // LUT_DEBUG_VALUES
 
 	// Texels exista as points in 3D cube. We are moving two heavily weighted
 	// points and need to compute the net force to be applied.
@@ -214,11 +205,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float whiteDistance = hypot3(1.f - neutralLUTColor);
 	const float totalRange = blackDistance + whiteDistance;
 
-#if LUT__DEBUG_VALUES
+#if LUT_DEBUG_VALUES
   // whiteY most always be > 0
 	if (analysis.whiteL <= 0) return DEBUG_COLOR;
-#endif
-
+#endif // LUT_DEBUG_VALUES
 
 	// Boost lightness by how much white was reduced
 	const float raiseL = linearNormalization(
@@ -228,59 +218,60 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		1.f / analysis.whiteL, 
 		1.f);
 
-#if LUT__DEBUG_VALUES
+#if LUT_DEBUG_VALUES
   // increaseY must always be >= 1
 	if (raiseL < 1) return DEBUG_COLOR;
-#endif
+#endif // LUT_DEBUG_VALUES
 
 	targetL *= raiseL;
 
 	// Use hue from LUT cube color
 	const float targetHue = linear_srgb_to_oklch(color)[2];
 
-#if LUT__SDR__ON_CLIP > 0 || LUT__HDR__ON_CLIP > 0
+//TODO: copy these define values into runtime bools
+#if LUT_SDR_ON_CLIP > 0 || LUT_HDR_ON_CLIP > 0
 	if (targetL >= 1.f) {
-	#if LUT__SDR__ON_CLIP > 0 && LUT__SDR__ON_CLIP != LUT__HDR__ON_CLIP 
+#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP 
 		if (SDRRange) {
-	#endif
+#endif
 
-	#if LUT__SDR__ON_CLIP == 1
+#if LUT_SDR_ON_CLIP == 1
 		// Original (do nothing)
-	#elif LUT__SDR__ON_CLIP == 2
+#elif LUT_SDR_ON_CLIP == 2
 		// White
 		color = white;
-	#elif LUT__SDR__ON_CLIP == 3
+#elif LUT_SDR_ON_CLIP == 3
 		// TODO
-	#elif LUT__SDR__ON_CLIP == 4
+#elif LUT_SDR_ON_CLIP == 4
 		color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
-	#endif
+#endif
 
-	#if LUT__SDR__ON_CLIP > 0 && LUT__SDR__ON_CLIP != LUT__HDR__ON_CLIP 
+#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP 
 		}
-		#if LUT__HDR__ON_CLIP > 0
+#if LUT_HDR_ON_CLIP > 0
 		else {
-		#endif
-	#endif
+#endif
+#endif
 
-	#if LUT__SDR__ON_CLIP == 0 && LUT__HDR__ON_CLIP > 0
+#if LUT_SDR_ON_CLIP == 0 && LUT_HDR_ON_CLIP > 0
 		if (!SDRRange) {
-	#endif
+#endif
 
-	#if LUT__HDR__ON_CLIP != LUT__SDR_ON_CLIP
-		#if LUT__HDR__ON_CLIP == 1
+#if LUT_HDR_ON_CLIP != LUT__SDR_ON_CLIP
+#if LUT_HDR_ON_CLIP == 1
 			// Original (do nothing)
-		#elif LUT__HDR__ON_CLIP == 2
+#elif LUT_HDR_ON_CLIP == 2
 			// White
 			color = white;
-		#elif LUT__HDR__ON_CLIP == 3
+#elif LUT_HDR_ON_CLIP == 3
  			// TODO
-		#elif LUT__HDR__ON_CLIP == 4
+#elif LUT_HDR_ON_CLIP == 4
 			color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
-		#endif
-	#endif
-	#if LUT__HDR__ON_CLIP > 0 && LUT__SDR__ON_CLIP != LUT__HDR__ON_CLIP
+#endif
+#endif
+#if LUT_HDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP
 		}
-	#endif
+#endif
 	} else {
 		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
 	}
