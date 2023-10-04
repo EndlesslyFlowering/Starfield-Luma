@@ -464,8 +464,8 @@ void Log2Adjust(inout float Channel)
 }
 
 // sigmoidal inspired contrast adjustment using 2 power curves
-// normalizes both lower and upper part which is divided by contrastMidPoint
-// and then applies a power curve based off of contrastIntensity
+// normalizes both lower and upper part which are divided by contrastMidPoint
+// and then applies a power curve based off of contrastIntensity on each part
 float SigmoidalContrastAdjustment(
 	float Channel,
 	float contrastMidPoint,
@@ -544,7 +544,7 @@ float3 PostProcess(
 	if (contrastIntensity != 1.f) // worth to do performance wise
 	{
 		float cIn = contrastIntensity;
-		// adjustment to match native better
+		// adjustment to match native better and make the curve be an S curve (too low intensity makes it a double S curve)
 		// only do them when contrastIntensity is above 1 because 1 is neutral (no adjustment)
 		// below 1 it matches native nicely (though idk if contrast is ever lowered)
 		if (contrastIntensity > 1.f)
