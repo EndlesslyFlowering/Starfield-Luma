@@ -489,7 +489,8 @@ float SigmoidalContrastAdjustment(
 	}
 	else
 	{
-		Channel = 1.f - ((Channel - contrastMidPoint) * normalizationFactorUpper);
+		// protect against float issues
+		Channel = max(1.f - ((Channel - contrastMidPoint) * normalizationFactorUpper), asfloat(0x00000001));
 		// doing this for contrastIntensity below 1 greatly desaturates compared to not doing this
 		// look into if contrastIntensity ever goes below 1
 		// and remove this check if it does not
@@ -540,23 +541,26 @@ float3 PostProcess(
 
 #elif POST_PROCESS_CONTRAST_TYPE == 3
 
-	float cIn = contrastIntensity;
-	// adjustment to match native better
-	// only do them when contrastIntensity is above 1 because 1 is neutral (no adjustment)
-	// below 1 it matches native nicely (though idk if contrast is ever lowered)
-	if (contrastIntensity > 1.f)
+	if (contrastIntensity != 1.f) // worth to do performance wise
 	{
-		cIn = contrastIntensity * (4.f / 3.f);
+		float cIn = contrastIntensity;
+		// adjustment to match native better
+		// only do them when contrastIntensity is above 1 because 1 is neutral (no adjustment)
+		// below 1 it matches native nicely (though idk if contrast is ever lowered)
+		if (contrastIntensity > 1.f)
+		{
+			cIn = contrastIntensity * (4.f / 3.f);
+		}
+		float cMid = contrastMidPoint;
+
+		// normalization factors for lower and upper power curve
+		float normalizationFactorLower = 1.f / cMid;
+		float normalizationFactorUpper = 1.f / (1.f - cMid);
+
+		Color.r = SigmoidalContrastAdjustment(Color.r, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
+		Color.g = SigmoidalContrastAdjustment(Color.g, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
+		Color.b = SigmoidalContrastAdjustment(Color.b, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
 	}
-	float cMid = contrastMidPoint;
-
-	// normalization factors for lower and upper power curve
-	float normalizationFactorLower = 1.f / cMid;
-	float normalizationFactorUpper = 1.f / (1.f - cMid);
-
-	Color.r = SigmoidalContrastAdjustment(Color.r, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
-	Color.g = SigmoidalContrastAdjustment(Color.g, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
-	Color.b = SigmoidalContrastAdjustment(Color.b, cMid, cIn, normalizationFactorLower, normalizationFactorUpper);
 
 #endif
 
