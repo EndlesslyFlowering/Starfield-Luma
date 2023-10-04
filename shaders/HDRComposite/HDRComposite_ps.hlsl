@@ -19,7 +19,7 @@
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
 // 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
 //   (optimisation left if contrastIntensity doesn't go below 1)
-#define POST_PROCESS_CONTRAST_TYPE 3
+#define POST_PROCESS_CONTRAST_TYPE 2
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
@@ -96,8 +96,8 @@ struct PSOutput
 
 // exp2(x * 1.44269502162933349609375f) is the same as exp(x)
 
-static const float TonemapStrength = 1.f; //TODO: implement
-static const float PostProcessStrength = 1.f; //TODO: implement
+static const float SDRTonemapStrength = 1.f;
+static const float PostProcessStrength = 1.f;
 // Similar to "AdditionalNeutralLUTPercentage" in the LUT shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 static const float GradingLUTStrength = 1.f;
 // 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
@@ -784,6 +784,7 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift.
 	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor)); //TODO: test and improve.
 	//return select(tonemappedColor == 0, postProcessedOffsetColor, postProcessedRatioColor); //TODO: improve. This causes flickering sometimes.
+	//return inverseTonemappedColor; //TODO: improve. This causes flickering sometimes.
 }
 
 PSOutput PS(PSInput psInput)
@@ -848,7 +849,7 @@ PSOutput PS(PSInput psInput)
 
 #if ENABLE_POST_PROCESS
 	float prePostProcessColorLuminance;
-	float3 tonemappedPostProcessedColor = PostProcess(tonemappedColor, prePostProcessColorLuminance);
+	float3 tonemappedPostProcessedColor = lerp(tonemappedColor, PostProcess(tonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
 #else
 	float3 tonemappedPostProcessedColor = tonemappedColor; // No need to do anything (not even a saturate here)
 #endif //ENABLE_POST_PROCESS
@@ -936,7 +937,7 @@ PSOutput PS(PSInput psInput)
 		// Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
 		if (onlyInvertHighlights && inverseTonemappedColor[channel] < minHighlightsColorOut)
 		{
-			inverseTonemappedColor[channel] = tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn);
+			inverseTonemappedColor[channel] = lerp(inverseTonemappedColor[channel], tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn), SDRTonemapStrength);
 		}
 		// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that)
 		if (inverseTonemappedColor[channel] >= minHighlightsColorOut)
@@ -947,6 +948,10 @@ PSOutput PS(PSInput psInput)
 	if (onlyInvertHighlights && midGrayOut < minHighlightsColorOut) // This is probably always true
 	{
 		midGrayOut = midGrayIn * (minHighlightsColorOut / minHighlightsColorIn);
+	}
+	if (SDRTonemapStrength != 1.f)
+	{
+
 	}
 
 	const float midGrayScale = midGrayOut / midGrayIn;
