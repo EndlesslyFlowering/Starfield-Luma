@@ -67,7 +67,7 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 	return uint3(U, UVW.y, 0);
 }
 
-//TODO: try to do the LUT analysys in linear from gamma 2.2 instead of sRGB, but then convert back to linear from sRGB at the end 
+//TODO: try to do the LUT analysys in linear from gamma 2.2 instead of sRGB, but then convert back to linear from sRGB at the end
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
 	Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
@@ -155,7 +155,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	{
 		return color;
 	}
-	
+
 #if LUT_DEBUG_VALUES
 	float3 DEBUG_COLOR = float3(1.f, 0.f, 1.f); // Magenta
 #endif // LUT_DEBUG_VALUES
@@ -164,7 +164,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
 	// Sample and hold targetChroma
 	const float3 reduceFactor = linearNormalization<float3>(
-		neutralLUTColor, 
+		neutralLUTColor,
 		0.f,
 		1.f,
 		1.f / (1.f - analysis.black),
@@ -175,8 +175,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1];
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
-	// Sample and hold targetL  
-	
+	// Sample and hold targetL
+
 	const float3 increaseFactor = linearNormalization<float3>(
 			neutralLUTColor,
 			0.f,
@@ -200,7 +200,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// This can also be represented as [-1 to 1] or [-B to +W].
 	// For interpolation between 0 and a maximum, it become [0, ..., W, ..., W+B]
 	// Distances do not always add up to sqrt(3) (eg: 1,0,0)
-	
+
 	const float blackDistance = hypot3(neutralLUTColor);
 	const float whiteDistance = hypot3(1.f - neutralLUTColor);
 	const float totalRange = blackDistance + whiteDistance;
@@ -212,10 +212,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	// Boost lightness by how much white was reduced
 	const float raiseL = linearNormalization(
-		whiteDistance, 
-		0.f, 
-		totalRange, 
-		1.f / analysis.whiteL, 
+		whiteDistance,
+		0.f,
+		totalRange,
+		1.f / analysis.whiteL,
 		1.f);
 
 #if LUT_DEBUG_VALUES
@@ -231,7 +231,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 //TODO: copy these define values into runtime bools
 #if LUT_SDR_ON_CLIP > 0 || LUT_HDR_ON_CLIP > 0
 	if (targetL >= 1.f) {
-#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP 
+#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP
 		if (SDRRange) {
 #endif
 
@@ -246,7 +246,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
 #endif
 
-#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP 
+#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP
 		}
 #if LUT_HDR_ON_CLIP > 0
 		else {
