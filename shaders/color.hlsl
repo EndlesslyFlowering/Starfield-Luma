@@ -92,7 +92,7 @@ float3 saturation(float3 color, float saturation)
     return lerp(luminance, color, saturation);
 }
 
-
+// sRGB/Rec.709
 float3 linear_srgb_to_oklab(float3 rgb) {
 	float l = (0.4122214708f * rgb.r) + (0.5363325363f * rgb.g) + (0.0514459929f * rgb.b);
 	float m = (0.2119034982f * rgb.r) + (0.6806995451f * rgb.g) + (0.1073969566f * rgb.b);
@@ -109,7 +109,7 @@ float3 linear_srgb_to_oklab(float3 rgb) {
 	);
 }
 
-
+// sRGB/Rec.709
 float3 oklab_to_linear_srgb(float3 lab) {
 	float L = lab[0];
 	float a = lab[1];
