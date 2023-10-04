@@ -9,14 +9,28 @@
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
 #define UNUSED_PARAMS 0
-#define LUT_DEBUG_VALUES true
+#define LUT_DEBUG_VALUES false
 
-// Enum: {0: AS_IS, 1: ORIGINAL, 2:WHITE, 3: MAX_HUE, 4: CLAMP }
-#define LUT_SDR_ON_CLIP 1
-#define LUT_HDR_ON_CLIP 0
+#if SDR_USE_GAMMA_2_2 // Make sure LUTs are normalized by linearizing them with gamma 2.2, so they work with values closer to the expected ones. Their mixed output is still kept in sRGB.
+	#define LINEARIZE(x) pow(x, 2.2f)
+	#define CORRECT_GAMMA(x) gamma_linear_to_sRGB(pow(x, 1.f / 2.2f))
+#else
+	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
+	#define CORRECT_GAMMA(x) x
+#endif
+
+// Behaviour when the color luminance goes beyond 1
+// -0: As is, keep the normalized value that could be beyond the 0-1
+// -1: Keep orignal (non normalized) color
+// -2: "Clip" to full white
+// -3: Max Hue
+// -4: Clamp
+#define LUT_SDR_ON_CLIP 1u
+#define LUT_HDR_ON_CLIP 0u
 
 static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
 static float LUTCorrectionPercentage = 1.f;
+static float LUTSaturation = 1.f;
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
@@ -70,9 +84,9 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 //TODO: try to do the LUT analysys in linear from gamma 2.2 instead of sRGB, but then convert back to linear from sRGB at the end
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
-	Analysis.black = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
+	Analysis.black = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
 	Analysis.blackY = Luminance(Analysis.black);
-	Analysis.white = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
+	Analysis.white = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
 	Analysis.whiteY = Luminance(Analysis.white);
 	Analysis.whiteL = linear_srgb_to_oklab(Analysis.white)[0];
 #if UNUSED_PARAMS
@@ -101,7 +115,7 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 		{
 			for (uint z = 0; z < LUT_SIZE_UINT; z += analyzeTexelFrequency)
 			{
-				float3 LUTColor = gamma_sRGB_to_linear(LUT.Load(ThreeToTwoDimensionCoordinates(uint3(x, y, z))).rgb);
+				float3 LUTColor = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(uint3(x, y, z))).rgb);
 
 				minColor = min(minColor, LUTColor);
 				maxColor = max(maxColor, LUTColor);
@@ -147,7 +161,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	LUTAnalysis analysis;
 	AnalyzeLUT(LUT, analysis);
 
-	float3 color = gamma_sRGB_to_linear(LUT.Load(UVW));
+	float3 color = LINEARIZE(LUT.Load(UVW));
 	const float3 originalColor = color;
 
 	if (analysis.whiteY < analysis.blackY // If LUT is inversed (eg: photo negative) don't do anything
@@ -172,7 +186,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
-	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1];
+	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * LUTSaturation;
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
@@ -206,7 +220,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float totalRange = blackDistance + whiteDistance;
 
 #if LUT_DEBUG_VALUES
-  // whiteY most always be > 0
+	// whiteY most always be > 0
 	if (analysis.whiteL <= 0) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
 
@@ -228,56 +242,23 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Use hue from LUT cube color
 	const float targetHue = linear_srgb_to_oklch(color)[2];
 
-//TODO: copy these define values into runtime bools
-#if LUT_SDR_ON_CLIP > 0 || LUT_HDR_ON_CLIP > 0
 	if (targetL >= 1.f) {
-#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP
-		if (SDRRange) {
-#endif
-
-#if LUT_SDR_ON_CLIP == 1
-		// Original (do nothing)
-#elif LUT_SDR_ON_CLIP == 2
-		// White
-		color = white;
-#elif LUT_SDR_ON_CLIP == 3
-		// TODO
-#elif LUT_SDR_ON_CLIP == 4
-		color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
-#endif
-
-#if LUT_SDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP
+		const uint clipBehavior = SDRRange ? LUT_SDR_ON_CLIP : LUT_HDR_ON_CLIP;
+		if (clipBehavior == 0) // As is (treat it the same as any other color)
+			color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
+		else if (clipBehavior == 1) { } // Keep original color (do nothing)
+		else if (clipBehavior == 2) // White
+			color = 1.f;
+		else if (clipBehavior == 3) // Max Hue
+		{
+			// TODO: can we even do anything about this? if the lightness is >= 1, then the color is white?
 		}
-#if LUT_HDR_ON_CLIP > 0
-		else {
-#endif
-#endif
-
-#if LUT_SDR_ON_CLIP == 0 && LUT_HDR_ON_CLIP > 0
-		if (!SDRRange) {
-#endif
-
-#if LUT_HDR_ON_CLIP != LUT__SDR_ON_CLIP
-#if LUT_HDR_ON_CLIP == 1
-			// Original (do nothing)
-#elif LUT_HDR_ON_CLIP == 2
-			// White
-			color = white;
-#elif LUT_HDR_ON_CLIP == 3
- 			// TODO
-#elif LUT_HDR_ON_CLIP == 4
-			color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue));
-#endif
-#endif
-#if LUT_HDR_ON_CLIP > 0 && LUT_SDR_ON_CLIP != LUT_HDR_ON_CLIP
-		}
-#endif
-	} else {
+		else if (clipBehavior == 4) // Clamp
+			color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue)); // TODO: isn't this the same as the "White" setting?
+	}
+	else {
 		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
 	}
-#elif
-		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
-#endif
 
 	// Optional step to keep colors in the SDR range.
 	if (SDRRange) {
@@ -297,7 +278,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	const uint3 outUVW = SV_DispatchThreadID;
 
 	float3 neutralLUTColor = float3(outUVW) / (LUT_SIZE - 1.f); // The neutral LUT is automatically generated by the coordinates, but it's baked with sRGB gamma
-	neutralLUTColor = gamma_sRGB_to_linear(neutralLUTColor);
+	neutralLUTColor = LINEARIZE(neutralLUTColor);
 
 #if LUT_IMPROVEMENT_TYPE != 1
 
@@ -305,10 +286,10 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	float3 LUT2Color = LUT2.Load(inUVW);
 	float3 LUT3Color = LUT3.Load(inUVW);
 	float3 LUT4Color = LUT4.Load(inUVW);
-	LUT1Color = gamma_sRGB_to_linear(LUT1Color);
-	LUT2Color = gamma_sRGB_to_linear(LUT2Color);
-	LUT3Color = gamma_sRGB_to_linear(LUT3Color);
-	LUT4Color = gamma_sRGB_to_linear(LUT4Color);
+	LUT1Color = LINEARIZE(LUT1Color);
+	LUT2Color = LINEARIZE(LUT2Color);
+	LUT3Color = LINEARIZE(LUT3Color);
+	LUT4Color = LINEARIZE(LUT4Color);
 
 #endif // LUT_IMPROVEMENT_TYPE
 
@@ -372,6 +353,8 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	                + (adjustedLUT2Percentage * LUT2Color)
 	                + (adjustedLUT3Percentage * LUT3Color)
 	                + (adjustedLUT4Percentage * LUT4Color);
+					
+	mixedLUT = CORRECT_GAMMA(mixedLUT);
 
 // Convert to sRGB after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
 #if !LUT_FIX_GAMMA_MAPPING
