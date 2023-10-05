@@ -1,6 +1,7 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
 #include "../math.hlsl"
+#include "RootSignature.hlsl"
 
 // These are defined at compile time (shaders permutations)
 //#define APPLY_BLOOM
@@ -792,6 +793,7 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 #endif
 }
 
+[RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
 {
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
