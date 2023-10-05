@@ -16,12 +16,10 @@
 #define HDR_UI_PAPER_WHITE HDR_REFERENCE_PAPER_WHITE * HDR_UI_PAPER_WHITE_MULTIPLIER
 
 // If this is true, the code makes the assumption that Bethesda developed and calibrated the game on gamma 2.2 screens, as opposed to sRGB gamma.
-// This implies there's a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
+// This implies there was a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
+// By turning this on, we emulate the SDR look in HDR by baking that assumption into our calculations.
 // This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping.
 #define SDR_USE_GAMMA_2_2 1
-// Emulates the SDR look of the game on an SDR display using gamma 2.2.
-// Which by our best guesses should be the creative intent.
-#define EMULATE_SDR_GAMMA_APPEARANCE 1
 
 // Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
 // This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
