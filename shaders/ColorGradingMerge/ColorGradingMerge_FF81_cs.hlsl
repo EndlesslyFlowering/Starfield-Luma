@@ -11,9 +11,11 @@
 #define UNUSED_PARAMS 0
 #define LUT_DEBUG_VALUES false
 
-#if SDR_USE_GAMMA_2_2 // Make sure LUTs are normalized by linearizing them with gamma 2.2, so they work with values closer to the expected ones. Their mixed output is still kept in sRGB.
+// Make sure LUTs are normalized by linearizing them with gamma 2.2, so they work with values closer to the expected ones. Their mixed output is still kept in sRGB.
+// There's a chance that LUTs had correctly been made on sRGB gamma monitors, so in that case this would be wrong (LUTs were likely made with external tools).
+#if SDR_USE_GAMMA_2_2 && 0 // Disabled as this does indeed look too bright.
 	#define LINEARIZE(x) pow(x, 2.2f)
-	#define CORRECT_GAMMA(x) gamma_linear_to_sRGB(pow(x, 1.f / 2.2f))
+	#define CORRECT_GAMMA(x) gamma_sRGB_to_linear(pow(x, 1.f / 2.2f))
 #else
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
@@ -30,7 +32,7 @@
 
 static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
 static float LUTCorrectionPercentage = 1.f;
-static float LUTSaturation = 1.f;
+static float LUTAdditionalSaturation = 0.f; // Between 0 and 1
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
@@ -81,7 +83,6 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 	return uint3(U, UVW.y, 0);
 }
 
-//TODO: try to do the LUT analysys in linear from gamma 2.2 instead of sRGB, but then convert back to linear from sRGB at the end
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
 	Analysis.black = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
@@ -186,7 +187,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
-	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * LUTSaturation;
+	//TODO: test if "LUTAdditionalSaturation" works without a saturate()
+	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] + LUTAdditionalSaturation;
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
@@ -353,7 +355,8 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	                + (adjustedLUT2Percentage * LUT2Color)
 	                + (adjustedLUT3Percentage * LUT3Color)
 	                + (adjustedLUT4Percentage * LUT4Color);
-					
+
+	// Note: this might not work great if the LUT has colors beyond the SDR 0-1 range	
 	mixedLUT = CORRECT_GAMMA(mixedLUT);
 
 // Convert to sRGB after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
