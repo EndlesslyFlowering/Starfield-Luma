@@ -15,7 +15,7 @@
 #define ENABLE_TONEMAP 1
 #define ENABLE_POST_PROCESS 1
 // 0 disable contrast adjustment
-// 1 original (weak, generates values beyond 0-1 which then get clipped)
+// 1 original (weak, generates values beyond 0-1 which then might get clipped)
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
 // 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
 //   (optimisation left if contrastIntensity doesn't go below 1)
@@ -24,7 +24,9 @@
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
 #define ENABLE_REPLACED_TONEMAP 1
-// Only invert highlights, which helps conserve the SDR filmic look (shadow crush)
+// Only invert highlights, which helps conserve the SDR filmic look (shadow crush) and altered colors.
+// The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
+// or to replicate the SDR tonemapper by luminance, though both would alter the look too much and break some scenes.
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
 #define CLAMP_INPUT_OUTPUT 1
 
@@ -96,7 +98,7 @@ struct PSOutput
 
 // exp2(x * 1.44269502162933349609375f) is the same as exp(x)
 
-static const float SDRTonemapStrength = 1.f;
+static const float SDRTonemapHDRStrength = 1.f;
 static const float PostProcessStrength = 1.f;
 // Similar to "AdditionalNeutralLUTPercentage" in the LUT shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 static const float GradingLUTStrength = 1.f;
@@ -420,19 +422,19 @@ T Hable_Inverse(
 	return (T)itmColor * hableParams.dstParams.W;
 }
 
-// Tonemapper inspired from DICE. Works on luminance to maintain hue, not per channel.
+// Tonemapper inspired from DICE. Can work by luminance to maintain hue.
 // "HighlightsShoulderStart" should be between 0 and 1. Determines where the highlights curve (shoulder) starts. Leaving at zero for now as it's a simple and good looking default.
 float3 DICETonemap(
 	float3 Color,
 	float  MaxOutputLuminance,
 	float  HighlightsShoulderStart = 0.f)
 {
-#if 1 // Do by channel for now, to match all other tonemappers, especially when "INVERT_TONEMAP_HIGHLIGHTS_ONLY" is on
+#if 0 // Even if all SDR tonemappers work by channel, in HDR we prefer to maintain the hue and to match the screen peak brightness in absolute (luminance) nits, not as channel values.
 	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart);
 	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart);
 	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart);
 	return Color;
-#else //TODO: try "per channel" option given all other tm is per channel. If not, restore the "luminance based" inverse tonemapping, to keep the SDR colors more.
+#else
 	const float sourceLuminance = Luminance(Color);
 	if (sourceLuminance > 0.0f)
 	{
@@ -781,10 +783,12 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 	postProcessedRatioColor *= postProcessColorRatio;
 	postProcessedOffsetColor += postProcessColorOffset * midGrayScale;
 	// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
-	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift.
-	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor)); //TODO: test and improve.
-	//return select(tonemappedColor == 0, postProcessedOffsetColor, postProcessedRatioColor); //TODO: improve. This causes flickering sometimes.
-	//return inverseTonemappedColor; //TODO: improve. This causes flickering sometimes.
+	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
+#if 1 // Note: in case "INVERT_TONEMAP_HIGHLIGHTS_ONLY" was false, we might want to test the "postProcessedOffsetColor" blend in range more carefully
+	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
+#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values
+	return select(tonemappedColor == 0, postProcessedOffsetColor, postProcessedRatioColor);
+#endif
 }
 
 PSOutput PS(PSInput psInput)
@@ -864,8 +868,8 @@ PSOutput PS(PSInput psInput)
 	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD);
 #endif // ENABLE_LUT
 
-#if EMULATE_SDR_GAMMA_APPEARANCE // Do this even if "ENABLE_LUT" is false, for consistency
-#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 //TODO: Disabled as this looks awful, probably because the Bethesda optimize sRGB function doesn't even stay in the 0-1 range
+// Do these even if "ENABLE_LUT" is false, for consistency
+#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it
 	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
 	tonemappedPostProcessedGradedColor = gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor));
 #endif
@@ -873,7 +877,6 @@ PSOutput PS(PSInput psInput)
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays
 	tonemappedPostProcessedGradedColor = pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f);
 #endif
-#endif // EMULATE_SDR_GAMMA_APPEARANCE
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
@@ -890,7 +893,7 @@ PSOutput PS(PSInput psInput)
 
 	const float paperWhite = HDR_GAME_PAPER_WHITE;
 
-	const float midGrayIn = MidGray; //TODO: try to increase this to ~0.21?
+	const float midGrayIn = MidGray;
 	float midGrayOut = midGrayIn;
 
 	float3 inverseTonemappedColor = tonemappedColor;
@@ -930,14 +933,12 @@ PSOutput PS(PSInput psInput)
 			break;
 	}
 
-	//TODO: improve inverse tonemapped look. Are mid tones too "raised"?
-
 	for (uint channel = 0; channel < 3; channel++)
 	{
 		// Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
 		if (onlyInvertHighlights && inverseTonemappedColor[channel] < minHighlightsColorOut)
 		{
-			inverseTonemappedColor[channel] = lerp(inverseTonemappedColor[channel], tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn), SDRTonemapStrength);
+			inverseTonemappedColor[channel] = tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn);
 		}
 		// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that)
 		if (inverseTonemappedColor[channel] >= minHighlightsColorOut)
@@ -949,15 +950,19 @@ PSOutput PS(PSInput psInput)
 	{
 		midGrayOut = midGrayIn * (minHighlightsColorOut / minHighlightsColorIn);
 	}
-	if (SDRTonemapStrength != 1.f)
+	if (onlyInvertHighlights && SDRTonemapHDRStrength != 1.f)
 	{
-
+		inverseTonemappedColor = lerp(inputColor, inverseTonemappedColor, SDRTonemapHDRStrength);
+		midGrayOut = lerp(midGrayIn, midGrayOut, SDRTonemapHDRStrength);
+		minHighlightsColorOut = lerp(minHighlightsColorIn, minHighlightsColorOut, SDRTonemapHDRStrength);
 	}
 
 	const float midGrayScale = midGrayOut / midGrayIn;
 
 	float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale);
-	//minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale); //TODO: should we even do this?
+#if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
+	minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale);
+#endif
 
 	// Bring back the color to the same range as SDR by dividing by the mid gray change.
 	inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
