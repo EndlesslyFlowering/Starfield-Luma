@@ -30,31 +30,31 @@ $main =
 
 
 function Run-DXC {
-    param (
-        [Parameter(Mandatory=$true)]
-        [string]$Arguments
-    )
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$Arguments
+	)
 
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $processInfo.FileName = "${PSScriptRoot}\..\tools\dxc_2023_08_14\bin\x64\dxc.exe"
-    $processInfo.Arguments = $Arguments
-    $processInfo.RedirectStandardError = $true
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
+	$processInfo = New-Object System.Diagnostics.ProcessStartInfo
+	$processInfo.FileName = "${PSScriptRoot}\..\tools\dxc_2023_08_14\bin\x64\dxc.exe"
+	$processInfo.Arguments = $Arguments
+	$processInfo.RedirectStandardError = $true
+	$processInfo.RedirectStandardOutput = $true
+	$processInfo.UseShellExecute = $false
+	$processInfo.CreateNoWindow = $true
 
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-    $process.Start() | Out-Null
-    $process.WaitForExit()
+	$process = New-Object System.Diagnostics.Process
+	$process.StartInfo = $processInfo
+	$process.Start() | Out-Null
+	$process.WaitForExit()
 
-    # Output the result
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+	# Output the result
+	$stdout = $process.StandardOutput.ReadToEnd()
+	$stderr = $process.StandardError.ReadToEnd()
 
-    if ($process.ExitCode -ne 0) {
-        Write-Error "An error occurred during shader compilation:`n$stderr"
-    }
+	if ($process.ExitCode -ne 0) {
+		Write-Error "An error occurred during shader compilation:`n$stderr"
+	}
 	
 	if ($stdout.Length -gt 0) {
 		Write-Host $stdout
@@ -62,22 +62,22 @@ function Run-DXC {
 }
 
 function Compile-Shader {
-    param (
-		[Parameter(Mandatory=$true)]
-        [string]$Type,
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$Type,
 	
-        [Parameter(Mandatory=$true)]
-        [string]$TechniqueName,
+		[Parameter(Mandatory = $true)]
+		[string]$TechniqueName,
         
-        [Parameter(Mandatory=$true)]
-        [string]$TechniqueId,
+		[Parameter(Mandatory = $true)]
+		[string]$TechniqueId,
 
-		[Parameter(Mandatory=$false)]
-        [string]$Entry = $Type.ToUpper(),
+		[Parameter(Mandatory = $false)]
+		[string]$Entry = $Type.ToUpper(),
 		
-        [parameter(Mandatory=$false)]
-        [array]$Defines
-    )
+		[parameter(Mandatory = $false)]
+		[array]$Defines
+	)
 
 	$inputHlslName = "${TechniqueName}_${Type}.hlsl"
 	$outputBinName = "${TechniqueName}_${TechniqueId}_${Type}.bin"
@@ -97,10 +97,10 @@ function Compile-Shader {
 	}
 	
 	foreach ($define in $Defines) {
-        $args = $args + "-D ${define} "
-    }
+		$args = $args + "-D ${define} "
+	}
 	
-    Run-DXC -Arguments $args
+	Run-DXC -Arguments $args
 	
 	# Extract and strip away the DXIL root signature
 	# TODO: Can extractrootsignature and Qstrip_rootsignature be used in the same operation?
