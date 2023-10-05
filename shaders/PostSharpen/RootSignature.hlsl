@@ -1,11 +1,12 @@
 #define ShaderRootSignature \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT), " \
+	\
 	"RootConstants(num32BitConstants=7, b0), " \
 	\
 	"DescriptorTable( " \
 		"SRV(t0, space=6), " \
 		"SRV(t1, space=6), " \
-		"SRV(t2, space=6), " \
+		"SRV(t2, space=6, flags=DATA_VOLATILE), " \
 		"SRV(t3, space=6), " \
 		"SRV(t4, space=6), " \
 		"SRV(t5, space=6), " \
@@ -35,25 +36,25 @@
 		"SRV(t28, space=6) " \
 	"), " \
 	\
-	"DescriptorTable(" \
-		"Sampler(s0, space=6, numDescriptors=10), " \
-		"Sampler(s10, space=6, numDescriptors=2) " \
+	"DescriptorTable( " \
+		"Sampler(s0, numDescriptors=10, space=6), " \
+		"Sampler(s10, numDescriptors=2, space=6) " \
 	"), " \
 	\
 	"SRV(t6, space=6), " \
 	"CBV(b0, space=6), " \
 	"CBV(b1, space=6), " \
 	\
-	"DescriptorTable(" \
+	"DescriptorTable( " \
 		"SRV(t2, space=7), " \
 		"SRV(t3, space=7), " \
-		"SRV(t5, space=7), " \
-		"SRV(t6, space=7), " \
+		"SRV(t5, space=7, flags=DATA_VOLATILE), " \
+		"SRV(t6, space=7, flags=DATA_VOLATILE), " \
 		"UAV(u0, space=7), " \
 		"UAV(u1, space=7), " \
 		"UAV(u2, space=7), " \
 		"UAV(u3, space=7), " \
-		"SRV(t7, space=7, numDescriptors=12) " \
+		"SRV(t7, numDescriptors=12, space=7, flags=DATA_VOLATILE) " \
 	"), " \
 	\
 	"SRV(t0, space=7), " \
@@ -63,17 +64,17 @@
 	"CBV(b1, space=7), " \
 	"CBV(b2, space=7), " \
 	\
-	"DescriptorTable(" \
+	"DescriptorTable( " \
 		"SRV(t0, space=8) " \
 	"), " \
 	\
-	"StaticSampler(s12, space=6), " \
-	"StaticSampler(s13, space=6), " \
-	"StaticSampler(s14, space=6), " \
-	"StaticSampler(s15, space=6), " \
-	"StaticSampler(s16, space=6), " \
-	"StaticSampler(s17, space=6), " \
-	"StaticSampler(s18, space=6), " \
-	"StaticSampler(s19, space=6), " \
-	"StaticSampler(s20, space=6), " \
-	"StaticSampler(s21, space=6) "
+	"StaticSampler(s12, filter=FILTER_MIN_MAG_MIP_POINT, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s13, filter=FILTER_MIN_MAG_MIP_POINT, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s14, filter=FILTER_MIN_MAG_MIP_LINEAR, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s15, filter=FILTER_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s16, filter=FILTER_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_MIRROR, addressV=TEXTURE_ADDRESS_MIRROR, addressW=TEXTURE_ADDRESS_MIRROR, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s17, maxAnisotropy=4, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s18, addressU=TEXTURE_ADDRESS_MIRROR, addressV=TEXTURE_ADDRESS_MIRROR, addressW=TEXTURE_ADDRESS_MIRROR, maxAnisotropy=4, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s19, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=4, comparisonFunc=COMPARISON_NEVER, space=6), " \
+	"StaticSampler(s20, filter=FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=1, comparisonFunc=COMPARISON_LESS, space=6), " \
+	"StaticSampler(s21, filter=FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=1, comparisonFunc=COMPARISON_GREATER, space=6) "
