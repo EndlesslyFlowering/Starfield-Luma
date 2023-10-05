@@ -32,7 +32,7 @@
 
 static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
 static float LUTCorrectionPercentage = 1.f;
-static float LUTAdditionalSaturation = 0.f; // Between 0 and 1
+static float LUTSaturationMultiplier = 1.f; // 1 is neutral
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
@@ -187,8 +187,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
-	//TODO: test if "LUTAdditionalSaturation" works without a saturate()
-	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] + LUTAdditionalSaturation;
+	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * LUTSaturationMultiplier;
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
