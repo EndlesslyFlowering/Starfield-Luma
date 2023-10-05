@@ -102,6 +102,7 @@ static const float SDRTonemapHDRStrength = 1.f;
 static const float PostProcessStrength = 1.f;
 // Similar to "AdditionalNeutralLUTPercentage" in the LUT shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 static const float GradingLUTStrength = 1.f;
+static const float SecondaryContrast = 1.f;
 // 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
 
@@ -946,14 +947,17 @@ PSOutput PS(PSInput psInput)
 			inverseTonemappedColor[channel] = inputColor[channel];
 		}
 	}
+	const float previousMidGrayOut = midGrayOut;
+	// If we only inverted highlights, the mid gray in and out should have the same value, so we need to base it on the highlights in/out change
 	if (onlyInvertHighlights && midGrayOut < minHighlightsColorOut) // This is probably always true
 	{
 		midGrayOut = midGrayIn * (minHighlightsColorOut / minHighlightsColorIn);
 	}
+	// Shift back to the original linear color if we want to ignore the SDR tonemapper
 	if (onlyInvertHighlights && SDRTonemapHDRStrength != 1.f)
 	{
 		inverseTonemappedColor = lerp(inputColor, inverseTonemappedColor, SDRTonemapHDRStrength);
-		midGrayOut = lerp(midGrayIn, midGrayOut, SDRTonemapHDRStrength);
+		midGrayOut = lerp(previousMidGrayOut, midGrayOut, SDRTonemapHDRStrength);
 		minHighlightsColorOut = lerp(minHighlightsColorIn, minHighlightsColorOut, SDRTonemapHDRStrength);
 	}
 
@@ -963,6 +967,9 @@ PSOutput PS(PSInput psInput)
 #if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
 	minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale);
 #endif
+	
+	// Secondary user driven contrast
+	inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), SecondaryContrast) * (MidGray * midGrayScale);
 
 	// Bring back the color to the same range as SDR by dividing by the mid gray change.
 	inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
