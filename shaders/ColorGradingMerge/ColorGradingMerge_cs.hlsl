@@ -1,6 +1,7 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
 #include "../math.hlsl"
+#include "RootSignature.hlsl"
 
 // 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good and it's kinda broken in SDR)
 #define LUT_IMPROVEMENT_TYPE 1
@@ -272,6 +273,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 }
 
 // Dispatch size is 1 1 16 (x and y have one thread and one thread group, while z has 16 thread groups with a thread each)
+[RootSignature(ShaderRootSignature)]
 [numthreads(LUT_SIZE_UINT, LUT_SIZE_UINT, 1)]
 void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 {

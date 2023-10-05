@@ -103,17 +103,15 @@ function Compile-Shader {
     Run-DXC -Arguments $args
 	
 	# Extract and strip away the DXIL root signature
-	#
 	# TODO: Can extractrootsignature and Qstrip_rootsignature be used in the same operation?
-	# TODO: Enable when ready
-	#Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -extractrootsignature -Fo `"${stagedSigPath}`""
-	#Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
+	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -extractrootsignature -Fo `"${stagedSigPath}`""
+	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
 	
 	# Move the resulting bins to the game directory. Move-Item is to avoid partial reads when live shader editing
 	# is enabled.
 	New-Item -Force -ItemType Directory -Path "${ShaderOutputDirectory}\${TechniqueName}" | Out-Null
 	Move-Item -Force -Path $stagedBinPath -Destination "${ShaderOutputDirectory}\${TechniqueName}\${outputBinName}"
-	#Move-Item -Force -Path $stagedSigPath -Destination "${ShaderOutputDirectory}\${TechniqueName}\${outputSigName}"
+	Move-Item -Force -Path $stagedSigPath -Destination "${ShaderOutputDirectory}\${TechniqueName}\${outputSigName}"
 }
 
 try {
