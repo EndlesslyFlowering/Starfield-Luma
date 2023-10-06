@@ -184,3 +184,13 @@ struct PushConstantWrapper_ColorGradingMerge
 	float neutralLUTPercentage;
 };
 //ColorGradingMerge end
+
+//ContrastAdaptiveSharpening start
+struct ContrastAdaptiveSharpeningData
+{
+	uint4 cas0;
+	uint4 cas1;
+	uint4 cas2;
+	uint4 cas3;
+};
+//ContrastAdaptiveSharpening end
