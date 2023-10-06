@@ -19,13 +19,13 @@ $main =
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF81"
 
 	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "FF94" -Entry "main"
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "100FF94" -Entry "main" -Defines "USE_PACKED_MATH"
-	
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "100FF94" -Defines "USE_PACKED_MATH" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
+
 	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "FF9A" -Entry "main"
 
 	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "FFAA"
 
-	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "FFAB"	
+	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "FFAB"
 }
 
 
@@ -55,7 +55,7 @@ function Run-DXC {
 	if ($process.ExitCode -ne 0) {
 		Write-Error "An error occurred during shader compilation:`n$stderr"
 	}
-	
+
 	if ($stdout.Length -gt 0) {
 		Write-Host $stdout
 	}
@@ -65,18 +65,21 @@ function Compile-Shader {
 	param (
 		[Parameter(Mandatory = $true)]
 		[string]$Type,
-	
+
 		[Parameter(Mandatory = $true)]
 		[string]$TechniqueName,
-        
+
 		[Parameter(Mandatory = $true)]
 		[string]$TechniqueId,
 
 		[Parameter(Mandatory = $false)]
 		[string]$Entry = $Type.ToUpper(),
-		
+
 		[parameter(Mandatory = $false)]
-		[array]$Defines
+		[array]$Defines,
+
+		[parameter(Mandatory = $false)]
+		[array]$AdditionalParams
 	)
 
 	$inputHlslName = "${TechniqueName}_${Type}.hlsl"
@@ -91,22 +94,26 @@ function Compile-Shader {
 
 	# Build the shader in its staging directory
 	$args = "`"${inputHlslPath}`" -Fo `"${stagedBinPath}`" -T ${Type}_6_6 -E ${Entry} "
-	
+
 	if ($ShaderOutputEmbedPDB -eq $true) {
 		$args = $args + "-Qembed_debug -Zi "
 	}
-	
+
 	foreach ($define in $Defines) {
 		$args = $args + "-D ${define} "
 	}
-	
+
+	foreach ($param in $AdditionalParams) {
+		$args = $args + "${param} "
+	}
+
 	Run-DXC -Arguments $args
-	
+
 	# Extract and strip away the DXIL root signature
 	# TODO: Can extractrootsignature and Qstrip_rootsignature be used in the same operation?
 	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -extractrootsignature -Fo `"${stagedSigPath}`""
 	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
-	
+
 	# Move the resulting bins to the game directory. Move-Item is to avoid partial reads when live shader editing
 	# is enabled.
 	New-Item -Force -ItemType Directory -Path "${ShaderOutputDirectory}\${TechniqueName}" | Out-Null
