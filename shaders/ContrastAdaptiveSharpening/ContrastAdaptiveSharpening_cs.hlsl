@@ -3,13 +3,12 @@
 #include "RootSignature.hlsl"
 
 // this is CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [100FF94]
-// other variants are also available, which are:
+// other variants are also available but seemingly unused, which are:
 // - CAS upscaling in FP32 [200FF94]
 // - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH and FFX_CAS_BETTER_DIAGONALS [300FF94]
 // - just CAS sharpening in FP32 [FF94]
 
-// TODO make full process in half not just after csp conversion?
-// needs matrices in half
+// TODO: make full process in half not just after csp conversion? (needs matrices in half)
 
 // don't need it
 //cbuffer _16_18 : register(b0, space6)
@@ -102,6 +101,8 @@ void CS(CSInput csInput)
 	float3 _168f = ColorIn.Load(int3(_167, _105, 0)).rgb;
 	float3 _173f = ColorIn.Load(int3(_138, _127, 0)).rgb;
 
+#if ENABLE_HDR
+
 	 _91f = BT709_To_BT2020( _91f);
 	_139f = BT709_To_BT2020(_139f);
 	_106f = BT709_To_BT2020(_106f);
@@ -113,8 +114,10 @@ void CS(CSInput csInput)
 	_128f = BT709_To_BT2020(_128f);
 	_173f = BT709_To_BT2020(_173f);
 
-	// worst case is red and blue at 0 and green high enough so that the luminance is HDR_MAX_OUTPUT_NITS
-	static const float normalizationFactor = (HDR_MAX_OUTPUT_NITS / 80.f) / 0.678f;
+	// since blue is the least contributing in terms of luminance
+	// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
+	// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
+	static const float normalizationFactor = (HDR_MAX_OUTPUT_NITS / 80.f) / 0.0593f;
 
 	half3  _91 = saturate( _91f / normalizationFactor);
 	half3 _139 = saturate(_139f / normalizationFactor);
@@ -126,6 +129,32 @@ void CS(CSInput csInput)
 	half3 _168 = saturate(_168f / normalizationFactor);
 	half3 _128 = saturate(_128f / normalizationFactor);
 	half3 _173 = saturate(_173f / normalizationFactor);
+
+#else // ENABLE_HDR
+
+	half3  _91 =  _91f;
+	half3 _139 = _139f;
+	half3 _106 = _106f;
+	half3 _151 = _151f;
+	half3 _109 = _109f;
+	half3 _156 = _156f;
+	half3 _119 = _119f;
+	half3 _168 = _168f;
+	half3 _128 = _128f;
+	half3 _173 = _173f;
+
+	 _91 = saturate(pow( _91, 2.2f));
+	_139 = saturate(pow(_139, 2.2f));
+	_106 = saturate(pow(_106, 2.2f));
+	_151 = saturate(pow(_151, 2.2f));
+	_109 = saturate(pow(_109, 2.2f));
+	_156 = saturate(pow(_156, 2.2f));
+	_119 = saturate(pow(_119, 2.2f));
+	_168 = saturate(pow(_168, 2.2f));
+	_128 = saturate(pow(_128, 2.2f));
+	_173 = saturate(pow(_173, 2.2f));
+
+#endif // ENABLE_HDR
 
 	half _193 =  _91.y;
 	half _194 = _139.y;
@@ -175,26 +204,34 @@ void CS(CSInput csInput)
 
 	half3 _329 = (((_151 + _139 + _168 + _173) * _316) + _156) * _323;
 	_329 = saturate(_329);
+#if ENABLE_HDR
 	float3 _1003 = _329 * normalizationFactor;
 
-	float3 o2 = BT2020_To_BT709(_1003);
+	float3 colorOut2 = BT2020_To_BT709(_1003);
+#else // ENABLE_HDR
+	float3 colorOut2 = pow(_329, 1.f / 2.2f);
+#endif // ENABLE_HDR
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
 	{
 		half3 _388 = (((_106 + _91 + _119 + _128) * _315) + _109) * _322;
 		_388 = saturate(_388);
+#if ENABLE_HDR
 		float3 _396 = _388 * normalizationFactor;
 
-		float3 o1 = BT2020_To_BT709(_396);
+		float3 colorOut1 = BT2020_To_BT709(_396);
+#else // ENABLE_HDR
+		float3 colorOut1 = pow(_388, 1.f / 2.2f);
+#endif // ENABLE_HDR
 
-		ColorOut[pp] = float4(o1, 1.f);
+		ColorOut[pp] = float4(colorOut1, 1.f);
 	}
 
 	pp.x += 8;
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
 	{
-		ColorOut[pp] = float4(o2, 1.f);
+		ColorOut[pp] = float4(colorOut2, 1.f);
 	}
 
 	pp.y += 8;
@@ -214,6 +251,8 @@ void CS(CSInput csInput)
 	float3 _561f = ColorIn.Load(int3(_138, _520, 0)).rgb;
 	float3 _570f = ColorIn.Load(int3(_167, _520, 0)).rgb;
 	float3 _575f = ColorIn.Load(int3(_138, _539, 0)).rgb;
+
+#if ENABLE_HDR
 
 	_509f = BT709_To_BT2020(_509f);
 	_547f = BT709_To_BT2020(_547f);
@@ -236,6 +275,32 @@ void CS(CSInput csInput)
 	half3 _570 = saturate(_570f / normalizationFactor);
 	half3 _540 = saturate(_540f / normalizationFactor);
 	half3 _575 = saturate(_575f / normalizationFactor);
+
+#else // ENABLE_HDR
+
+	half3 _509 = _509f;
+	half3 _547 = _547f;
+	half3 _521 = _521f;
+	half3 _556 = _556f;
+	half3 _524 = _524f;
+	half3 _561 = _561f;
+	half3 _531 = _531f;
+	half3 _570 = _570f;
+	half3 _540 = _540f;
+	half3 _575 = _575f;
+
+	_509 = saturate(pow(_509f, 2.2f));
+	_547 = saturate(pow(_547f, 2.2f));
+	_521 = saturate(pow(_521f, 2.2f));
+	_556 = saturate(pow(_556f, 2.2f));
+	_524 = saturate(pow(_524f, 2.2f));
+	_561 = saturate(pow(_561f, 2.2f));
+	_531 = saturate(pow(_531f, 2.2f));
+	_570 = saturate(pow(_570f, 2.2f));
+	_540 = saturate(pow(_540f, 2.2f));
+	_575 = saturate(pow(_575f, 2.2f));
+
+#endif // ENABLE_HDR
 
 	half _596 = _509.y;
 	half _597 = _547.y;
@@ -283,24 +348,32 @@ void CS(CSInput csInput)
 
 	half3 _724 = (((_556 + _547 + _570 + _575) * _712) + _561) * _718;
 	_724 = saturate(_724);
+#if ENABLE_HDR
 	float3 _1216 = _724 * normalizationFactor;
 
-	float3 o4 = BT2020_To_BT709(_1216);
+	float3 colorOut4 = BT2020_To_BT709(_1216);
+#else // ENABLE_HDR
+	float3 colorOut4 = pow(_724, 1.f / 2.2f);
+#endif // ENABLE_HDR
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
 	{
 		half3 _783 = (((_521 + _509 + _531 + _540) * _711) + _524) * _717;
 		_783 = saturate(_783);
+#if ENABLE_HDR
 		float3 _790 = _783 * normalizationFactor;
 
-		float3 o3 = BT2020_To_BT709(_790);
+		float3 colorOut3 = BT2020_To_BT709(_790);
+#else // ENABLE_HDR
+		float3 colorOut3 = pow(_783, 1.f / 2.2f);
+#endif // ENABLE_HDR
 
-		ColorOut[uint2(_58, pp.y)] = float4(o3, 1.f);
+		ColorOut[uint2(_58, pp.y)] = float4(colorOut3, 1.f);
 	}
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
 	{
-		ColorOut[pp] = float4(o4, 1.f);
+		ColorOut[pp] = float4(colorOut4, 1.f);
 	}
 
 #endif
