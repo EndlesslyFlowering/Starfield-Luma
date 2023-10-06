@@ -39,7 +39,7 @@ namespace Hooks
 
 			// disable photo mode screenshots with HDR
 			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(415473);
-			auto _Hook_TakeSnapshot = dku::Hook::AddVMTHook(&takeSnapshotVtbl, 1, FUNC_INFO(Hook_TakeSnapshot));
+			auto       _Hook_TakeSnapshot = dku::Hook::AddVMTHook(&takeSnapshotVtbl, 1, FUNC_INFO(Hook_TakeSnapshot));
 			_TakeSnapshot = reinterpret_cast<std::add_pointer_t<decltype(Hook_TakeSnapshot)>>(_Hook_TakeSnapshot->OldAddress);
 			_Hook_TakeSnapshot->Enable();
 
@@ -50,6 +50,9 @@ namespace Hooks
 			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136130, 0x37), Hook_SettingsDataModelFloatEvent);
 
 			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x89), Hook_RecreateSwapchain);
+
+			_ApplyRenderPassRenderState = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204409, 0x18), Hook_ApplyRenderPassRenderState);  // CmdDraw
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(204408, 0x20), Hook_ApplyRenderPassRenderState);                                // CmdDispatch
 		}
 
 	private:
@@ -77,6 +80,9 @@ namespace Hooks
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelIntEvent)> _SettingsDataModelIntEvent;
 		static void Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelFloatEvent)> _SettingsDataModelFloatEvent;
+
+		static bool Hook_ApplyRenderPassRenderState(void* a_arg1, void* a_arg2);
+		static inline std::add_pointer_t<decltype(Hook_ApplyRenderPassRenderState)> _ApplyRenderPassRenderState;
 	};
 
 	void Install();
