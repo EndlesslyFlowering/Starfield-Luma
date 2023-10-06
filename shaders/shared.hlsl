@@ -33,7 +33,12 @@ struct StructHdrDllPluginConstants
 	float PeakBrightness;
 	float GamePaperWhite;
 	float UIPaperWhite;
-	uint Unused;
+	float Saturation;
+	float LUTCorrectionStrength;
+	float ColorGradingStrength;
+	float Contrast;
+	float DevSetting01;
+	float DevSetting02;
 };
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);

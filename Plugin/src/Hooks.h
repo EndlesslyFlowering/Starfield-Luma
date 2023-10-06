@@ -56,8 +56,6 @@ namespace Hooks
 		}
 
 	private:
-	    static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
-
 		static void ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable);
 		static void CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled);
 		static void CreateStepperSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_settingList, Settings::Stepper& a_setting, bool a_bEnabled);

@@ -115,3 +115,7 @@ using namespace std::literals;
 // DKUtil
 #include "DKUtil/Hook.hpp"
 #include "DKUtil/Logger.hpp"
+
+// reshade addon api
+#include "imgui.h"
+#include "reshade/reshade_api.hpp"
