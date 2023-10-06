@@ -26,3 +26,14 @@
 #define LUT_FIX_GAMMA_MAPPING 1
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
+
+// Custom push constants uploaded by the HDR DLL plugin code. Do note that register space comes at a premium when adding members. Bit/byte packing is advised.
+struct StructHdrDllPluginConstants
+{
+	float PeakBrightness;
+	float GamePaperWhite;
+	float UIPaperWhite;
+	uint Unused;
+};
+
+ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);
