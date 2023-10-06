@@ -60,6 +60,12 @@ namespace Settings
 			config.Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config.Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config.Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
+			config.Bind(Saturation.value, Saturation.defaultValue);
+			config.Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
+			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
+			config.Bind(Contrast.value, Contrast.defaultValue);
+			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
+			config.Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config.Bind(RenderTargetsToUpgrade,
 			    "ImageSpaceBuffer",
 				"ScaleformCompositeBuffer",

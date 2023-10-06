@@ -1,6 +1,7 @@
 #include "Hooks.h"
 #include "Offsets.h"
 #include "Utils.h"
+#include "reshade/reshade.hpp"
 
 namespace Hooks
 {
@@ -18,16 +19,20 @@ namespace Hooks
 
     void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable)
     {
-		if (const auto peakBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kPeakBrightness))) {
+		if (const auto peakBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_PeakBrightness))) {
 			peakBrightnessSetting->m_Enabled.SetValue(a_bEnable);
 		}
 
-		if (const auto gamePaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kGamePaperWhite))) {
+		if (const auto gamePaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_GamePaperWhite))) {
 			gamePaperWhiteSetting->m_Enabled.SetValue(a_bEnable);
 		}
 
-		if (const auto uiPaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kUIPaperWhite))) {
+		if (const auto uiPaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite))) {
 			uiPaperWhiteSetting->m_Enabled.SetValue(a_bEnable);
+		}
+
+		if (const auto saturation = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Saturation))) {
+			saturation->m_Enabled.SetValue(a_bEnable);
 		}
     }
 
@@ -83,11 +88,13 @@ namespace Hooks
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
 		// save the pointer for later
-		swapChainObject = a_bgsSwapchainObject;
+		Settings::swapChainObject = a_bgsSwapchainObject;
 
 		const auto settings = Settings::Main::GetSingleton();
 
 		a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(settings->GetDisplayModeColorSpaceType());
+
+		Settings::RegisterReshadeOverlay();
 
 		return _UnkFunc(a1, a_bgsSwapchainObject);		
     }
@@ -128,6 +135,12 @@ namespace Hooks
         CreateSliderSetting(a_settingList, settings->PeakBrightness, settings->IsHDREnabled());
         CreateSliderSetting(a_settingList, settings->GamePaperWhite, settings->IsHDREnabled());
         CreateSliderSetting(a_settingList, settings->UIPaperWhite, settings->IsHDREnabled());
+        CreateSliderSetting(a_settingList, settings->Saturation, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
+		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
+        CreateSliderSetting(a_settingList, settings->Contrast, true);
+        CreateSliderSetting(a_settingList, settings->DevSetting01, true);
+        CreateSliderSetting(a_settingList, settings->DevSetting02, true);
 
 		// Initialize the rest of the settings after ours
 		_CreateDataModelOptions(a_arg1, a_settingList);
@@ -158,7 +171,7 @@ namespace Hooks
 					ToggleEnableHDRSubSettings(a_eventData.m_Model, false);
 				}
 
-				swapChainObject->format = newFormat;
+				Settings::swapChainObject->format = newFormat;
 
 				// toggle vsync to force a swapchain recreation
 			    Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
@@ -187,14 +200,32 @@ namespace Hooks
 		};
 
 		switch (a_eventData.m_SettingID) {
-		case static_cast<int>(Settings::SettingID::kPeakBrightness):
+		case static_cast<int>(Settings::SettingID::kHDR_PeakBrightness):
 			HandleSetting(settings->PeakBrightness);
 			break;
-		case static_cast<int>(Settings::SettingID::kGamePaperWhite):
+		case static_cast<int>(Settings::SettingID::kHDR_GamePaperWhite):
 			HandleSetting(settings->GamePaperWhite);
 			break;
-		case static_cast<int>(Settings::SettingID::kUIPaperWhite):
+		case static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite):
 			HandleSetting(settings->UIPaperWhite);
+			break;
+		case static_cast<int>(Settings::SettingID::kHDR_Saturation):
+			HandleSetting(settings->Saturation);
+			break;
+		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
+			HandleSetting(settings->LUTCorrectionStrength);
+			break;
+		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
+			HandleSetting(settings->ColorGradingStrength);
+			break;
+		case static_cast<int>(Settings::SettingID::kContrast):
+			HandleSetting(settings->Contrast);
+			break;
+		case static_cast<int>(Settings::SettingID::kDevSetting01):
+			HandleSetting(settings->DevSetting01);
+			break;
+		case static_cast<int>(Settings::SettingID::kDevSetting02):
+			HandleSetting(settings->DevSetting02);
 			break;
 		}
 
@@ -214,11 +245,16 @@ namespace Hooks
 				const auto settings = Settings::Main::GetSingleton();
 
 				// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
-				std::array<float, 4> data {
+				std::array<float, 9> data {
 					*settings->PeakBrightness.value,
 					*settings->GamePaperWhite.value,
 					*settings->UIPaperWhite.value,
-					4.0f
+					*settings->Saturation.value * 0.02f,
+					*settings->LUTCorrectionStrength.value * 0.01f,
+					*settings->ColorGradingStrength.value * 0.01f,
+					*settings->Contrast.value * 0.02f,
+					*settings->DevSetting01.value * 0.01f,
+					*settings->DevSetting02.value * 0.01f
 				};
 
 				if (!Compute)

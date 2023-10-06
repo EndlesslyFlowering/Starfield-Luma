@@ -32,59 +32,63 @@ void SFSEPlugin_Preload(SFSE::LoadInterface* a_sfse);
 
 static inline bool bIsLoaded = false;
 
-DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
+void LoadPlugin(bool a_bIsSFSE)
 {
-	if (bIsLoaded) {
-	    return true;
-	}
-
-#ifndef NDEBUG
-	while (!IsDebuggerPresent()) {
-		Sleep(100);
-	}
-#endif
-
-	SFSE::Init(a_sfse);
-
 	dku::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));
 	INFO("{} v{} loaded", Plugin::NAME, Plugin::Version)
 
 	// do stuff
 	Settings::Main::GetSingleton()->Load();
 
-	SFSE::AllocTrampoline(1 << 7);
+	if (a_bIsSFSE) {
+		SFSE::AllocTrampoline(1 << 7);
+	} else {
+		dku::Hook::Trampoline::AllocTrampoline(1 << 7);
+	}
+	
 	Offsets::Initialize();
 	Hooks::Install();
-
+	
 	bIsLoaded = true;
+}
+
+DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
+{
+#ifndef NDEBUG
+	while (!IsDebuggerPresent()) {
+		Sleep(100);
+	}
+#endif
+
+	if (bIsLoaded) {
+	    return true;
+	}
+
+	SFSE::Init(a_sfse);
+
+	LoadPlugin(true);
 
 	return true;
 }
 
-// for non sfse plugin loaders
 BOOL APIENTRY DllMain(HMODULE a_hModule, DWORD a_ul_reason_for_call, LPVOID a_lpReserved)
 {
-	if (bIsLoaded) {
-	    return TRUE;
-	}
-
-	if (a_ul_reason_for_call == DLL_PROCESS_ATTACH) {
+	switch (a_ul_reason_for_call) {
+	case DLL_PROCESS_ATTACH:
 #ifndef NDEBUG
 		while (!IsDebuggerPresent()) {
 			Sleep(100);
 		}
 #endif
+		if (bIsLoaded) {
+			return TRUE;
+		}
 
-		dku::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));
-		INFO("{} v{} loaded", Plugin::NAME, Plugin::Version)
-
-		Settings::Main::GetSingleton()->Load();
-
-		dku::Hook::Trampoline::AllocTrampoline(1 << 7);
-		Offsets::Initialize();
-		Hooks::Install();
-
-		bIsLoaded = true;
+		LoadPlugin(false);
+	    break;
+	case DLL_PROCESS_DETACH:
+	    reshade::unregister_addon(a_hModule);
+	    break;
 	}
 
 	return TRUE;
