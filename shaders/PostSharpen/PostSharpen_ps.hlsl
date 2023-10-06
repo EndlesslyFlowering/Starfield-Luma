@@ -1,5 +1,6 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
+#include "RootSignature.hlsl"
 
 cbuffer _13_15 : register(b0, space7)
 {
@@ -68,6 +69,7 @@ void frag_main()
 	SV_Target.w = 1.0f;
 }
 
+[RootSignature(ShaderRootSignature)]
 SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
 {
 	TEXCOORD = stage_input.TEXCOORD;

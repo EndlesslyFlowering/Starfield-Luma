@@ -1,5 +1,6 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
+#include "RootSignature.hlsl"
 
 Texture2D<float> _8 : register(t0, space8);
 Texture2D<float> _9 : register(t1, space8);
@@ -12,6 +13,7 @@ struct PSInputs
 	float2 TEXCOORD : TEXCOORD0;
 };
 
+[RootSignature(ShaderRootSignature)]
 float4 PS(PSInputs inputs) : SV_Target
 {
 	float Y = _8.Sample(_13, inputs.TEXCOORD.xy).x;

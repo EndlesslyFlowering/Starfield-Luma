@@ -1,5 +1,6 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
+#include "RootSignature.hlsl"
 
 cbuffer _16_18 : register(b0, space6)
 {
@@ -239,6 +240,7 @@ void comp_main()
 #endif
 }
 
+[RootSignature(ShaderRootSignature)]
 [numthreads(64, 1, 1)]
 void main(SPIRV_Cross_Input stage_input)
 {
