@@ -201,6 +201,77 @@ namespace Hooks
 		_SettingsDataModelFloatEvent(a_arg1, a_eventData);
     }
 
+	bool Hooks::Hook_ApplyRenderPassRenderState(void* a_arg1, void* a_arg2)
+	{
+		const bool result = _ApplyRenderPassRenderState(a_arg1, a_arg2);
+
+		if (result) {
+			const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg2) + 0x8);
+			const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x78);
+
+			auto uploadRootConstants = [&](uint32_t RootParameterIndex, bool Compute) {
+				auto       commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_arg1) + 0x10);
+				const auto settings = Settings::Main::GetSingleton();
+
+				// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
+				std::array<float, 4> data {
+					*settings->PeakBrightness.value,
+					*settings->GamePaperWhite.value,
+					*settings->UIPaperWhite.value,
+					4.0f
+				};
+
+				if (!Compute)
+					commandList->SetGraphicsRoot32BitConstants(RootParameterIndex, data.size(), reinterpret_cast<uint32_t*>(data.data()), 0);
+				else
+					commandList->SetComputeRoot32BitConstants(RootParameterIndex, data.size(), reinterpret_cast<uint32_t*>(data.data()), 0);
+			};
+
+			// Note: The following switch statement may be called several thousand times per frame. Additionally, it'll be called from multiple
+			// threads concurrently. The individual cases are called at most once or twice per frame. Keep the amount of code here fairly light.
+			//
+			// RootParameterIndex is the index of our custom RootConstants() entry in the root signature. It's taken from the corresponding
+			// RootSignature.hlsl file stored next to each technique hlsl file.
+			switch (techniqueId) {
+			case 0xFF1A:
+			case 0x600FF1A:
+			case 0x700FF1A:
+			//case 0x800FF1A:
+			case 0xE00FF1A:
+			case 0xF00FF1A:
+				uploadRootConstants(14, false); // HDRComposite
+				break;
+
+			case 0xFF75:
+				uploadRootConstants(2, false);  // FilmGrain
+				break;
+
+			case 0xFF81:
+				uploadRootConstants(7, true);  // ColorGradingMerge
+				break;
+
+			//case 0xFF94:
+			case 0x100FF94:
+				uploadRootConstants(14, true);  // ContrastAdaptiveSharpening
+				break;
+
+			case 0xFF9A:
+				uploadRootConstants(14, false);  // PostSharpen
+				break;
+
+			case 0xFFAA:
+				uploadRootConstants(2, false);  // ScaleformComposite
+				break;
+
+			case 0xFFAB:
+				uploadRootConstants(1, false);  // BinkMovie
+				break;
+			}
+		}
+
+		return result;
+	}
+
     void Install()
 	{
 #ifndef NDEBUG
