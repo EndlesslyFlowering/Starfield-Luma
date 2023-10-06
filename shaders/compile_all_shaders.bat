@@ -75,7 +75,7 @@ call :errorlevel_check
 call :errorlevel_check
 
 "%dxc%" "ContrastAdaptiveSharpening\ContrastAdaptiveSharpening_100FF94_cs.hlsl" ^
-        -T cs_6_6 -E main -Fo ^
+        -T cs_6_6 -E CS -enable-16bit-types -Wno-conversion -Fo ^
         "%target_folder%ContrastAdaptiveSharpening\ContrastAdaptiveSharpening_100FF94_cs.bin"
 
 call :errorlevel_check
