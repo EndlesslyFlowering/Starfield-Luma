@@ -51,11 +51,17 @@ struct CSInput
 
 #define HDR_BT2020 1
 
+// since blue is the least contributing in terms of luminance
+// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
+// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
+// TODO: normalizing by peak brightness isn't right, we need to do a quick inverse pass of the tonemapper.
+static const float normalizationFactor = (HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709) / 0.0593f;
+
 [RootSignature(ShaderRootSignature)]
 [numthreads(64, 1, 1)]
 void CS(CSInput csInput)
 {
-#if 1 // Disable the CS so it just outputs the input
+#if 0 // Disable the CS so it just outputs the input
 	uint2 _55 = CASData.cas2.xy;
 	uint _58 = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
 	uint ppx = _58;
@@ -75,13 +81,13 @@ void CS(CSInput csInput)
 
 	uint4 _55 = CASData.cas2;
 
-	uint _58 = ((csInput.SV_GroupThreadID.x >> 1) & 7)
-	         | (csInput.SV_GroupID.x << 4)
+	uint _58 = (((csInput.SV_GroupThreadID.x >> 1) & 7)
+	          | (csInput.SV_GroupID.x << 4))
 					 + _55.x;
 
-	uint2 pp = uint2(_58, ((csInput.SV_GroupThreadID.x >> 3) & 6)
-	                    | (csInput.SV_GroupThreadID.x & 1)
-	                    | (csInput.SV_GroupID.y << 4)
+	uint2 pp = uint2(_58, (((csInput.SV_GroupThreadID.x >> 3) & 6)
+	                     | (csInput.SV_GroupThreadID.x & 1)
+	                     | (csInput.SV_GroupID.y << 4))
 											+ _55.y);
 
 	uint4 _69 = CASData.cas3;
@@ -117,63 +123,67 @@ void CS(CSInput csInput)
 	float3 _168f = ColorIn.Load(int3(_167, _105, 0)).rgb;
 	float3 _173f = ColorIn.Load(int3(_138, _127, 0)).rgb;
 
-#if ENABLE_HDR //TODO: replace with "if (HdrDllPluginConstants.DisplayMode > 0)"
+	half3  _91;
+	half3 _139;
+	half3 _106;
+	half3 _151;
+	half3 _109;
+	half3 _156;
+	half3 _119;
+	half3 _168;
+	half3 _128;
+	half3 _173;
 
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
 #if HDR_BT2020
-	 _91f = BT709_To_BT2020( _91f);
-	_139f = BT709_To_BT2020(_139f);
-	_106f = BT709_To_BT2020(_106f);
-	_151f = BT709_To_BT2020(_151f);
-	_109f = BT709_To_BT2020(_109f);
-	_156f = BT709_To_BT2020(_156f);
-	_119f = BT709_To_BT2020(_119f);
-	_168f = BT709_To_BT2020(_168f);
-	_128f = BT709_To_BT2020(_128f);
-	_173f = BT709_To_BT2020(_173f);
+		 _91f = BT709_To_BT2020( _91f);
+		_139f = BT709_To_BT2020(_139f);
+		_106f = BT709_To_BT2020(_106f);
+		_151f = BT709_To_BT2020(_151f);
+		_109f = BT709_To_BT2020(_109f);
+		_156f = BT709_To_BT2020(_156f);
+		_119f = BT709_To_BT2020(_119f);
+		_168f = BT709_To_BT2020(_168f);
+		_128f = BT709_To_BT2020(_128f);
+		_173f = BT709_To_BT2020(_173f);
 #endif
 
-	// since blue is the least contributing in terms of luminance
-	// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
-	// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
-	// TODO: normalizing by peak brightness isn't right, we need to do a quick inverse pass of the tonemapper.
-	static const float normalizationFactor = (HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709) / 0.0593f;
+		 _91 = saturate( _91f / normalizationFactor);
+		_139 = saturate(_139f / normalizationFactor);
+		_106 = saturate(_106f / normalizationFactor);
+		_151 = saturate(_151f / normalizationFactor);
+		_109 = saturate(_109f / normalizationFactor);
+		_156 = saturate(_156f / normalizationFactor);
+		_119 = saturate(_119f / normalizationFactor);
+		_168 = saturate(_168f / normalizationFactor);
+		_128 = saturate(_128f / normalizationFactor);
+		_173 = saturate(_173f / normalizationFactor);
+	}
+	else
+	{
+		 _91 =  _91f;
+		_139 = _139f;
+		_106 = _106f;
+		_151 = _151f;
+		_109 = _109f;
+		_156 = _156f;
+		_119 = _119f;
+		_168 = _168f;
+		_128 = _128f;
+		_173 = _173f;
 
-	half3  _91 = saturate( _91f / normalizationFactor);
-	half3 _139 = saturate(_139f / normalizationFactor);
-	half3 _106 = saturate(_106f / normalizationFactor);
-	half3 _151 = saturate(_151f / normalizationFactor);
-	half3 _109 = saturate(_109f / normalizationFactor);
-	half3 _156 = saturate(_156f / normalizationFactor);
-	half3 _119 = saturate(_119f / normalizationFactor);
-	half3 _168 = saturate(_168f / normalizationFactor);
-	half3 _128 = saturate(_128f / normalizationFactor);
-	half3 _173 = saturate(_173f / normalizationFactor);
-
-#else // ENABLE_HDR
-
-	half3  _91 =  _91f;
-	half3 _139 = _139f;
-	half3 _106 = _106f;
-	half3 _151 = _151f;
-	half3 _109 = _109f;
-	half3 _156 = _156f;
-	half3 _119 = _119f;
-	half3 _168 = _168f;
-	half3 _128 = _128f;
-	half3 _173 = _173f;
-
-	 _91 = saturate(GAMMA_TO_LINEAR(_91));
-	_139 = saturate(GAMMA_TO_LINEAR(_139));
-	_106 = saturate(GAMMA_TO_LINEAR(_106));
-	_151 = saturate(GAMMA_TO_LINEAR(_151));
-	_109 = saturate(GAMMA_TO_LINEAR(_109));
-	_156 = saturate(GAMMA_TO_LINEAR(_156));
-	_119 = saturate(GAMMA_TO_LINEAR(_119));
-	_168 = saturate(GAMMA_TO_LINEAR(_168));
-	_128 = saturate(GAMMA_TO_LINEAR(_128));
-	_173 = saturate(GAMMA_TO_LINEAR(_173));
-
-#endif // ENABLE_HDR
+		 _91 = saturate(GAMMA_TO_LINEAR(_91));
+		_139 = saturate(GAMMA_TO_LINEAR(_139));
+		_106 = saturate(GAMMA_TO_LINEAR(_106));
+		_151 = saturate(GAMMA_TO_LINEAR(_151));
+		_109 = saturate(GAMMA_TO_LINEAR(_109));
+		_156 = saturate(GAMMA_TO_LINEAR(_156));
+		_119 = saturate(GAMMA_TO_LINEAR(_119));
+		_168 = saturate(GAMMA_TO_LINEAR(_168));
+		_128 = saturate(GAMMA_TO_LINEAR(_128));
+		_173 = saturate(GAMMA_TO_LINEAR(_173));
+	}
 
 	half _193 =  _91.y;
 	half _194 = _139.y;
@@ -223,25 +233,35 @@ void CS(CSInput csInput)
 
 	half3 _329 = (((_151 + _139 + _168 + _173) * _316) + _156) * _323;
 	_329 = saturate(_329);
-#if ENABLE_HDR
-	float3 _1003 = _329 * normalizationFactor;
 
-	float3 colorOut2 = (bool)HDR_BT2020 ? BT2020_To_BT709(_1003) : _1003;
-#else // ENABLE_HDR
-	float3 colorOut2 = LINEAR_TO_GAMMA(_329);
-#endif // ENABLE_HDR
+	float3 colorOut2;
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
+		float3 _1003 = _329 * normalizationFactor;
+
+		colorOut2 = (bool)HDR_BT2020 ? BT2020_To_BT709(_1003) : _1003;
+	}
+	else
+	{
+		colorOut2 = LINEAR_TO_GAMMA(_329);
+	}
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
 	{
 		half3 _388 = (((_106 + _91 + _119 + _128) * _315) + _109) * _322;
 		_388 = saturate(_388);
-#if ENABLE_HDR
-		float3 _396 = _388 * normalizationFactor;
 
-		float3 colorOut1 = (bool)HDR_BT2020 ? BT2020_To_BT709(_396) : _396;
-#else // ENABLE_HDR
-		float3 colorOut1 = LINEAR_TO_GAMMA(_388);
-#endif // ENABLE_HDR
+		float3 colorOut1;
+		if (HdrDllPluginConstants.DisplayMode > 0)
+		{
+			float3 _396 = _388 * normalizationFactor;
+
+			colorOut1 = (bool)HDR_BT2020 ? BT2020_To_BT709(_396) : _396;
+		}
+		else
+		{
+			colorOut1 = LINEAR_TO_GAMMA(_388);
+		}
 
 		ColorOut[pp] = float4(colorOut1, 1.f);
 	}
@@ -271,57 +291,67 @@ void CS(CSInput csInput)
 	float3 _570f = ColorIn.Load(int3(_167, _520, 0)).rgb;
 	float3 _575f = ColorIn.Load(int3(_138, _539, 0)).rgb;
 
-#if ENABLE_HDR
+	half3 _509;
+	half3 _547;
+	half3 _521;
+	half3 _556;
+	half3 _524;
+	half3 _561;
+	half3 _531;
+	half3 _570;
+	half3 _540;
+	half3 _575;
 
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
 #if HDR_BT2020
-	_509f = BT709_To_BT2020(_509f);
-	_547f = BT709_To_BT2020(_547f);
-	_521f = BT709_To_BT2020(_521f);
-	_556f = BT709_To_BT2020(_556f);
-	_524f = BT709_To_BT2020(_524f);
-	_561f = BT709_To_BT2020(_561f);
-	_531f = BT709_To_BT2020(_531f);
-	_570f = BT709_To_BT2020(_570f);
-	_540f = BT709_To_BT2020(_540f);
-	_575f = BT709_To_BT2020(_575f);
+		_509f = BT709_To_BT2020(_509f);
+		_547f = BT709_To_BT2020(_547f);
+		_521f = BT709_To_BT2020(_521f);
+		_556f = BT709_To_BT2020(_556f);
+		_524f = BT709_To_BT2020(_524f);
+		_561f = BT709_To_BT2020(_561f);
+		_531f = BT709_To_BT2020(_531f);
+		_570f = BT709_To_BT2020(_570f);
+		_540f = BT709_To_BT2020(_540f);
+		_575f = BT709_To_BT2020(_575f);
 #endif
 
-	half3 _509 = saturate(_509f / normalizationFactor);
-	half3 _547 = saturate(_547f / normalizationFactor);
-	half3 _521 = saturate(_521f / normalizationFactor);
-	half3 _556 = saturate(_556f / normalizationFactor);
-	half3 _524 = saturate(_524f / normalizationFactor);
-	half3 _561 = saturate(_561f / normalizationFactor);
-	half3 _531 = saturate(_531f / normalizationFactor);
-	half3 _570 = saturate(_570f / normalizationFactor);
-	half3 _540 = saturate(_540f / normalizationFactor);
-	half3 _575 = saturate(_575f / normalizationFactor);
+		_509 = saturate(_509f / normalizationFactor);
+		_547 = saturate(_547f / normalizationFactor);
+		_521 = saturate(_521f / normalizationFactor);
+		_556 = saturate(_556f / normalizationFactor);
+		_524 = saturate(_524f / normalizationFactor);
+		_561 = saturate(_561f / normalizationFactor);
+		_531 = saturate(_531f / normalizationFactor);
+		_570 = saturate(_570f / normalizationFactor);
+		_540 = saturate(_540f / normalizationFactor);
+		_575 = saturate(_575f / normalizationFactor);
+	}
+	else
+	{
+		_509 = _509f;
+		_547 = _547f;
+		_521 = _521f;
+		_556 = _556f;
+		_524 = _524f;
+		_561 = _561f;
+		_531 = _531f;
+		_570 = _570f;
+		_540 = _540f;
+		_575 = _575f;
 
-#else // ENABLE_HDR
-
-	half3 _509 = _509f;
-	half3 _547 = _547f;
-	half3 _521 = _521f;
-	half3 _556 = _556f;
-	half3 _524 = _524f;
-	half3 _561 = _561f;
-	half3 _531 = _531f;
-	half3 _570 = _570f;
-	half3 _540 = _540f;
-	half3 _575 = _575f;
-
-	_509 = saturate(GAMMA_TO_LINEAR(_509f));
-	_547 = saturate(GAMMA_TO_LINEAR(_547f));
-	_521 = saturate(GAMMA_TO_LINEAR(_521f));
-	_556 = saturate(GAMMA_TO_LINEAR(_556f));
-	_524 = saturate(GAMMA_TO_LINEAR(_524f));
-	_561 = saturate(GAMMA_TO_LINEAR(_561f));
-	_531 = saturate(GAMMA_TO_LINEAR(_531f));
-	_570 = saturate(GAMMA_TO_LINEAR(_570f));
-	_540 = saturate(GAMMA_TO_LINEAR(_540f));
-	_575 = saturate(GAMMA_TO_LINEAR(_575f));
-
-#endif // ENABLE_HDR
+		_509 = saturate(GAMMA_TO_LINEAR(_509f));
+		_547 = saturate(GAMMA_TO_LINEAR(_547f));
+		_521 = saturate(GAMMA_TO_LINEAR(_521f));
+		_556 = saturate(GAMMA_TO_LINEAR(_556f));
+		_524 = saturate(GAMMA_TO_LINEAR(_524f));
+		_561 = saturate(GAMMA_TO_LINEAR(_561f));
+		_531 = saturate(GAMMA_TO_LINEAR(_531f));
+		_570 = saturate(GAMMA_TO_LINEAR(_570f));
+		_540 = saturate(GAMMA_TO_LINEAR(_540f));
+		_575 = saturate(GAMMA_TO_LINEAR(_575f));
+	}
 
 	half _596 = _509.y;
 	half _597 = _547.y;
@@ -369,25 +399,35 @@ void CS(CSInput csInput)
 
 	half3 _724 = (((_556 + _547 + _570 + _575) * _712) + _561) * _718;
 	_724 = saturate(_724);
-#if ENABLE_HDR
-	float3 _1216 = _724 * normalizationFactor;
 
-	float3 colorOut4 = (bool)HDR_BT2020 ? BT2020_To_BT709(_1216) : _1216;
-#else // ENABLE_HDR
-	float3 colorOut4 = LINEAR_TO_GAMMA(_724);
-#endif // ENABLE_HDR
+	float3 colorOut4;
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
+		float3 _1216 = _724 * normalizationFactor;
+
+		colorOut4 = (bool)HDR_BT2020 ? BT2020_To_BT709(_1216) : _1216;
+	}
+	else
+	{
+		colorOut4 = LINEAR_TO_GAMMA(_724);
+	}
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
 	{
 		half3 _783 = (((_521 + _509 + _531 + _540) * _711) + _524) * _717;
 		_783 = saturate(_783);
-#if ENABLE_HDR
+
+		float3 colorOut3;
+		if (HdrDllPluginConstants.DisplayMode > 0)
+		{
 		float3 _790 = _783 * normalizationFactor;
 
-		float3 colorOut3 = (bool)HDR_BT2020 ? BT2020_To_BT709(_790) : _790;
-#else // ENABLE_HDR
-		float3 colorOut3 = LINEAR_TO_GAMMA(_783);
-#endif // ENABLE_HDR
+			colorOut3 = (bool)HDR_BT2020 ? BT2020_To_BT709(_790) : _790;
+		}
+		else
+		{
+			colorOut3 = LINEAR_TO_GAMMA(_783);
+		}
 
 		ColorOut[uint2(_58, pp.y)] = float4(colorOut3, 1.f);
 	}
