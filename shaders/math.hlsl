@@ -11,7 +11,7 @@ float hypot3(float3 input)
 	return sqrt(inputSquared.x + inputSquared.y + inputSquared.z);
 }
 
-// From old to new range
+// From old to new range (just a remap function)
 template<class T>
 T linearNormalization(T input, T min, T max, T newMin, T newMax)
 {
