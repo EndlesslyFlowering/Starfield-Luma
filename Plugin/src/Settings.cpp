@@ -61,9 +61,9 @@ namespace Settings
 			config.Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config.Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
 			config.Bind(Saturation.value, Saturation.defaultValue);
+			config.Bind(Contrast.value, Contrast.defaultValue);
 			config.Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
 			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
-			config.Bind(Contrast.value, Contrast.defaultValue);
 			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config.Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config.Bind(RenderTargetsToUpgrade,
@@ -77,7 +77,12 @@ namespace Settings
 				"ImageSpaceBufferE5B9G9R9",
 				"TAA_idTech7HistoryColorTarget",
 				"EnvBRDF",
-				"ImageSpaceBufferR10G10B10A2");
+				"ImageSpaceBufferR10G10B10A2",
+#if 0
+				'NativeResolutionColorBuffer01',
+				'ColorBuffer01'
+#endif
+				);
 		});
 
 		config.Load();
