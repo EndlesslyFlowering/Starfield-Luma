@@ -46,7 +46,7 @@ struct CSInput
 [numthreads(64, 1, 1)]
 void CS(CSInput csInput)
 {
-#if 0
+#if 1
 	// butchered the CS so it just outputs the input
 	uint4 _55 = CASData.cas2;
 	uint ppx = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
@@ -120,7 +120,8 @@ void CS(CSInput csInput)
 	// since blue is the least contributing in terms of luminance
 	// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
 	// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
-	static const float normalizationFactor = (HDR_MAX_OUTPUT_NITS / 80.f) / 0.0593f;
+	// TODO: normalizing by peak brightness isn't right, we need to do a quick inverse pass of the tonemapper.
+	static const float normalizationFactor = (HdrDllPluginConstants.HDRPeakBrightness / WhiteNits_BT709) / 0.0593f;
 
 	half3  _91 = saturate( _91f / normalizationFactor);
 	half3 _139 = saturate(_139f / normalizationFactor);
@@ -146,6 +147,7 @@ void CS(CSInput csInput)
 	half3 _128 = _128f;
 	half3 _173 = _173f;
 
+	//TODO: use sRGB gamma if SDR_USE_GAMMA_2_2 is false
 	 _91 = saturate(pow( _91, 2.2h));
 	_139 = saturate(pow(_139, 2.2h));
 	_106 = saturate(pow(_106, 2.2h));

@@ -31,9 +31,7 @@
 #define LUT_SDR_ON_CLIP 1u
 #define LUT_HDR_ON_CLIP 0u
 
-static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise
-static float LUTCorrectionPercentage = 1.f;
-static float LUTSaturationMultiplier = 1.f; // 1 is neutral
+static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by HdrDllPluginConstants.LUTCorrectionStrength
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
@@ -188,7 +186,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
-	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * LUTSaturationMultiplier;
+	// The saturation multiplier is restricted to HDR as it easily goes beyond Rec.709
+	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * (SDRRange ? 1.f : HdrDllPluginConstants.HDRLUTCorrectionSaturation);
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
@@ -267,7 +266,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		color = saturate(color);
 	}
 
-	color = lerp(originalColor, color, LUTCorrectionPercentage);
+	color = lerp(originalColor, color, HdrDllPluginConstants.LUTCorrectionStrength);
 
 	return color;
 }
@@ -296,7 +295,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 
 #endif // LUT_IMPROVEMENT_TYPE
 
-	const bool SDRRange = !((bool)ENABLE_HDR) || (bool)FORCE_SDR_LUTS;
+	const bool SDRRange = HdrDllPluginConstants.DisplayMode == 0 || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
 
 	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
@@ -313,7 +312,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 
 	if (LUT1Luminance != 0.f)
 	{
-		LUT1Color *= lerp(1.f, neutralLUTLuminance / LUT1Luminance, LUTCorrectionPercentage);
+		LUT1Color *= lerp(1.f, neutralLUTLuminance / LUT1Luminance, HdrDllPluginConstants.LUTCorrectionStrength);
 		if (SDRRange)
 		{
 			LUT1Color = saturate(LUT1Color);
@@ -321,7 +320,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	}
 	if (LUT2Luminance != 0.f)
 	{
-		LUT2Color *= lerp(1.f, neutralLUTLuminance / LUT2Luminance, LUTCorrectionPercentage);
+		LUT2Color *= lerp(1.f, neutralLUTLuminance / LUT2Luminance, HdrDllPluginConstants.LUTCorrectionStrength);
 		if (SDRRange)
 		{
 			LUT2Color = saturate(LUT2Color);
@@ -329,7 +328,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	}
 	if (LUT3Luminance != 0.f)
 	{
-		LUT3Color *= lerp(1.f, neutralLUTLuminance / LUT3Luminance, LUTCorrectionPercentage);
+		LUT3Color *= lerp(1.f, neutralLUTLuminance / LUT3Luminance, HdrDllPluginConstants.LUTCorrectionStrength);
 		if (SDRRange)
 		{
 			LUT3Color = saturate(LUT3Color);
@@ -337,7 +336,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	}
 	if (LUT4Luminance != 0.f)
 	{
-		LUT4Color *= lerp(1.f, neutralLUTLuminance / LUT4Luminance, LUTCorrectionPercentage);
+		LUT4Color *= lerp(1.f, neutralLUTLuminance / LUT4Luminance, HdrDllPluginConstants.LUTCorrectionStrength);
 		if (SDRRange)
 		{
 			LUT4Color = saturate(LUT4Color);

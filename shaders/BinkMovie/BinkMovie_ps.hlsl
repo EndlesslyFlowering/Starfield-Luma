@@ -49,7 +49,7 @@ float4 PS(PSInputs inputs) : SV_Target
 #endif
 	//TODO: AutoHDR on movies???
 
-	color *= HDR_GAME_PAPER_WHITE;
+	color *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709; // Use the game brightness, not the UI one, as these are usually videos that are seamless with gameplay
 #endif // ENABLE_HDR
 
 	return float4(color, 1.0f);
