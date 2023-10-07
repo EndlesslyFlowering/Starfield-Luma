@@ -973,11 +973,12 @@ PSOutput PS(PSInput psInput)
 #endif
 	
 		// Secondary user driven contrast
+		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
 #if 0 // By luminance (no hue shift) (looks off)
 		float inverseTonemappedPostProcessedColorLuminance = Luminance(inverseTonemappedPostProcessedColor);
-		inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / (MidGray * midGrayScale), HdrDllPluginConstants.HDRSecondaryContrast) * (MidGray * midGrayScale), inverseTonemappedPostProcessedColorLuminance);
+		inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / (MidGray * midGrayScale), secondaryContrast) * (MidGray * midGrayScale), inverseTonemappedPostProcessedColorLuminance);
 #else // By channel (also increases saturation)
-		inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), HdrDllPluginConstants.HDRSecondaryContrast) * (MidGray * midGrayScale);
+		inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), secondaryContrast) * (MidGray * midGrayScale);
 #endif
 
 		// Bring back the color to the same range as SDR by dividing by the mid gray change.
