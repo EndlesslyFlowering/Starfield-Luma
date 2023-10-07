@@ -109,11 +109,13 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->GamePaperWhite, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->UIPaperWhite, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
-		CreateSliderSetting(a_settingList, settings->Contrast, true);
+#if 1
 		CreateSliderSetting(a_settingList, settings->DevSetting01, true);
 		CreateSliderSetting(a_settingList, settings->DevSetting02, true);
+#endif
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
 
@@ -233,14 +235,14 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kHDR_Saturation):
 			HandleSetting(settings->Saturation);
 			break;
+		case static_cast<int>(Settings::SettingID::kHDR_Contrast):
+			HandleSetting(settings->Contrast);
+			break;
 		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
 			HandleSetting(settings->LUTCorrectionStrength);
 			break;
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
-			break;
-		case static_cast<int>(Settings::SettingID::kContrast):
-			HandleSetting(settings->Contrast);
 			break;
 		case static_cast<int>(Settings::SettingID::kDevSetting01):
 			HandleSetting(settings->DevSetting01);
@@ -271,12 +273,12 @@ namespace Hooks
 					static_cast<float>(*settings->PeakBrightness.value),
 					static_cast<float>(*settings->GamePaperWhite.value),
 					static_cast<float>(*settings->UIPaperWhite.value),
-					static_cast<float>(*settings->Saturation.value * 0.02f),
-					static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),
-					static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),
-					static_cast<float>(*settings->Contrast.value * 0.02f),
-					static_cast<float>(*settings->DevSetting01.value * 0.01f),
-					static_cast<float>(*settings->DevSetting02.value * 0.01f)
+					static_cast<float>(*settings->Saturation.value * 0.02f), // 0-100 to 0-2
+					static_cast<float>(*settings->Contrast.value * 0.02f), // 0-100 to 0-2
+					static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f), // 0-100 to 0-1
+					static_cast<float>(*settings->ColorGradingStrength.value * 0.01f), // 0-100 to 0-1
+					static_cast<float>(*settings->DevSetting01.value * 0.01f), // 0-100 to 0-1
+					static_cast<float>(*settings->DevSetting02.value * 0.01f) // 0-100 to 0-1
 				};
 
 				if (!Compute)
