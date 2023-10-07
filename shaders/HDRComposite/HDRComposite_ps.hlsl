@@ -808,8 +808,7 @@ PSOutput PS(PSInput psInput)
 #if defined(APPLY_BLOOM)
 
 	float3 bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD);
-	float bloomMultiplier = PcwHdrComposite.BloomMultiplier;
-	inputColor += bloomMultiplier * bloom;
+	inputColor += PcwHdrComposite.BloomMultiplier * bloom;
 
 #endif // APPLY_BLOOM
 
