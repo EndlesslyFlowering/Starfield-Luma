@@ -101,9 +101,6 @@ struct PSOutput
 
 static const float SDRTonemapHDRStrength = 1.f;
 static const float PostProcessStrength = 1.f;
-// Similar to "AdditionalNeutralLUTPercentage" in the LUT shader, though this is more precise as it skips the precision loss induced by a neutral LUT
-static const float GradingLUTStrength = 1.f;
-static const float SecondaryContrast = 1.f;
 // 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
 
@@ -768,7 +765,8 @@ float3 GradingLUT(float3 color, float2 uv)
 	LUTColor = gamma_sRGB_to_linear(LUTColor);
 #endif // !LUT_FIX_GAMMA_MAPPING
 
-	const float LUTMaskAlpha = saturate(LUTMaskTexture.Sample(Sampler0, uv).x + (1.f - GradingLUTStrength));
+	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" in the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
+	const float LUTMaskAlpha = saturate(LUTMaskTexture.Sample(Sampler0, uv).x + (1.f - HdrDllPluginConstants.ColorGradingStrength));
 	LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
 
 	return LUTColor;
@@ -894,7 +892,7 @@ PSOutput PS(PSInput psInput)
 
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-	const float paperWhite = HDR_GAME_PAPER_WHITE;
+	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
 
 	const float midGrayIn = MidGray;
 	float midGrayOut = midGrayIn;
@@ -971,19 +969,19 @@ PSOutput PS(PSInput psInput)
 #endif
 	
 	// Secondary user driven contrast
-	inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), SecondaryContrast) * (MidGray * midGrayScale);
+	inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), HdrDllPluginConstants.HDRSecondaryContrast) * (MidGray * midGrayScale);
 
 	// Bring back the color to the same range as SDR by dividing by the mid gray change.
 	inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
 	minHighlightsColorOut *= paperWhite / midGrayScale;
 
-	const float maxOutputLuminance = HDR_MAX_OUTPUT_NITS / WhiteNits_BT709;
+	const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709;
 	const float highlightsShoulderStart = onlyInvertHighlights ? minHighlightsColorOut : 0.f;
     float3 outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart);
 
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-	float3 outputColor = finalOriginalColor * HDR_GAME_PAPER_WHITE_MULTIPLIER; // Don't use "HDR_GAME_PAPER_WHITE" as it'd be too bright on an untonemapped image
+	float3 outputColor = finalOriginalColor * (HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408); // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
