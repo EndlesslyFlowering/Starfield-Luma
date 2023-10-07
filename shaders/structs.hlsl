@@ -186,11 +186,28 @@ struct PushConstantWrapper_ColorGradingMerge
 //ColorGradingMerge end
 
 //ContrastAdaptiveSharpening start
+
+struct CASConst0
+{
+	float rcpScalingFactorX;
+	float rcpScalingFactorY;
+	float otherScalingFactorX; //0.5 * inputSizeInPixelsX * (1.0 / outputSizeInPixelsX) - 0.5
+	float otherScalingFactorY; //0.5 * inputSizeInPixelsY * (1.0 / outputSizeInPixelsY) - 0.5
+};
+
+struct CASConst1
+{
+	float sharp;
+	uint  sharpAsHalf; //needs to be unpacked
+	float rcpScalingFactorXTimes8;
+	int   unused;
+};
+
 struct ContrastAdaptiveSharpeningData
 {
-	uint4 cas0;
-	uint4 cas1;
-	uint4 cas2;
-	uint4 cas3;
+	CASConst0 upscalingConst0;
+	CASConst1 upscalingConst1;
+	uint4     rectLimits0;
+	uint4     rectLimits1;
 };
 //ContrastAdaptiveSharpening end
