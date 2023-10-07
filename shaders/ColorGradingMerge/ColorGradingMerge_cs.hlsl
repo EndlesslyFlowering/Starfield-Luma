@@ -187,7 +187,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
 	// The saturation multiplier is restricted to HDR as it easily goes beyond Rec.709
-	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * (SDRRange ? 1.f : HdrDllPluginConstants.HDRLUTCorrectionSaturation);
+	const float saturation = linearNormalization(HdrDllPluginConstants.HDRLUTCorrectionSaturation, 0.f, 2.f, 0.5f, 1.5f);
+	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * (SDRRange ? 1.f : saturation);
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
@@ -297,12 +298,10 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 
 	const bool SDRRange = HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
-
 	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
 	float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);
 	float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralLUTColor, SDRRange);
 	float3 LUT4Color = PatchLUTColor(LUT4, inUVW, neutralLUTColor, SDRRange);
-
 #elif LUT_IMPROVEMENT_TYPE == 2
 	float neutralLUTLuminance = Luminance(neutralLUTColor);
 	float LUT1Luminance = Luminance(LUT1Color);
