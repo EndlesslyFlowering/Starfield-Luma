@@ -41,16 +41,17 @@ float4 PS(PSInputs inputs) : SV_Target
 	// as UI blending produces invalid pixels if it's blended with an invalid color.
 	color = max(color, 0.f);
 
-#if ENABLE_HDR
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
 #if SDR_USE_GAMMA_2_2
-	color = pow(color, 2.2f);
+		color = pow(color, 2.2f);
 #else
-	color = gamma_sRGB_to_linear(color);
+		color = gamma_sRGB_to_linear(color);
 #endif
-	//TODO: AutoHDR on movies???
+		//TODO: AutoHDR on movies???
 
-	color *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709; // Use the game brightness, not the UI one, as these are usually videos that are seamless with gameplay
-#endif // ENABLE_HDR
+		color *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709; // Use the game brightness, not the UI one, as these are usually videos that are seamless with gameplay
+	}
 
 	return float4(color, 1.0f);
 }

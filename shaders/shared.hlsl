@@ -2,7 +2,6 @@
 
 #include "structs.hlsl"
 
-#define ENABLE_HDR 1
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
 #define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_BT709)
 
