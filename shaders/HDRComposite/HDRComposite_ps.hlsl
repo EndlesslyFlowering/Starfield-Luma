@@ -945,7 +945,8 @@ PSOutput PS(PSInput psInput)
 			{
 				inverseTonemappedColor[channel] = tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn);
 			}
-			// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that)
+			// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
+			// If there were problems with this (a disconnect in gradients), directly compare "inputColor" against "minHighlightsColorOut".
 			if (inverseTonemappedColor[channel] >= minHighlightsColorOut)
 			{
 				inverseTonemappedColor[channel] = inputColor[channel];
@@ -986,7 +987,8 @@ PSOutput PS(PSInput psInput)
 		minHighlightsColorOut *= paperWhite / midGrayScale;
 
 		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709;
-		const float highlightsShoulderStart = onlyInvertHighlights ? minHighlightsColorOut : 0.f;
+		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness
+		const float highlightsShoulderStart = onlyInvertHighlights ? min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut) : 0.f;
   	  	outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart);
 
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
