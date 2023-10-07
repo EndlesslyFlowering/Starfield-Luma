@@ -131,7 +131,7 @@ void CS(CSInput csInput)
 	// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
 	// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
 	// TODO: normalizing by peak brightness isn't right, we need to do a quick inverse pass of the tonemapper.
-	static const float normalizationFactor = (HdrDllPluginConstants.HDRPeakBrightness / WhiteNits_BT709) / 0.0593f;
+	static const float normalizationFactor = (HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709) / 0.0593f;
 
 	half3  _91 = saturate( _91f / normalizationFactor);
 	half3 _139 = saturate(_139f / normalizationFactor);
