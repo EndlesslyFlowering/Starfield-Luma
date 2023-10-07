@@ -41,6 +41,13 @@ struct CSInput
 //	return f16tof32(uint2(value & 0xffff, value >> 16));
 //}
 
+#if SDR_USE_GAMMA_2_2
+	#define GAMMA_TO_LINEAR(x) pow(x, 2.2h)
+	#define LINEAR_TO_GAMMA(x) pow(x, 1.h / 2.2h)
+#else //TODO: make this use half instead of float
+	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
+	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
+#endif
 
 [RootSignature(ShaderRootSignature)]
 [numthreads(64, 1, 1)]
@@ -147,17 +154,16 @@ void CS(CSInput csInput)
 	half3 _128 = _128f;
 	half3 _173 = _173f;
 
-	//TODO: use sRGB gamma if SDR_USE_GAMMA_2_2 is false
-	 _91 = saturate(pow( _91, 2.2h));
-	_139 = saturate(pow(_139, 2.2h));
-	_106 = saturate(pow(_106, 2.2h));
-	_151 = saturate(pow(_151, 2.2h));
-	_109 = saturate(pow(_109, 2.2h));
-	_156 = saturate(pow(_156, 2.2h));
-	_119 = saturate(pow(_119, 2.2h));
-	_168 = saturate(pow(_168, 2.2h));
-	_128 = saturate(pow(_128, 2.2h));
-	_173 = saturate(pow(_173, 2.2h));
+	 _91 = saturate(GAMMA_TO_LINEAR(_91));
+	_139 = saturate(GAMMA_TO_LINEAR(_139));
+	_106 = saturate(GAMMA_TO_LINEAR(_106));
+	_151 = saturate(GAMMA_TO_LINEAR(_151));
+	_109 = saturate(GAMMA_TO_LINEAR(_109));
+	_156 = saturate(GAMMA_TO_LINEAR(_156));
+	_119 = saturate(GAMMA_TO_LINEAR(_119));
+	_168 = saturate(GAMMA_TO_LINEAR(_168));
+	_128 = saturate(GAMMA_TO_LINEAR(_128));
+	_173 = saturate(GAMMA_TO_LINEAR(_173));
 
 #endif // ENABLE_HDR
 
@@ -214,7 +220,7 @@ void CS(CSInput csInput)
 
 	float3 colorOut2 = BT2020_To_BT709(_1003);
 #else // ENABLE_HDR
-	float3 colorOut2 = pow(_329, 1.f / 2.2h);
+	float3 colorOut2 = LINEAR_TO_GAMMA(_329);
 #endif // ENABLE_HDR
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
@@ -226,7 +232,7 @@ void CS(CSInput csInput)
 
 		float3 colorOut1 = BT2020_To_BT709(_396);
 #else // ENABLE_HDR
-		float3 colorOut1 = pow(_388, 1.f / 2.2h);
+		float3 colorOut1 = LINEAR_TO_GAMMA(_388);
 #endif // ENABLE_HDR
 
 		ColorOut[pp] = float4(colorOut1, 1.f);
@@ -294,16 +300,16 @@ void CS(CSInput csInput)
 	half3 _540 = _540f;
 	half3 _575 = _575f;
 
-	_509 = saturate(pow(_509f, 2.2h));
-	_547 = saturate(pow(_547f, 2.2h));
-	_521 = saturate(pow(_521f, 2.2h));
-	_556 = saturate(pow(_556f, 2.2h));
-	_524 = saturate(pow(_524f, 2.2h));
-	_561 = saturate(pow(_561f, 2.2h));
-	_531 = saturate(pow(_531f, 2.2h));
-	_570 = saturate(pow(_570f, 2.2h));
-	_540 = saturate(pow(_540f, 2.2h));
-	_575 = saturate(pow(_575f, 2.2h));
+	_509 = saturate(GAMMA_TO_LINEAR(_509f));
+	_547 = saturate(GAMMA_TO_LINEAR(_547f));
+	_521 = saturate(GAMMA_TO_LINEAR(_521f));
+	_556 = saturate(GAMMA_TO_LINEAR(_556f));
+	_524 = saturate(GAMMA_TO_LINEAR(_524f));
+	_561 = saturate(GAMMA_TO_LINEAR(_561f));
+	_531 = saturate(GAMMA_TO_LINEAR(_531f));
+	_570 = saturate(GAMMA_TO_LINEAR(_570f));
+	_540 = saturate(GAMMA_TO_LINEAR(_540f));
+	_575 = saturate(GAMMA_TO_LINEAR(_575f));
 
 #endif // ENABLE_HDR
 
@@ -358,7 +364,7 @@ void CS(CSInput csInput)
 
 	float3 colorOut4 = BT2020_To_BT709(_1216);
 #else // ENABLE_HDR
-	float3 colorOut4 = pow(_724, 1.f / 2.2h);
+	float3 colorOut4 = LINEAR_TO_GAMMA(_724);
 #endif // ENABLE_HDR
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
@@ -370,7 +376,7 @@ void CS(CSInput csInput)
 
 		float3 colorOut3 = BT2020_To_BT709(_790);
 #else // ENABLE_HDR
-		float3 colorOut3 = pow(_783, 1.f / 2.2h);
+		float3 colorOut3 = LINEAR_TO_GAMMA(_783);
 #endif // ENABLE_HDR
 
 		ColorOut[uint2(_58, pp.y)] = float4(colorOut3, 1.f);
