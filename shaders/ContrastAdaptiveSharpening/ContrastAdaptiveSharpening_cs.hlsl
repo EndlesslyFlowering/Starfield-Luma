@@ -62,11 +62,14 @@ void CS(CSInput csInput)
 
 	uint4 _55 = CASData.cas2;
 
-	uint _58 = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
+	uint _58 = (csInput.SV_GroupThreadID.x >> 1) & 7
+	         | (csInput.SV_GroupID.x << 4)
+					 + _55.x;
 
-	uint2 pp =
-		uint2(_58,
-	        ((((csInput.SV_GroupThreadID.x >> 3u) & 6u) | (csInput.SV_GroupThreadID.x & 1u)) | (csInput.SV_GroupID.y << 4u)) + _55.y);
+	uint2 pp = uint2(_58, (csInput.SV_GroupThreadID.x >> 3) & 6
+	                    | (csInput.SV_GroupThreadID.x & 1)
+	                    | (csInput.SV_GroupID.y << 4)
+											+ _55.y);
 
 	uint4 _69 = CASData.cas3;
 
@@ -143,16 +146,16 @@ void CS(CSInput csInput)
 	half3 _128 = _128f;
 	half3 _173 = _173f;
 
-	 _91 = saturate(pow( _91, 2.2f));
-	_139 = saturate(pow(_139, 2.2f));
-	_106 = saturate(pow(_106, 2.2f));
-	_151 = saturate(pow(_151, 2.2f));
-	_109 = saturate(pow(_109, 2.2f));
-	_156 = saturate(pow(_156, 2.2f));
-	_119 = saturate(pow(_119, 2.2f));
-	_168 = saturate(pow(_168, 2.2f));
-	_128 = saturate(pow(_128, 2.2f));
-	_173 = saturate(pow(_173, 2.2f));
+	 _91 = saturate(pow( _91, 2.2h));
+	_139 = saturate(pow(_139, 2.2h));
+	_106 = saturate(pow(_106, 2.2h));
+	_151 = saturate(pow(_151, 2.2h));
+	_109 = saturate(pow(_109, 2.2h));
+	_156 = saturate(pow(_156, 2.2h));
+	_119 = saturate(pow(_119, 2.2h));
+	_168 = saturate(pow(_168, 2.2h));
+	_128 = saturate(pow(_128, 2.2h));
+	_173 = saturate(pow(_173, 2.2h));
 
 #endif // ENABLE_HDR
 
@@ -209,7 +212,7 @@ void CS(CSInput csInput)
 
 	float3 colorOut2 = BT2020_To_BT709(_1003);
 #else // ENABLE_HDR
-	float3 colorOut2 = pow(_329, 1.f / 2.2f);
+	float3 colorOut2 = pow(_329, 1.f / 2.2h);
 #endif // ENABLE_HDR
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
@@ -221,7 +224,7 @@ void CS(CSInput csInput)
 
 		float3 colorOut1 = BT2020_To_BT709(_396);
 #else // ENABLE_HDR
-		float3 colorOut1 = pow(_388, 1.f / 2.2f);
+		float3 colorOut1 = pow(_388, 1.f / 2.2h);
 #endif // ENABLE_HDR
 
 		ColorOut[pp] = float4(colorOut1, 1.f);
@@ -289,16 +292,16 @@ void CS(CSInput csInput)
 	half3 _540 = _540f;
 	half3 _575 = _575f;
 
-	_509 = saturate(pow(_509f, 2.2f));
-	_547 = saturate(pow(_547f, 2.2f));
-	_521 = saturate(pow(_521f, 2.2f));
-	_556 = saturate(pow(_556f, 2.2f));
-	_524 = saturate(pow(_524f, 2.2f));
-	_561 = saturate(pow(_561f, 2.2f));
-	_531 = saturate(pow(_531f, 2.2f));
-	_570 = saturate(pow(_570f, 2.2f));
-	_540 = saturate(pow(_540f, 2.2f));
-	_575 = saturate(pow(_575f, 2.2f));
+	_509 = saturate(pow(_509f, 2.2h));
+	_547 = saturate(pow(_547f, 2.2h));
+	_521 = saturate(pow(_521f, 2.2h));
+	_556 = saturate(pow(_556f, 2.2h));
+	_524 = saturate(pow(_524f, 2.2h));
+	_561 = saturate(pow(_561f, 2.2h));
+	_531 = saturate(pow(_531f, 2.2h));
+	_570 = saturate(pow(_570f, 2.2h));
+	_540 = saturate(pow(_540f, 2.2h));
+	_575 = saturate(pow(_575f, 2.2h));
 
 #endif // ENABLE_HDR
 
@@ -353,7 +356,7 @@ void CS(CSInput csInput)
 
 	float3 colorOut4 = BT2020_To_BT709(_1216);
 #else // ENABLE_HDR
-	float3 colorOut4 = pow(_724, 1.f / 2.2f);
+	float3 colorOut4 = pow(_724, 1.f / 2.2h);
 #endif // ENABLE_HDR
 
 	if ((pp.x <= _55.z) && (pp.y <= _55.w))
@@ -365,7 +368,7 @@ void CS(CSInput csInput)
 
 		float3 colorOut3 = BT2020_To_BT709(_790);
 #else // ENABLE_HDR
-		float3 colorOut3 = pow(_783, 1.f / 2.2f);
+		float3 colorOut3 = pow(_783, 1.f / 2.2h);
 #endif // ENABLE_HDR
 
 		ColorOut[uint2(_58, pp.y)] = float4(colorOut3, 1.f);
