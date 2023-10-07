@@ -798,11 +798,12 @@ PSOutput PS(PSInput psInput)
 	float3 inputColor = InputColor.Load(int3(int2(psInput.SV_Position.xy), 0));
 
 #if CLAMP_INPUT_OUTPUT
-
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
 	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
 	inputColor = max(inputColor, 0.f);
-
+#else
+	if (Luminance(inputColor) < 0.f)
+		inputColor = 0.f;
 #endif // CLAMP_INPUT_OUTPUT
 
 #if defined(APPLY_BLOOM)
@@ -986,6 +987,9 @@ PSOutput PS(PSInput psInput)
 
 #if CLAMP_INPUT_OUTPUT
 	outputColor = clamp(outputColor, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
+#else
+	if (Luminance(outputColor) < 0.f)
+		outputColor = 0.f;
 #endif // CLAMP_INPUT_OUTPUT
 
 #else // ENABLE_HDR
