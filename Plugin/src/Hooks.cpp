@@ -36,7 +36,7 @@ namespace Hooks
 		}
     }
 
-    void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
+    void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
     {
 		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
 		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
@@ -48,10 +48,10 @@ namespace Hooks
 		s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
 		s.m_Enabled.SetValue(a_bEnabled);
 		s.m_CheckBoxData.m_ShuttleMap.GetData().m_Value.SetValue(a_setting.value.get_data());
-		a_settingList.AddItem(s);
+		a_settingList->AddItem(s);
     }
 
-    void Hooks::CreateStepperSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_settingList, Settings::Stepper& a_setting, bool a_bEnabled)
+    void Hooks::CreateStepperSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Stepper& a_setting, bool a_bEnabled)
     {
 		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
 		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
@@ -66,10 +66,10 @@ namespace Hooks
 			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem(optionName.c_str());
 		}
 		s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(a_setting.value.get_data());
-		a_settingList.AddItem(s);
+		a_settingList->AddItem(s);
     }
 
-    void Hooks::CreateSliderSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_settingList, Settings::Slider& a_setting, bool a_bEnabled)
+    void Hooks::CreateSliderSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Slider& a_setting, bool a_bEnabled)
     {
 		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
 		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
@@ -82,7 +82,39 @@ namespace Hooks
 		s.m_Enabled.SetValue(a_bEnabled);
 		s.m_SliderData.m_ShuttleMap.GetData().m_Value.SetValue(a_setting.GetSliderPercentage());
 		s.m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(a_setting.GetSliderText().c_str());
-		a_settingList.AddItem(s);
+		a_settingList->AddItem(s);
+    }
+
+    void Hooks::CreateSeparator(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::SettingID a_id)
+    {
+		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
+		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+
+		s.m_Text.SetStringValue("");
+		s.m_Description.SetStringValue("");
+		s.m_ID.SetValue(static_cast<unsigned int>(a_id));
+		s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::LargeStepper);
+		s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
+		s.m_Enabled.SetValue(false);
+		a_settingList->AddItem(s);
+    }
+
+    void Hooks::CreateSettings(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList)
+    {
+		const auto settings = Settings::Main::GetSingleton();
+
+		CreateSeparator(a_settingList, Settings::SettingID::kSTART);
+		CreateStepperSetting(a_settingList, settings->DisplayMode, true);
+		CreateSliderSetting(a_settingList, settings->PeakBrightness, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->GamePaperWhite, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->UIPaperWhite, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
+		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
+		CreateSliderSetting(a_settingList, settings->Contrast, true);
+		CreateSliderSetting(a_settingList, settings->DevSetting01, true);
+		CreateSliderSetting(a_settingList, settings->DevSetting02, true);
+		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
 
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
@@ -126,24 +158,13 @@ namespace Hooks
 		a_bgsSwapChainObject->swapChainInterface->SetColorSpace1(settings->GetDisplayModeColorSpaceType());
     }
 
-    void Hooks::Hook_CreateDataModelOptions(void* a_arg1, RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>& a_settingList)
+    void Hooks::Hook_CreateMonitorSetting(void* a1, void* a2)
     {
-		const auto settings = Settings::Main::GetSingleton();
+		_CreateMonitorSetting(a1, a2);
 
-		CreateStepperSetting(a_settingList, settings->DisplayMode, true);
-
-        CreateSliderSetting(a_settingList, settings->PeakBrightness, settings->IsHDREnabled());
-        CreateSliderSetting(a_settingList, settings->GamePaperWhite, settings->IsHDREnabled());
-        CreateSliderSetting(a_settingList, settings->UIPaperWhite, settings->IsHDREnabled());
-        CreateSliderSetting(a_settingList, settings->Saturation, settings->IsHDREnabled());
-		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
-		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
-        CreateSliderSetting(a_settingList, settings->Contrast, true);
-        CreateSliderSetting(a_settingList, settings->DevSetting01, true);
-        CreateSliderSetting(a_settingList, settings->DevSetting02, true);
-
-		// Initialize the rest of the settings after ours
-		_CreateDataModelOptions(a_arg1, a_settingList);
+		// insert our settings after
+		auto* settingList = reinterpret_cast<RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>*>(reinterpret_cast<uintptr_t>(a1) - 0x28);
+		CreateSettings(settingList);
     }
 
     void Hooks::Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
@@ -245,22 +266,23 @@ namespace Hooks
 				const auto settings = Settings::Main::GetSingleton();
 
 				// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
-				std::array<float, 9> data {
-					*settings->PeakBrightness.value,
-					*settings->GamePaperWhite.value,
-					*settings->UIPaperWhite.value,
-					*settings->Saturation.value * 0.02f,
-					*settings->LUTCorrectionStrength.value * 0.01f,
-					*settings->ColorGradingStrength.value * 0.01f,
-					*settings->Contrast.value * 0.02f,
-					*settings->DevSetting01.value * 0.01f,
-					*settings->DevSetting02.value * 0.01f
+				const Settings::ShaderConstants data {
+					static_cast<uint32_t>(*settings->DisplayMode.value),
+					static_cast<float>(*settings->PeakBrightness.value),
+					static_cast<float>(*settings->GamePaperWhite.value),
+					static_cast<float>(*settings->UIPaperWhite.value),
+					static_cast<float>(*settings->Saturation.value * 0.02f),
+					static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),
+					static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),
+					static_cast<float>(*settings->Contrast.value * 0.02f),
+					static_cast<float>(*settings->DevSetting01.value * 0.01f),
+					static_cast<float>(*settings->DevSetting02.value * 0.01f)
 				};
 
 				if (!Compute)
-					commandList->SetGraphicsRoot32BitConstants(RootParameterIndex, data.size(), reinterpret_cast<uint32_t*>(data.data()), 0);
+					commandList->SetGraphicsRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
 				else
-					commandList->SetComputeRoot32BitConstants(RootParameterIndex, data.size(), reinterpret_cast<uint32_t*>(data.data()), 0);
+					commandList->SetComputeRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
 			};
 
 			// Note: The following switch statement may be called several thousand times per frame. Additionally, it'll be called from multiple
