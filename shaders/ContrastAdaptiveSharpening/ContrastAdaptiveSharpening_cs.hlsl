@@ -56,25 +56,30 @@ struct CSInput
 void CS(CSInput csInput)
 {
 #if 1 // Disable the CS so it just outputs the input
-	uint4 _55 = CASData.cas2;
-	uint ppx = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
+	uint2 _55 = CASData.cas2.xy;
+	uint _58 = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
+	uint ppx = _58;
 	uint ppy = ((((csInput.SV_GroupThreadID.x >> 3u) & 6u) | (csInput.SV_GroupThreadID.x & 1u)) | (csInput.SV_GroupID.y << 4u)) + _55.y;
+
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0));
+
 	ppx += 8;
+
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0));
+
 	ppy += 8;
 
-	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
-	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
-	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
-	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
+	ColorOut[uint2(_58, ppy)] = ColorIn.Load(int3(uint2(_58, ppy), 0));
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0));
 #else
 
 	uint4 _55 = CASData.cas2;
 
-	uint _58 = (csInput.SV_GroupThreadID.x >> 1) & 7
+	uint _58 = ((csInput.SV_GroupThreadID.x >> 1) & 7)
 	         | (csInput.SV_GroupID.x << 4)
 					 + _55.x;
 
-	uint2 pp = uint2(_58, (csInput.SV_GroupThreadID.x >> 3) & 6
+	uint2 pp = uint2(_58, ((csInput.SV_GroupThreadID.x >> 3) & 6)
 	                    | (csInput.SV_GroupThreadID.x & 1)
 	                    | (csInput.SV_GroupID.y << 4)
 											+ _55.y);
