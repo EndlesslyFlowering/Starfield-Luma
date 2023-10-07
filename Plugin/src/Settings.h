@@ -20,9 +20,9 @@ namespace Settings
         kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
 		kHDR_Saturation,
+		kHDR_Contrast,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
-		kContrast,
 		kDevSetting01,
 		kDevSetting02,
 
@@ -67,9 +67,9 @@ namespace Settings
 		float    GamePaperWhite;
 		float    UIPaperWhite;
 		float    Saturation;
+		float    Contrast;
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
-		float    Contrast;
 		float    DevSetting01;
 		float    DevSetting02;
 	};
@@ -78,17 +78,19 @@ namespace Settings
     class Main : public DKUtil::model::Singleton<Main>
     {
     public:
-		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR, HDR10 PQ, or HDR scRGB", { "DisplayMode", "Main" }, { "SDR", "HDR10 PQ", "HDR scRGB" } };
+		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB", { "DisplayMode", "Main" }, { "SDR", "HDR10", "HDR scRGB" } };
 
-		Slider PeakBrightness{ SettingID::kHDR_PeakBrightness, "Peak Brightness", "Sets the peak brightness in HDR modes", { "PeakBrightness", "HDR" }, 80.f, 10000.f, 1000.f };
-		Slider GamePaperWhite{ SettingID::kHDR_GamePaperWhite, "Game Paper White", "Sets the game paper white brightness in HDR modes", { "GamePaperWhite", "HDR" }, 80.f, 500.f, 200.f };
-		Slider UIPaperWhite{ SettingID::kHDR_UIPaperWhite, "UI Paper White", "Sets the UI paper white brightness in HDR modes", { "UIPaperWhite", "HDR" }, 80.f, 500.f, 200.f };
-		Slider Saturation{ SettingID::kHDR_Saturation, "Saturation", "Sets the saturation strength in HDR modes", { "Saturation", "HDR" }, 0.f, 100.f, 50.f };
+		Slider PeakBrightness{ SettingID::kHDR_PeakBrightness, "Peak Brightness", "Sets the peak nits brightness in HDR modes, this should match your display peak brightness", { "PeakBrightness", "HDR" }, 80.f, 10000.f, 1000.f };
+		Slider GamePaperWhite{ SettingID::kHDR_GamePaperWhite, "Game Paper White", "Sets the game paper white nits brightness in HDR modes", { "GamePaperWhite", "HDR" }, 80.f, 500.f, 203.f };
+		Slider UIPaperWhite{ SettingID::kHDR_UIPaperWhite, "UI Paper White", "Sets the UI paper white nits brightness in HDR modes", { "UIPaperWhite", "HDR" }, 80.f, 500.f, 203.f };
+		Slider Saturation{ SettingID::kHDR_Saturation, "Saturation", "Sets the saturation strength in HDR modes (only applies if LUT correction is on) (neutral at 50)", { "Saturation", "HDR" }, 0.f, 100.f, 50.f };
+		Slider Contrast{ SettingID::kHDR_Contrast, "Contrast", "Sets the contrast strength in HDR modes (neutral at 50)", { "Contrast", "HDR" }, 0.f, 100.f, 50.f };
 		Slider LUTCorrectionStrength{ SettingID::kLUTCorrectionStrength, "LUT Correction Strength", "Sets the LUT correction (normalization) strength", { "LUTCorrectionStrength", "Main" }, 0.f, 100.f, 100.f };
-		Slider ColorGradingStrength{ SettingID::kColorGradingStrength, "Color Grading Strength", "Sets the color grading strength", { "ColorGradingStrength", "Main" }, 0.f, 100.f, 100.f };
-		Slider Contrast{ SettingID::kContrast, "Contrast", "Sets the contrast", { "Contrast", "Main" }, 0.f, 100.f, 50.f };
+		Slider ColorGradingStrength{ SettingID::kColorGradingStrength, "Color Grading Strength", "Sets the color grading strength (e.g. LUTs)", { "ColorGradingStrength", "Main" }, 0.f, 100.f, 100.f };
+#if 1
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", { "DevSetting01", "Dev" }, 0.f, 100.f, 0.f };
 		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", { "DevSetting02", "Dev" }, 0.f, 100.f, 0.f };
+#endif
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
 
         bool IsHDREnabled() const;
@@ -145,11 +147,13 @@ namespace Settings
 		DrawReshadeSlider(settings, settings->GamePaperWhite);
 		DrawReshadeSlider(settings, settings->UIPaperWhite);
 		DrawReshadeSlider(settings, settings->Saturation);
+		DrawReshadeSlider(settings, settings->Contrast);
 		DrawReshadeSlider(settings, settings->LUTCorrectionStrength);
 		DrawReshadeSlider(settings, settings->ColorGradingStrength);
-		DrawReshadeSlider(settings, settings->Contrast);
+#if 1
 		DrawReshadeSlider(settings, settings->DevSetting01);
 		DrawReshadeSlider(settings, settings->DevSetting02);
+#endif
 	}
 
 	static inline bool bReshadeSettingsOverlayRegistered = false;

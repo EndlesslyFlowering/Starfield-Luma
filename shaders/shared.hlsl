@@ -27,9 +27,9 @@ struct StructHdrDllPluginConstants
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRLUTCorrectionSaturation; // 1 is neutral
+	float HDRSecondaryContrast; // 1 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
-	float HDRSecondaryContrast; // 1 is neutral
 	float DevSetting01; // 0-1 variable for development
 	float DevSetting02; // 0-1 variable for development
 };
