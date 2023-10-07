@@ -5,7 +5,7 @@
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
 // 0 Vanilla, 1 New Random (no flicker/repeating), 2 New random, no raised blacks
-#define FILM_GRAIN_TYPE 0
+#define FILM_GRAIN_TYPE 2
 
 cbuffer _13_15 : register(b0, space0)
 {
