@@ -295,7 +295,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 
 #endif // LUT_IMPROVEMENT_TYPE
 
-	const bool SDRRange = HdrDllPluginConstants.DisplayMode == 0 || (bool)FORCE_SDR_LUTS;
+	const bool SDRRange = HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
 
 	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);

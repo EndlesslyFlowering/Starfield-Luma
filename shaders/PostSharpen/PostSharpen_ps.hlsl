@@ -40,9 +40,10 @@ struct SPIRV_Cross_Output
 void frag_main()
 {
 	float3 inColor = TonemappedColorTexture.Sample(Sampler0, TEXCOORD.xy).xyz;
-#if !ENABLE_HDR
-	inColor = GAMMA_TO_LINEAR(inColor);
-#endif
+	if (HdrDllPluginConstants.DisplayMode <= 0)
+	{
+		inColor = GAMMA_TO_LINEAR(inColor);
+	}
 	float3 outColor = inColor;
 	uint4 sharpenParams = asuint(_20_m0[0u]);
 	float sharpenIntensity = asfloat(sharpenParams.z);
@@ -70,19 +71,21 @@ void frag_main()
 		float3 _157 = TonemappedColorTexture.SampleLevel(Sampler1, float2(_147, _145), 0.0f);
 		float3 _162 = TonemappedColorTexture.SampleLevel(Sampler1, float2(_144, _149), 0.0f);
 		float3 _167 = TonemappedColorTexture.SampleLevel(Sampler1, float2(_147, _149), 0.0f);
-#if !ENABLE_HDR
-		_152 = GAMMA_TO_LINEAR(_152);
-		_157 = GAMMA_TO_LINEAR(_157);
-		_162 = GAMMA_TO_LINEAR(_162);
-		_167 = GAMMA_TO_LINEAR(_167);
-#endif
+		if (HdrDllPluginConstants.DisplayMode <= 0)
+		{
+			_152 = GAMMA_TO_LINEAR(_152);
+			_157 = GAMMA_TO_LINEAR(_157);
+			_162 = GAMMA_TO_LINEAR(_162);
+			_167 = GAMMA_TO_LINEAR(_167);
+		}
 		float3 sharpenedColor = (((_167 * _98) + (_162 * _87)) * _136) + (((_157 * _98) + (_152 * _87)) * _125);
 		// It seems controls the amount of (manaually done) bilinear filtering vs nearest neightbor, so full sharpening is just bilinear
 		outColor = lerp(sharpenedColor, inColor, sharpenIntensity); 
 	}
-#if !ENABLE_HDR
-	outColor = LINEAR_TO_GAMMA(outColor);
-#endif
+	if (HdrDllPluginConstants.DisplayMode <= 0)
+	{
+		outColor = LINEAR_TO_GAMMA(outColor);
+	}
 	SV_Target.xyz = outColor;
 	SV_Target.w = 1.0f;
 }

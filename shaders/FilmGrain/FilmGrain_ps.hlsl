@@ -51,11 +51,12 @@ void frag_main()
 //   .z = Film Grading Intensity (0 - 0.03)
 
 	float3 tonemappedColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
-#if ENABLE_HDR
 	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
-	tonemappedColor /= paperWhite;
-	tonemappedColor = gamma_linear_to_sRGB(tonemappedColor);
-#endif // ENABLE_HDR
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
+		tonemappedColor /= paperWhite;
+		tonemappedColor = gamma_linear_to_sRGB(tonemappedColor);
+	}
 float colorY = Luminance(tonemappedColor);
 
 #if FILM_GRAIN_TYPE == 0
@@ -112,9 +113,10 @@ float colorY = Luminance(tonemappedColor);
 	}
 #endif
 
-#if ENABLE_HDR
-	tonemappedColorWithFilmGrain = gamma_sRGB_to_linear(tonemappedColorWithFilmGrain) * paperWhite;
-#endif // ENABLE_HDR
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
+		tonemappedColorWithFilmGrain = gamma_sRGB_to_linear(tonemappedColorWithFilmGrain) * paperWhite;
+	}
 
 	SV_Target.rgb = tonemappedColorWithFilmGrain;
 

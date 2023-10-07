@@ -55,7 +55,7 @@ struct CSInput
 [numthreads(64, 1, 1)]
 void CS(CSInput csInput)
 {
-#if 0 // Disable the CS so it just outputs the input
+#if 1 // Disable the CS so it just outputs the input
 	uint4 _55 = CASData.cas2;
 	uint ppx = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
 	uint ppy = ((((csInput.SV_GroupThreadID.x >> 3u) & 6u) | (csInput.SV_GroupThreadID.x & 1u)) | (csInput.SV_GroupID.y << 4u)) + _55.y;
@@ -112,7 +112,7 @@ void CS(CSInput csInput)
 	float3 _168f = ColorIn.Load(int3(_167, _105, 0)).rgb;
 	float3 _173f = ColorIn.Load(int3(_138, _127, 0)).rgb;
 
-#if ENABLE_HDR
+#if ENABLE_HDR //TODO: replace with "if (HdrDllPluginConstants.DisplayMode > 0)"
 
 #if HDR_BT2020
 	 _91f = BT709_To_BT2020( _91f);
