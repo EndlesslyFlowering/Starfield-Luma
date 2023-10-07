@@ -52,7 +52,8 @@ void frag_main()
 
 	float3 tonemappedColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
 #if ENABLE_HDR
-	tonemappedColor /= HDR_GAME_PAPER_WHITE;
+	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+	tonemappedColor /= paperWhite;
 	tonemappedColor = gamma_linear_to_sRGB(tonemappedColor);
 #endif // ENABLE_HDR
 float colorY = Luminance(tonemappedColor);
@@ -112,7 +113,7 @@ float colorY = Luminance(tonemappedColor);
 #endif
 
 #if ENABLE_HDR
-	tonemappedColorWithFilmGrain = gamma_sRGB_to_linear(tonemappedColorWithFilmGrain) * HDR_GAME_PAPER_WHITE;
+	tonemappedColorWithFilmGrain = gamma_sRGB_to_linear(tonemappedColorWithFilmGrain) * paperWhite;
 #endif // ENABLE_HDR
 
 	SV_Target.rgb = tonemappedColorWithFilmGrain;

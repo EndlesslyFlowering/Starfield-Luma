@@ -2,18 +2,9 @@
 
 #include "structs.hlsl"
 
-// Enables HDR scRGB output. If false, we output Rec.709 in gamma space (~sRGB).
 #define ENABLE_HDR 1
-// Set equal to the max nits your display can output
-#define HDR_MAX_OUTPUT_NITS 1000.f
-// User configured variable
-#define HDR_GAME_PAPER_WHITE_MULTIPLIER 1.f
-// User configured variable
-#define HDR_UI_PAPER_WHITE_MULTIPLIER 1.f
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
-#define HDR_REFERENCE_PAPER_WHITE (ReferenceWhiteNits_BT2408 / WhiteNits_BT709)
-#define HDR_GAME_PAPER_WHITE HDR_REFERENCE_PAPER_WHITE * HDR_GAME_PAPER_WHITE_MULTIPLIER
-#define HDR_UI_PAPER_WHITE HDR_REFERENCE_PAPER_WHITE * HDR_UI_PAPER_WHITE_MULTIPLIER
+#define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_BT709)
 
 // If this is true, the code makes the assumption that Bethesda developed and calibrated the game on gamma 2.2 screens, as opposed to sRGB gamma.
 // This implies there was a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
@@ -30,16 +21,20 @@
 // Custom push constants uploaded by the HDR DLL plugin code. Do note that register space comes at a premium when adding members. Bit/byte packing is advised.
 struct StructHdrDllPluginConstants
 {
+    // SDR 0 (Rec.709 with 2.2 gamma, not sRGB), 1 HDR10 PQ BT.2020, 2 scRGB HDR
 	uint DisplayMode;
-	float PeakBrightness;
-	float GamePaperWhite;
-	float UIPaperWhite;
-	float Saturation;
-	float LUTCorrectionStrength;
-	float ColorGradingStrength;
-	float Contrast;
-	float DevSetting01;
-	float DevSetting02;
+	float HDRPeakBrightnessNits; // Set equal to the max nits your display can output
+	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
+	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
+	float HDRLUTCorrectionSaturation; // 1 is neutral
+	float LUTCorrectionStrength; // 1 is full strength
+	float ColorGradingStrength; // 1 is full strength
+	float HDRSecondaryContrast; // 1 is neutral
+	float DevSetting01; // 0-1 variable for development
+	float DevSetting02; // 0-1 variable for development
 };
+
+//TODO: use this in the root signature files?
+#define HDR_PLUGIN_CONSTANTS_SIZE 10
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);

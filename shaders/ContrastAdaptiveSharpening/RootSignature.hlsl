@@ -68,7 +68,7 @@
 	"), " \
 	\
 	"CBV(b0, space=8), " \
-	"RootConstants(num32BitConstants=4, b3), " \
+	"RootConstants(num32BitConstants=10, b3), " \
 	"StaticSampler(s12, filter=FILTER_MIN_MAG_MIP_POINT, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
 	"StaticSampler(s13, filter=FILTER_MIN_MAG_MIP_POINT, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
 	"StaticSampler(s14, filter=FILTER_MIN_MAG_MIP_LINEAR, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=6), " \
