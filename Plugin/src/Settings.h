@@ -13,7 +13,9 @@ namespace Settings
 
     enum class SettingID : unsigned int
     {
-        kDisplayMode = 600,
+		kSTART = 600,
+
+        kDisplayMode,
         kHDR_PeakBrightness,
         kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
@@ -22,7 +24,9 @@ namespace Settings
 		kColorGradingStrength,
 		kContrast,
 		kDevSetting01,
-		kDevSetting02
+		kDevSetting02,
+
+		kEND
     };
 
 	struct Setting
@@ -55,6 +59,21 @@ namespace Settings
 		float GetValueFromSlider(float a_percentage) const;
 		void SetValueFromSlider(float a_percentage);
 	};
+
+	struct ShaderConstants
+	{
+		uint32_t DisplayMode;
+		float    PeakBrightness;
+		float    GamePaperWhite;
+		float    UIPaperWhite;
+		float    Saturation;
+		float    LUTCorrectionStrength;
+		float    ColorGradingStrength;
+		float    Contrast;
+		float    DevSetting01;
+		float    DevSetting02;
+	};
+	static inline uint32_t shaderConstantsSize = 10;
 
     class Main : public DKUtil::model::Singleton<Main>
     {

@@ -30,6 +30,7 @@
 // Custom push constants uploaded by the HDR DLL plugin code. Do note that register space comes at a premium when adding members. Bit/byte packing is advised.
 struct StructHdrDllPluginConstants
 {
+	uint DisplayMode;
 	float PeakBrightness;
 	float GamePaperWhite;
 	float UIPaperWhite;
