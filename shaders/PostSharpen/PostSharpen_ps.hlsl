@@ -7,10 +7,17 @@ cbuffer _13_15 : register(b0, space7)
 	float4 _15_m0[3269] : packoffset(c0);
 };
 
-cbuffer PushConstantWrapper_PostSharpen : register(b0, space0)
+
+struct PushConstantWrapper_PostSharpen
 {
-	float4 PcwPostSharpen0;
-	float3 PcwPostSharpen1;
+	float4 params0;
+	float3 params1;
+};
+
+
+cbuffer CPushConstantWrapper_PostSharpen : register(b0, space0)
+{
+	PushConstantWrapper_PostSharpen PcwPostSharpen : packoffset(c0);
 };
 
 Texture2D<float3> TonemappedColorTexture : register(t0, space8); // Possibly in gamma space in SDR
@@ -19,8 +26,8 @@ SamplerState Sampler1 : register(s15, space6); // Likely nearest neighbor
 
 struct PSInput
 {
+	float4 TEXCOORD    : TEXCOORD0;
 	float4 SV_Position : SV_Position0;
-	float2 TEXCOORD    : TEXCOORD0;
 };
 
 struct PSOutput
@@ -49,7 +56,7 @@ PSOutput PS(PSInput psInput)
 		inColor = GAMMA_TO_LINEAR(inColor);
 	}
 	float3 outColor = inColor;
-	float4 sharpenParams = PcwPostSharpen0;
+	float4 sharpenParams = PcwPostSharpen.params0;
 	float sharpenIntensity = sharpenParams.z;
 	if (sharpenIntensity > 0.f)
 	{
