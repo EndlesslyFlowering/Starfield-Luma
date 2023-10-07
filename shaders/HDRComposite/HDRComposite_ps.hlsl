@@ -282,7 +282,9 @@ float3 Hable(
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L6
 	// Eval
 	float evalY0 = 0.f;
+#if 0 // Fixes full black output in some location (due to "invScale" being 0)
 	if (params_overshootX > 0.f)
+#endif
 	{
 		evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + hableParams.shoulderSegment.lnA) * LOG2_E) + params_overshootY;
 	}
@@ -969,7 +971,12 @@ PSOutput PS(PSInput psInput)
 #endif
 	
 	// Secondary user driven contrast
+#if 0 // By luminance (no hue shift) (looks off)
+	float inverseTonemappedPostProcessedColorLuminance = Luminance(inverseTonemappedPostProcessedColor);
+	inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / (MidGray * midGrayScale), HdrDllPluginConstants.HDRSecondaryContrast) * (MidGray * midGrayScale), inverseTonemappedPostProcessedColorLuminance);
+#else // By channel (also increases saturation)
 	inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), HdrDllPluginConstants.HDRSecondaryContrast) * (MidGray * midGrayScale);
+#endif
 
 	// Bring back the color to the same range as SDR by dividing by the mid gray change.
 	inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
