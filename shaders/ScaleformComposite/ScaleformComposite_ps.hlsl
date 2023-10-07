@@ -34,18 +34,21 @@ float4 PS(PSInputs inputs) : SV_Target
 	// Theoretically all UI is in sRGB (though it might have been designed on gamma 2.2 screens, we can't know that, but it was definately targeting gamma 2.2 as output anyway).
 	UIColor.xyz = gamma_sRGB_to_linear(UIColor.xyz);
 	UIColor.xyz = UIColor.xyz * UIIntensity;
-#if ENABLE_HDR
+	if (HdrDllPluginConstants.DisplayMode > 0)
+	{
 #if SDR_USE_GAMMA_2_2
-	UIColor.xyz = pow(gamma_linear_to_sRGB(UIColor.xyz), 2.2f);
+		UIColor.xyz = pow(gamma_linear_to_sRGB(UIColor.xyz), 2.2f);
 #endif // HDR_GAMMA_CORRECTION
-	UIColor.xyz *= HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_BT709;
-	// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
-	// this won't ever be perfect but it's close enough for most cases.
-	// We do a saturate to avoid pow of -0, which might lead to unexpected results.
-	UIColor.a = pow(saturate(UIColor.a), HDR_UI_BLEND_POW); //TODO: base the percentage of application of "HDR_UI_BLEND_POW" based on how black/dark the UI color is.
-#else
-	UIColor.xyz = gamma_linear_to_sRGB(UIColor.xyz);
-#endif // ENABLE_HDR
+		UIColor.xyz *= HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_BT709;
+		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
+		// this won't ever be perfect but it's close enough for most cases.
+		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
+		UIColor.a = pow(saturate(UIColor.a), HDR_UI_BLEND_POW); //TODO: base the percentage of application of "HDR_UI_BLEND_POW" based on how black/dark the UI color is.
+	}
+	else
+	{
+		UIColor.xyz = gamma_linear_to_sRGB(UIColor.xyz);
+	}
 
 	return UIColor;
 }
