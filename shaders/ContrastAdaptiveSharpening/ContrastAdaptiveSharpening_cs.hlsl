@@ -2,249 +2,382 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-cbuffer _16_18 : register(b0, space6)
+// this is CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [100FF94]
+// other variants are also available but seemingly unused, which are:
+// - CAS upscaling in FP32 [200FF94]
+// - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH and FFX_CAS_BETTER_DIAGONALS [300FF94]
+// - just CAS sharpening in FP32 [FF94]
+
+// TODO: make full process in half not just after csp conversion? (needs matrices in half)
+
+// don't need it
+//cbuffer _16_18 : register(b0, space6)
+//{
+//	float4 _18_m0[8] : packoffset(c0); // _18_m0[1u].w = Gamma
+//};
+
+cbuffer CCASData : register(b0, space8)
 {
-	float4 _18_m0[8] : packoffset(c0);
+	ContrastAdaptiveSharpeningData CASData : packoffset(c0);
 };
 
-cbuffer _21_23 : register(b0, space8)
+Texture2D<float4>   ColorIn  : register(t0, space8);
+RWTexture2D<float4> ColorOut : register(u0, space8);
+
+struct CSInput
 {
-	float4 _23_m0[4] : packoffset(c0);
+	uint3 SV_GroupID       : SV_GroupID;
+	uint3 SV_GroupThreadID : SV_GroupThreadID;
 };
 
-Texture2D<float4> _8 : register(t0, space8);
-RWTexture2D<float4> _11 : register(u0, space8);
+//uint spvPackHalf2x16(float2 value)
+//{
+//	uint2 Packed = f32tof16(value);
+//	return Packed.x | (Packed.y << 16);
+//}
+//
+//half2 spvUnpackHalf2x16(uint value)
+//{
+//	return f16tof32(uint2(value & 0xffff, value >> 16));
+//}
 
-static uint3 gl_WorkGroupID;
-static uint3 gl_LocalInvocationID;
-struct SPIRV_Cross_Input
-{
-	uint3 gl_WorkGroupID       : SV_GroupID;
-	uint3 gl_LocalInvocationID : SV_GroupThreadID;
-};
 
-uint spvPackHalf2x16(float2 value)
+[RootSignature(ShaderRootSignature)]
+[numthreads(64, 1, 1)]
+void CS(CSInput csInput)
 {
-	uint2 Packed = f32tof16(value);
-	return Packed.x | (Packed.y << 16);
-}
-
-float2 spvUnpackHalf2x16(uint value)
-{
-	return f16tof32(uint2(value & 0xffff, value >> 16));
-}
-
-void comp_main()
-{
-#if ENABLE_HDR
+#if 0
 	// butchered the CS so it just outputs the input
-	uint4 _55 = asuint(_23_m0[2u]);
-	uint _58 = _55.x + (((gl_LocalInvocationID.x >> 1u) & 7u) | (gl_WorkGroupID.x << 4u));
-	uint _59 = ((((gl_LocalInvocationID.x >> 3u) & 6u) | (gl_LocalInvocationID.x & 1u)) | (gl_WorkGroupID.y << 4u)) + _55.y;
-	uint _458 = _58 + 8u;
-	uint _489 = _59 + 8u;
+	uint4 _55 = CASData.cas2;
+	uint ppx = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
+	uint ppy = ((((csInput.SV_GroupThreadID.x >> 3u) & 6u) | (csInput.SV_GroupThreadID.x & 1u)) | (csInput.SV_GroupID.y << 4u)) + _55.y;
+	ppx += 8;
+	ppy += 8;
 
-	_11[uint2(_58, _59)] = _8.Load(int3(uint2(_58, _59), 0u));
-	_11[uint2(_458, _59)] = _8.Load(int3(uint2(_458, _59), 0u));
-	_11[uint2(_58, _489)] = _8.Load(int3(uint2(_58, _489), 0u));
-	_11[uint2(_458, _489)] = _8.Load(int3(uint2(_458, _489), 0u));
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
+	ColorOut[uint2(ppx, ppy)] = ColorIn.Load(int3(uint2(ppx, ppy), 0u));
 #else
-	uint4 _55 = asuint(_23_m0[2u]);
-	uint _58 = _55.x + (((gl_LocalInvocationID.x >> 1u) & 7u) | (gl_WorkGroupID.x << 4u));
-	uint _59 = ((((gl_LocalInvocationID.x >> 3u) & 6u) | (gl_LocalInvocationID.x & 1u)) | (gl_WorkGroupID.y << 4u)) + _55.y;
-	uint4 _69 = asuint(_23_m0[3u]);
+
+	uint4 _55 = CASData.cas2;
+
+	uint _58 = (csInput.SV_GroupThreadID.x >> 1) & 7
+	         | (csInput.SV_GroupID.x << 4)
+					 + _55.x;
+
+	uint2 pp = uint2(_58, (csInput.SV_GroupThreadID.x >> 3) & 6
+	                    | (csInput.SV_GroupThreadID.x & 1)
+	                    | (csInput.SV_GroupID.y << 4)
+											+ _55.y);
+
+	uint4 _69 = CASData.cas3;
+
 	uint _70 = _69.x;
 	uint _71 = _69.y;
 	uint _72 = _69.z;
 	uint _73 = _69.w;
-	uint _74 = _58 << 16u;
-	uint _76 = uint(int(_74) >> int(16u));
-	uint _77 = _59 << 16u;
-	uint _87 = uint(int(max(min(_76, _72), _70) << 16u) >> int(16u));
-	uint _89 = uint(int(max(min(uint(int(_77 + 4294901760u) >> int(16u)), _73), _71) << 16u) >> int(16u));
-	float4 _91 = _8.Load(int3(uint2(_87, _89), 0u));
-	uint _96 = uint(int(_74 + 4294901760u) >> int(16u));
-	uint _105 = uint(int(max(min(uint(int(_77) >> int(16u)), _73), _71) << 16u) >> int(16u));
-	float4 _106 = _8.Load(int3(uint2(uint(int(max(min(_96, _72), _70) << 16u) >> int(16u)), _105), 0u));
-	float4 _109 = _8.Load(int3(uint2(_87, _105), 0u));
-	uint _114 = uint(int(_74 + 65536u) >> int(16u));
-	float4 _119 = _8.Load(int3(uint2(uint(int(max(min(_114, _72), _70) << 16u) >> int(16u)), _105), 0u));
-	uint _127 = uint(int(max(min(uint(int(_77 + 65536u) >> int(16u)), _73), _71) << 16u) >> int(16u));
-	float4 _128 = _8.Load(int3(uint2(_87, _127), 0u));
-	uint _134 = uint(int((_58 << 16u) + 524288u) >> int(16u));
-	uint _138 = uint(int(max(min(_134, _72), _70) << 16u) >> int(16u));
-	float4 _139 = _8.Load(int3(uint2(_138, _89), 0u));
-	uint _146 = uint(int(_74 + 458752u) >> int(16u));
-	float4 _151 = _8.Load(int3(uint2(uint(int(max(min(_146, _72), _70) << 16u) >> int(16u)), _105), 0u));
-	float4 _156 = _8.Load(int3(uint2(_138, _105), 0u));
-	uint _163 = uint(int(_74 + 589824u) >> int(16u));
-	float4 _168 = _8.Load(int3(uint2(uint(int(max(min(_163, _72), _70) << 16u) >> int(16u)), _105), 0u));
-	float4 _173 = _8.Load(int3(uint2(_138, _127), 0u));
-	float _193 = exp2(log2((_91.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _194 = exp2(log2((_139.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _213 = exp2(log2((_106.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _214 = exp2(log2((_151.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _233 = exp2(log2((_109.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _234 = exp2(log2((_156.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _253 = exp2(log2((_119.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _254 = exp2(log2((_168.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _273 = exp2(log2((_128.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _274 = exp2(log2((_173.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _280 = isnan(_213) ? _193 : (isnan(_193) ? _213 : min(_193, _213));
-	float _281 = isnan(_214) ? _194 : (isnan(_194) ? _214 : min(_194, _214));
-	float _282 = isnan(_233) ? _280 : (isnan(_280) ? _233 : min(_280, _233));
-	float _283 = isnan(_234) ? _281 : (isnan(_281) ? _234 : min(_281, _234));
-	float _284 = isnan(_273) ? _253 : (isnan(_253) ? _273 : min(_253, _273));
-	float _285 = isnan(_274) ? _254 : (isnan(_254) ? _274 : min(_254, _274));
-	float _286 = isnan(_282) ? _284 : (isnan(_284) ? _282 : min(_284, _282));
-	float _287 = isnan(_283) ? _285 : (isnan(_285) ? _283 : min(_285, _283));
-	float _288 = isnan(_213) ? _193 : (isnan(_193) ? _213 : max(_193, _213));
-	float _289 = isnan(_214) ? _194 : (isnan(_194) ? _214 : max(_194, _214));
-	float _290 = isnan(_233) ? _288 : (isnan(_288) ? _233 : max(_288, _233));
-	float _291 = isnan(_234) ? _289 : (isnan(_289) ? _234 : max(_289, _234));
-	float _292 = isnan(_273) ? _253 : (isnan(_253) ? _273 : max(_253, _273));
-	float _293 = isnan(_274) ? _254 : (isnan(_254) ? _274 : max(_254, _274));
-	float _294 = isnan(_290) ? _292 : (isnan(_292) ? _290 : max(_292, _290));
-	float _295 = isnan(_291) ? _293 : (isnan(_293) ? _291 : max(_293, _291));
-	float _299 = 1.0f - _294;
-	float _300 = 1.0f - _295;
-	float _303 = (isnan(_299) ? _286 : (isnan(_286) ? _299 : min(_286, _299))) * (1.0f / _294);
-	float _304 = (isnan(_300) ? _287 : (isnan(_287) ? _300 : min(_287, _300))) * (1.0f / _295);
-	float _981 = isnan(0.0f) ? _303 : (isnan(_303) ? 0.0f : max(_303, 0.0f));
-	float _992 = isnan(0.0f) ? _304 : (isnan(_304) ? 0.0f : max(_304, 0.0f));
-	float2 _313 = spvUnpackHalf2x16(asuint(_23_m0[1u]).y & 65535u);
-	float _314 = _313.x;
-	float _315 = _314 * sqrt(isnan(1.0f) ? _981 : (isnan(_981) ? 1.0f : min(_981, 1.0f)));
-	float _316 = _314 * sqrt(isnan(1.0f) ? _992 : (isnan(_992) ? 1.0f : min(_992, 1.0f)));
-	float _322 = 1.0f / ((_315 * 4.0f) + 1.0f);
-	float _323 = 1.0f / ((_316 * 4.0f) + 1.0f);
-	float _329 = ((_316 * (((exp2(_18_m0[1u].w * log2((_151.x + 0.05499267578125f) * 0.9482421875f)) + exp2(_18_m0[1u].w * log2((_139.x + 0.05499267578125f) * 0.9482421875f))) + exp2(_18_m0[1u].w * log2((_168.x + 0.05499267578125f) * 0.9482421875f))) + exp2(_18_m0[1u].w * log2((_173.x + 0.05499267578125f) * 0.9482421875f)))) + exp2(_18_m0[1u].w * log2((_156.x + 0.05499267578125f) * 0.9482421875f))) * _323;
-	float _1003 = isnan(0.0f) ? _329 : (isnan(_329) ? 0.0f : max(_329, 0.0f));
-	float _336 = ((_316 * (((_214 + _194) + _254) + _274)) + _234) * _323;
-	float _1014 = isnan(0.0f) ? _336 : (isnan(_336) ? 0.0f : max(_336, 0.0f));
-	float _343 = ((_316 * (((exp2(log2((_151.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w) + exp2(log2((_139.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_168.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_173.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w))) + exp2(log2((_156.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _323;
-	float _1025 = isnan(0.0f) ? _343 : (isnan(_343) ? 0.0f : max(_343, 0.0f));
-	float _345 = isnan(0.00100040435791015625f) ? _18_m0[1u].w : (isnan(_18_m0[1u].w) ? 0.00100040435791015625f : max(_18_m0[1u].w, 0.00100040435791015625f));
-	if ((_58 <= _55.z) && (_59 <= _55.w))
-	{
-		float _388 = (((((exp2(log2((_106.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w) + exp2(log2((_91.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_119.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_128.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _315) + exp2(log2((_109.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _322;
-		float _1041 = isnan(0.0f) ? _388 : (isnan(_388) ? 0.0f : max(_388, 0.0f));
-		float _391 = 1.0f / _345;
-		float _396 = (exp2(_391 * log2(isnan(1.0f) ? _1041 : (isnan(_1041) ? 1.0f : min(_1041, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _404 = ((_315 * (((_213 + _193) + _253) + _273)) + _233) * _322;
-		float _1057 = isnan(0.0f) ? _404 : (isnan(_404) ? 0.0f : max(_404, 0.0f));
-		float _410 = (exp2(_391 * log2(isnan(1.0f) ? _1057 : (isnan(_1057) ? 1.0f : min(_1057, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _447 = (((((exp2(log2((_106.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w) + exp2(log2((_91.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_119.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_128.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _315) + exp2(log2((_109.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _322;
-		float _1073 = isnan(0.0f) ? _447 : (isnan(_447) ? 0.0f : max(_447, 0.0f));
-		float _453 = (exp2(_391 * log2(isnan(1.0f) ? _1073 : (isnan(_1073) ? 1.0f : min(_1073, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		_11[uint2(_58, _59)] = float4(isnan(0.0f) ? _453 : (isnan(_453) ? 0.0f : max(_453, 0.0f)), isnan(0.0f) ? _410 : (isnan(_410) ? 0.0f : max(_410, 0.0f)), isnan(0.0f) ? _396 : (isnan(_396) ? 0.0f : max(_396, 0.0f)), 1.0f);
-	}
-	uint _458 = _58 + 8u;
-	uint4 _461 = asuint(_23_m0[2u]);
-	if ((_458 <= _461.z) && (_59 <= _461.w))
-	{
-		float _468 = 1.0f / _345;
-		float _472 = (exp2(_468 * log2(isnan(1.0f) ? _1025 : (isnan(_1025) ? 1.0f : min(_1025, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _478 = (exp2(_468 * log2(isnan(1.0f) ? _1014 : (isnan(_1014) ? 1.0f : min(_1014, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _484 = (exp2(_468 * log2(isnan(1.0f) ? _1003 : (isnan(_1003) ? 1.0f : min(_1003, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		_11[uint2(_458, _59)] = float4(isnan(0.0f) ? _484 : (isnan(_484) ? 0.0f : max(_484, 0.0f)), isnan(0.0f) ? _478 : (isnan(_478) ? 0.0f : max(_478, 0.0f)), isnan(0.0f) ? _472 : (isnan(_472) ? 0.0f : max(_472, 0.0f)), 1.0f);
-	}
-	uint _489 = _59 + 8u;
-	uint4 _492 = asuint(_23_m0[3u]);
-	uint _493 = _492.x;
-	uint _494 = _492.y;
-	uint _495 = _492.z;
-	uint _496 = _492.w;
-	uint _497 = _489 << 16u;
-	uint _505 = uint(int(max(min(_76, _495), _493) << 16u) >> int(16u));
-	uint _507 = uint(int(max(min(uint(int(_497 + 4294901760u) >> int(16u)), _496), _494) << 16u) >> int(16u));
-	float4 _509 = _8.Load(int3(uint2(_505, _507), 0u));
-	uint _520 = uint(int(max(min(uint(int(_497) >> int(16u)), _496), _494) << 16u) >> int(16u));
-	float4 _521 = _8.Load(int3(uint2(uint(int(max(min(_96, _495), _493) << 16u) >> int(16u)), _520), 0u));
-	float4 _524 = _8.Load(int3(uint2(_505, _520), 0u));
-	float4 _531 = _8.Load(int3(uint2(uint(int(max(min(_114, _495), _493) << 16u) >> int(16u)), _520), 0u));
-	uint _539 = uint(int(max(min(uint(int(_497 + 65536u) >> int(16u)), _496), _494) << 16u) >> int(16u));
-	float4 _540 = _8.Load(int3(uint2(_505, _539), 0u));
-	uint _546 = uint(int(max(min(_134, _495), _493) << 16u) >> int(16u));
-	float4 _547 = _8.Load(int3(uint2(_546, _507), 0u));
-	float4 _556 = _8.Load(int3(uint2(uint(int(max(min(_146, _495), _493) << 16u) >> int(16u)), _520), 0u));
-	float4 _561 = _8.Load(int3(uint2(_546, _520), 0u));
-	float4 _570 = _8.Load(int3(uint2(uint(int(max(min(_163, _495), _493) << 16u) >> int(16u)), _520), 0u));
-	float4 _575 = _8.Load(int3(uint2(_546, _539), 0u));
-	float _596 = exp2(log2((_509.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _597 = exp2(log2((_547.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _616 = exp2(log2((_521.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _617 = exp2(log2((_556.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _636 = exp2(log2((_524.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _637 = exp2(log2((_561.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _656 = exp2(log2((_531.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _657 = exp2(log2((_570.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _676 = exp2(log2((_540.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _677 = exp2(log2((_575.y + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w);
-	float _683 = isnan(_616) ? _596 : (isnan(_596) ? _616 : min(_596, _616));
-	float _684 = isnan(_617) ? _597 : (isnan(_597) ? _617 : min(_597, _617));
-	float _685 = isnan(_636) ? _683 : (isnan(_683) ? _636 : min(_683, _636));
-	float _686 = isnan(_637) ? _684 : (isnan(_684) ? _637 : min(_684, _637));
-	float _687 = isnan(_676) ? _656 : (isnan(_656) ? _676 : min(_656, _676));
-	float _688 = isnan(_677) ? _657 : (isnan(_657) ? _677 : min(_657, _677));
-	float _689 = isnan(_685) ? _687 : (isnan(_687) ? _685 : min(_687, _685));
-	float _690 = isnan(_686) ? _688 : (isnan(_688) ? _686 : min(_688, _686));
-	float _691 = isnan(_616) ? _596 : (isnan(_596) ? _616 : max(_596, _616));
-	float _692 = isnan(_617) ? _597 : (isnan(_597) ? _617 : max(_597, _617));
-	float _693 = isnan(_636) ? _691 : (isnan(_691) ? _636 : max(_691, _636));
-	float _694 = isnan(_637) ? _692 : (isnan(_692) ? _637 : max(_692, _637));
-	float _695 = isnan(_676) ? _656 : (isnan(_656) ? _676 : max(_656, _676));
-	float _696 = isnan(_677) ? _657 : (isnan(_657) ? _677 : max(_657, _677));
-	float _697 = isnan(_693) ? _695 : (isnan(_695) ? _693 : max(_695, _693));
-	float _698 = isnan(_694) ? _696 : (isnan(_696) ? _694 : max(_696, _694));
-	float _701 = 1.0f - _697;
-	float _702 = 1.0f - _698;
-	float _705 = (isnan(_701) ? _689 : (isnan(_689) ? _701 : min(_689, _701))) * (1.0f / _697);
-	float _706 = (isnan(_702) ? _690 : (isnan(_690) ? _702 : min(_690, _702))) * (1.0f / _698);
-	float _1194 = isnan(0.0f) ? _705 : (isnan(_705) ? 0.0f : max(_705, 0.0f));
-	float _1205 = isnan(0.0f) ? _706 : (isnan(_706) ? 0.0f : max(_706, 0.0f));
-	float _711 = _314 * sqrt(isnan(1.0f) ? _1194 : (isnan(_1194) ? 1.0f : min(_1194, 1.0f)));
-	float _712 = _314 * sqrt(isnan(1.0f) ? _1205 : (isnan(_1205) ? 1.0f : min(_1205, 1.0f)));
-	float _717 = 1.0f / ((_711 * 4.0f) + 1.0f);
-	float _718 = 1.0f / ((_712 * 4.0f) + 1.0f);
-	float _724 = ((_712 * (((exp2(_18_m0[1u].w * log2((_556.x + 0.05499267578125f) * 0.9482421875f)) + exp2(_18_m0[1u].w * log2((_547.x + 0.05499267578125f) * 0.9482421875f))) + exp2(_18_m0[1u].w * log2((_570.x + 0.05499267578125f) * 0.9482421875f))) + exp2(_18_m0[1u].w * log2((_575.x + 0.05499267578125f) * 0.9482421875f)))) + exp2(_18_m0[1u].w * log2((_561.x + 0.05499267578125f) * 0.9482421875f))) * _718;
-	float _1216 = isnan(0.0f) ? _724 : (isnan(_724) ? 0.0f : max(_724, 0.0f));
-	float _731 = ((_712 * (((_617 + _597) + _657) + _677)) + _637) * _718;
-	float _1227 = isnan(0.0f) ? _731 : (isnan(_731) ? 0.0f : max(_731, 0.0f));
-	float _738 = ((_712 * (((exp2(log2((_556.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w) + exp2(log2((_547.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_570.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_575.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w))) + exp2(log2((_561.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _718;
-	float _1238 = isnan(0.0f) ? _738 : (isnan(_738) ? 0.0f : max(_738, 0.0f));
-	uint4 _742 = asuint(_23_m0[2u]);
-	if ((_58 <= _742.z) && (_489 <= _742.w))
-	{
-		float _783 = (((((exp2(log2((_521.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w) + exp2(log2((_509.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_531.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_540.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _711) + exp2(log2((_524.z + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _717;
-		float _1249 = isnan(0.0f) ? _783 : (isnan(_783) ? 0.0f : max(_783, 0.0f));
-		float _786 = 1.0f / _345;
-		float _790 = (exp2(_786 * log2(isnan(1.0f) ? _1249 : (isnan(_1249) ? 1.0f : min(_1249, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _797 = ((_711 * (((_616 + _596) + _656) + _676)) + _636) * _717;
-		float _1265 = isnan(0.0f) ? _797 : (isnan(_797) ? 0.0f : max(_797, 0.0f));
-		float _803 = (exp2(_786 * log2(isnan(1.0f) ? _1265 : (isnan(_1265) ? 1.0f : min(_1265, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _840 = (((((exp2(log2((_521.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w) + exp2(log2((_509.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_531.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) + exp2(log2((_540.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _711) + exp2(log2((_524.x + 0.05499267578125f) * 0.9482421875f) * _18_m0[1u].w)) * _717;
-		float _1281 = isnan(0.0f) ? _840 : (isnan(_840) ? 0.0f : max(_840, 0.0f));
-		float _846 = (exp2(_786 * log2(isnan(1.0f) ? _1281 : (isnan(_1281) ? 1.0f : min(_1281, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		_11[uint2(_58, _489)] = float4(isnan(0.0f) ? _846 : (isnan(_846) ? 0.0f : max(_846, 0.0f)), isnan(0.0f) ? _803 : (isnan(_803) ? 0.0f : max(_803, 0.0f)), isnan(0.0f) ? _790 : (isnan(_790) ? 0.0f : max(_790, 0.0f)), 1.0f);
-	}
-	uint4 _853 = asuint(_23_m0[2u]);
-	if ((_458 <= _853.z) && (_489 <= _853.w))
-	{
-		float _860 = 1.0f / _345;
-		float _864 = (exp2(_860 * log2(isnan(1.0f) ? _1238 : (isnan(_1238) ? 1.0f : min(_1238, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _870 = (exp2(_860 * log2(isnan(1.0f) ? _1227 : (isnan(_1227) ? 1.0f : min(_1227, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		float _876 = (exp2(_860 * log2(isnan(1.0f) ? _1216 : (isnan(_1216) ? 1.0f : min(_1216, 1.0f)))) * 1.0546875f) + (-0.05499267578125f);
-		_11[uint2(_458, _489)] = float4(isnan(0.0f) ? _876 : (isnan(_876) ? 0.0f : max(_876, 0.0f)), isnan(0.0f) ? _870 : (isnan(_870) ? 0.0f : max(_870, 0.0f)), isnan(0.0f) ? _864 : (isnan(_864) ? 0.0f : max(_864, 0.0f)), 1.0f);
-	}
-#endif
-}
 
-[RootSignature(ShaderRootSignature)]
-[numthreads(64, 1, 1)]
-void main(SPIRV_Cross_Input stage_input)
-{
-	gl_WorkGroupID = stage_input.gl_WorkGroupID;
-	gl_LocalInvocationID = stage_input.gl_LocalInvocationID;
-	comp_main();
+	uint _87 = max(min(pp.x, _72), _70);
+	uint _89 = max(min(pp.y - 1, _73), _71);
+	float3  _91f = ColorIn.Load(int3( _87,  _89, 0)).rgb;
+
+	uint _105 = max(min(pp.y, _73), _71);
+	uint _107 = max(min(pp.x - 1, _72), _70);
+	float3 _106f = ColorIn.Load(int3(_107, _105, 0)).rgb;
+	float3 _109f = ColorIn.Load(int3( _87, _105, 0)).rgb;
+
+	uint _118 = max(min(pp.x + 1, _72), _70);
+	float3 _119f = ColorIn.Load(int3(_118, _105, 0)).rgb;
+
+	uint _127 = max(min(pp.y + 1, _73), _71);
+	float3 _128f = ColorIn.Load(int3( _87, _127, 0)).rgb;
+
+	uint _138 = max(min(pp.x + 8, _72), _70);
+	float3 _139f = ColorIn.Load(int3(_138,  _89, 0)).rgb;
+
+	uint _150 = max(min(pp.x + 7, _72), _70);
+	float3 _151f = ColorIn.Load(int3(_150, _105, 0)).rgb;
+	float3 _156f = ColorIn.Load(int3(_138, _105, 0)).rgb;
+
+	uint _167 = max(min(pp.x + 9, _72), _70);
+	float3 _168f = ColorIn.Load(int3(_167, _105, 0)).rgb;
+	float3 _173f = ColorIn.Load(int3(_138, _127, 0)).rgb;
+
+#if ENABLE_HDR
+
+	 _91f = BT709_To_BT2020( _91f);
+	_139f = BT709_To_BT2020(_139f);
+	_106f = BT709_To_BT2020(_106f);
+	_151f = BT709_To_BT2020(_151f);
+	_109f = BT709_To_BT2020(_109f);
+	_156f = BT709_To_BT2020(_156f);
+	_119f = BT709_To_BT2020(_119f);
+	_168f = BT709_To_BT2020(_168f);
+	_128f = BT709_To_BT2020(_128f);
+	_173f = BT709_To_BT2020(_173f);
+
+	// since blue is the least contributing in terms of luminance
+	// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
+	// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
+	static const float normalizationFactor = (HDR_MAX_OUTPUT_NITS / 80.f) / 0.0593f;
+
+	half3  _91 = saturate( _91f / normalizationFactor);
+	half3 _139 = saturate(_139f / normalizationFactor);
+	half3 _106 = saturate(_106f / normalizationFactor);
+	half3 _151 = saturate(_151f / normalizationFactor);
+	half3 _109 = saturate(_109f / normalizationFactor);
+	half3 _156 = saturate(_156f / normalizationFactor);
+	half3 _119 = saturate(_119f / normalizationFactor);
+	half3 _168 = saturate(_168f / normalizationFactor);
+	half3 _128 = saturate(_128f / normalizationFactor);
+	half3 _173 = saturate(_173f / normalizationFactor);
+
+#else // ENABLE_HDR
+
+	half3  _91 =  _91f;
+	half3 _139 = _139f;
+	half3 _106 = _106f;
+	half3 _151 = _151f;
+	half3 _109 = _109f;
+	half3 _156 = _156f;
+	half3 _119 = _119f;
+	half3 _168 = _168f;
+	half3 _128 = _128f;
+	half3 _173 = _173f;
+
+	 _91 = saturate(pow( _91, 2.2h));
+	_139 = saturate(pow(_139, 2.2h));
+	_106 = saturate(pow(_106, 2.2h));
+	_151 = saturate(pow(_151, 2.2h));
+	_109 = saturate(pow(_109, 2.2h));
+	_156 = saturate(pow(_156, 2.2h));
+	_119 = saturate(pow(_119, 2.2h));
+	_168 = saturate(pow(_168, 2.2h));
+	_128 = saturate(pow(_128, 2.2h));
+	_173 = saturate(pow(_173, 2.2h));
+
+#endif // ENABLE_HDR
+
+	half _193 =  _91.y;
+	half _194 = _139.y;
+	half _213 = _106.y;
+	half _214 = _151.y;
+	half _233 = _109.y;
+	half _234 = _156.y;
+	half _253 = _119.y;
+	half _254 = _168.y;
+	half _273 = _128.y;
+	half _274 = _173.y;
+
+	half _280 = min(_193, _213);
+	half _281 = min(_194, _214);
+	half _282 = min(_280, _233);
+	half _283 = min(_281, _234);
+	half _284 = min(_253, _273);
+	half _285 = min(_254, _274);
+	half _286 = min(_284, _282);
+	half _287 = min(_285, _283);
+
+	half _288 = max(_193, _213);
+	half _289 = max(_194, _214);
+	half _290 = max(_288, _233);
+	half _291 = max(_289, _234);
+	half _292 = max(_253, _273);
+	half _293 = max(_254, _274);
+	half _294 = max(_292, _290);
+	half _295 = max(_293, _291);
+
+	half _299 = 1.h - _294;
+	half _300 = 1.h - _295;
+
+	half _303 = min(_286, _299) * (1.h / _294);
+	half _304 = min(_287, _300) * (1.h / _295);
+
+	half _981 = saturate(_303);
+	half _992 = saturate(_304);
+
+	half hSharp = f16tof32(CASData.cas1.y & 0xFFFF);
+
+	half _315 = hSharp * sqrt(_981);
+	half _316 = hSharp * sqrt(_992);
+
+	half _322 = 1.h / ((_315 * 4.h) + 1.h);
+	half _323 = 1.h / ((_316 * 4.h) + 1.h);
+
+	half3 _329 = (((_151 + _139 + _168 + _173) * _316) + _156) * _323;
+	_329 = saturate(_329);
+#if ENABLE_HDR
+	float3 _1003 = _329 * normalizationFactor;
+
+	float3 colorOut2 = BT2020_To_BT709(_1003);
+#else // ENABLE_HDR
+	float3 colorOut2 = pow(_329, 1.f / 2.2h);
+#endif // ENABLE_HDR
+
+	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	{
+		half3 _388 = (((_106 + _91 + _119 + _128) * _315) + _109) * _322;
+		_388 = saturate(_388);
+#if ENABLE_HDR
+		float3 _396 = _388 * normalizationFactor;
+
+		float3 colorOut1 = BT2020_To_BT709(_396);
+#else // ENABLE_HDR
+		float3 colorOut1 = pow(_388, 1.f / 2.2h);
+#endif // ENABLE_HDR
+
+		ColorOut[pp] = float4(colorOut1, 1.f);
+	}
+
+	pp.x += 8;
+
+	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	{
+		ColorOut[pp] = float4(colorOut2, 1.f);
+	}
+
+	pp.y += 8;
+
+	uint _507 = max(min(pp.y - 1, _73), _71);
+	float3 _509f = ColorIn.Load(int3( _87, _507, 0)).rgb;
+
+	uint _520 = max(min(pp.y, _73), _71);
+	float3 _521f = ColorIn.Load(int3(_107, _520, 0)).rgb;
+	float3 _524f = ColorIn.Load(int3( _87, _520, 0)).rgb;
+	float3 _531f = ColorIn.Load(int3(_118, _520, 0)).rgb;
+
+	uint _539 = max(min(pp.y + 1, _73), _71);
+	float3 _540f = ColorIn.Load(int3( _87, _539, 0)).rgb;
+	float3 _547f = ColorIn.Load(int3(_138, _507, 0)).rgb;
+	float3 _556f = ColorIn.Load(int3(_150, _520, 0)).rgb;
+	float3 _561f = ColorIn.Load(int3(_138, _520, 0)).rgb;
+	float3 _570f = ColorIn.Load(int3(_167, _520, 0)).rgb;
+	float3 _575f = ColorIn.Load(int3(_138, _539, 0)).rgb;
+
+#if ENABLE_HDR
+
+	_509f = BT709_To_BT2020(_509f);
+	_547f = BT709_To_BT2020(_547f);
+	_521f = BT709_To_BT2020(_521f);
+	_556f = BT709_To_BT2020(_556f);
+	_524f = BT709_To_BT2020(_524f);
+	_561f = BT709_To_BT2020(_561f);
+	_531f = BT709_To_BT2020(_531f);
+	_570f = BT709_To_BT2020(_570f);
+	_540f = BT709_To_BT2020(_540f);
+	_575f = BT709_To_BT2020(_575f);
+
+	half3 _509 = saturate(_509f / normalizationFactor);
+	half3 _547 = saturate(_547f / normalizationFactor);
+	half3 _521 = saturate(_521f / normalizationFactor);
+	half3 _556 = saturate(_556f / normalizationFactor);
+	half3 _524 = saturate(_524f / normalizationFactor);
+	half3 _561 = saturate(_561f / normalizationFactor);
+	half3 _531 = saturate(_531f / normalizationFactor);
+	half3 _570 = saturate(_570f / normalizationFactor);
+	half3 _540 = saturate(_540f / normalizationFactor);
+	half3 _575 = saturate(_575f / normalizationFactor);
+
+#else // ENABLE_HDR
+
+	half3 _509 = _509f;
+	half3 _547 = _547f;
+	half3 _521 = _521f;
+	half3 _556 = _556f;
+	half3 _524 = _524f;
+	half3 _561 = _561f;
+	half3 _531 = _531f;
+	half3 _570 = _570f;
+	half3 _540 = _540f;
+	half3 _575 = _575f;
+
+	_509 = saturate(pow(_509f, 2.2h));
+	_547 = saturate(pow(_547f, 2.2h));
+	_521 = saturate(pow(_521f, 2.2h));
+	_556 = saturate(pow(_556f, 2.2h));
+	_524 = saturate(pow(_524f, 2.2h));
+	_561 = saturate(pow(_561f, 2.2h));
+	_531 = saturate(pow(_531f, 2.2h));
+	_570 = saturate(pow(_570f, 2.2h));
+	_540 = saturate(pow(_540f, 2.2h));
+	_575 = saturate(pow(_575f, 2.2h));
+
+#endif // ENABLE_HDR
+
+	half _596 = _509.y;
+	half _597 = _547.y;
+	half _616 = _521.y;
+	half _617 = _556.y;
+	half _636 = _524.y;
+	half _637 = _561.y;
+	half _656 = _531.y;
+	half _657 = _570.y;
+	half _676 = _540.y;
+	half _677 = _575.y;
+
+	half _683 = min(_596, _616);
+	half _684 = min(_597, _617);
+	half _685 = min(_683, _636);
+	half _686 = min(_684, _637);
+	half _687 = min(_656, _676);
+	half _688 = min(_657, _677);
+	half _689 = min(_687, _685);
+	half _690 = min(_688, _686);
+
+	half _691 = max(_596, _616);
+	half _692 = max(_597, _617);
+	half _693 = max(_691, _636);
+	half _694 = max(_692, _637);
+	half _695 = max(_656, _676);
+	half _696 = max(_657, _677);
+	half _697 = max(_695, _693);
+	half _698 = max(_696, _694);
+
+	half _701 = 1.h - _697;
+	half _702 = 1.h - _698;
+
+	half _705 = min(_689, _701) * (1.h / _697);
+	half _706 = min(_690, _702) * (1.h / _698);
+
+	half _1194 = saturate(_705);
+	half _1205 = saturate(_706);
+
+	half _711 = hSharp * sqrt(_1194);
+	half _712 = hSharp * sqrt(_1205);
+
+	half _717 = 1.h / ((_711 * 4.h) + 1.h);
+	half _718 = 1.h / ((_712 * 4.h) + 1.h);
+
+	half3 _724 = (((_556 + _547 + _570 + _575) * _712) + _561) * _718;
+	_724 = saturate(_724);
+#if ENABLE_HDR
+	float3 _1216 = _724 * normalizationFactor;
+
+	float3 colorOut4 = BT2020_To_BT709(_1216);
+#else // ENABLE_HDR
+	float3 colorOut4 = pow(_724, 1.f / 2.2h);
+#endif // ENABLE_HDR
+
+	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	{
+		half3 _783 = (((_521 + _509 + _531 + _540) * _711) + _524) * _717;
+		_783 = saturate(_783);
+#if ENABLE_HDR
+		float3 _790 = _783 * normalizationFactor;
+
+		float3 colorOut3 = BT2020_To_BT709(_790);
+#else // ENABLE_HDR
+		float3 colorOut3 = pow(_783, 1.f / 2.2h);
+#endif // ENABLE_HDR
+
+		ColorOut[uint2(_58, pp.y)] = float4(colorOut3, 1.f);
+	}
+
+	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	{
+		ColorOut[pp] = float4(colorOut4, 1.f);
+	}
+
+#endif
 }
