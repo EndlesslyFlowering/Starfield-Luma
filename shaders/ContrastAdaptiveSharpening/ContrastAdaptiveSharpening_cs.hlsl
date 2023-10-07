@@ -49,12 +49,13 @@ struct CSInput
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
 #endif
 
+#define HDR_BT2020 1
+
 [RootSignature(ShaderRootSignature)]
 [numthreads(64, 1, 1)]
 void CS(CSInput csInput)
 {
-#if 1
-	// butchered the CS so it just outputs the input
+#if 0 // Disable the CS so it just outputs the input
 	uint4 _55 = CASData.cas2;
 	uint ppx = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
 	uint ppy = ((((csInput.SV_GroupThreadID.x >> 3u) & 6u) | (csInput.SV_GroupThreadID.x & 1u)) | (csInput.SV_GroupID.y << 4u)) + _55.y;
@@ -113,6 +114,7 @@ void CS(CSInput csInput)
 
 #if ENABLE_HDR
 
+#if HDR_BT2020
 	 _91f = BT709_To_BT2020( _91f);
 	_139f = BT709_To_BT2020(_139f);
 	_106f = BT709_To_BT2020(_106f);
@@ -123,6 +125,7 @@ void CS(CSInput csInput)
 	_168f = BT709_To_BT2020(_168f);
 	_128f = BT709_To_BT2020(_128f);
 	_173f = BT709_To_BT2020(_173f);
+#endif
 
 	// since blue is the least contributing in terms of luminance
 	// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
@@ -218,7 +221,7 @@ void CS(CSInput csInput)
 #if ENABLE_HDR
 	float3 _1003 = _329 * normalizationFactor;
 
-	float3 colorOut2 = BT2020_To_BT709(_1003);
+	float3 colorOut2 = (bool)HDR_BT2020 ? BT2020_To_BT709(_1003) : _1003;
 #else // ENABLE_HDR
 	float3 colorOut2 = LINEAR_TO_GAMMA(_329);
 #endif // ENABLE_HDR
@@ -230,7 +233,7 @@ void CS(CSInput csInput)
 #if ENABLE_HDR
 		float3 _396 = _388 * normalizationFactor;
 
-		float3 colorOut1 = BT2020_To_BT709(_396);
+		float3 colorOut1 = (bool)HDR_BT2020 ? BT2020_To_BT709(_396) : _396;
 #else // ENABLE_HDR
 		float3 colorOut1 = LINEAR_TO_GAMMA(_388);
 #endif // ENABLE_HDR
@@ -265,6 +268,7 @@ void CS(CSInput csInput)
 
 #if ENABLE_HDR
 
+#if HDR_BT2020
 	_509f = BT709_To_BT2020(_509f);
 	_547f = BT709_To_BT2020(_547f);
 	_521f = BT709_To_BT2020(_521f);
@@ -275,6 +279,7 @@ void CS(CSInput csInput)
 	_570f = BT709_To_BT2020(_570f);
 	_540f = BT709_To_BT2020(_540f);
 	_575f = BT709_To_BT2020(_575f);
+#endif
 
 	half3 _509 = saturate(_509f / normalizationFactor);
 	half3 _547 = saturate(_547f / normalizationFactor);
@@ -362,7 +367,7 @@ void CS(CSInput csInput)
 #if ENABLE_HDR
 	float3 _1216 = _724 * normalizationFactor;
 
-	float3 colorOut4 = BT2020_To_BT709(_1216);
+	float3 colorOut4 = (bool)HDR_BT2020 ? BT2020_To_BT709(_1216) : _1216;
 #else // ENABLE_HDR
 	float3 colorOut4 = LINEAR_TO_GAMMA(_724);
 #endif // ENABLE_HDR
@@ -374,7 +379,7 @@ void CS(CSInput csInput)
 #if ENABLE_HDR
 		float3 _790 = _783 * normalizationFactor;
 
-		float3 colorOut3 = BT2020_To_BT709(_790);
+		float3 colorOut3 = (bool)HDR_BT2020 ? BT2020_To_BT709(_790) : _790;
 #else // ENABLE_HDR
 		float3 colorOut3 = LINEAR_TO_GAMMA(_783);
 #endif // ENABLE_HDR
