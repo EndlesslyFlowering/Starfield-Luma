@@ -13,7 +13,7 @@ cbuffer _18_20 : register(b0, space0)
 };
 
 Texture2D<float3> TonemappedColorTexture : register(t0, space8); // Possibly in gamma space in SDR
-SamplerState Sampler0 : register(s13, space6);
+SamplerState Sampler0 : register(s13, space6); // Likely bilinear
 SamplerState Sampler1 : register(s15, space6); // Likely nearest neighbor
 
 static float4 TEXCOORD;
@@ -29,14 +29,24 @@ struct SPIRV_Cross_Output
 	float4 SV_Target : SV_Target0;
 };
 
+#if SDR_USE_GAMMA_2_2
+	#define GAMMA_TO_LINEAR(x) pow(x, 2.2f)
+	#define LINEAR_TO_GAMMA(x) pow(x, 1.f / 2.2f)
+#else //TODO: make this use half instead of float
+	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
+	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
+#endif
+
 void frag_main()
 {
-	float3 inColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y)).xyz;
+	float3 inColor = TonemappedColorTexture.Sample(Sampler0, TEXCOORD.xy).xyz;
+#if !ENABLE_HDR
+	inColor = GAMMA_TO_LINEAR(inColor);
+#endif
+	float3 outColor = inColor;
 	uint4 sharpenParams = asuint(_20_m0[0u]);
 	float sharpenIntensity = asfloat(sharpenParams.z);
-	float3 outColor = inColor;
-#if !ENABLE_HDR //TODO: implement
-	if (sharpenIntensity > 0.f) //TODO: should this check for "sharpenIntensity < 1.f"? It seems like its the inverse intensity
+	if (sharpenIntensity > 0.f)
 	{
 		float _70 = ((_15_m0[161u].z * TEXCOORD.x) * asfloat(sharpenParams.x)) + 0.5f;
 		float _72 = ((_15_m0[161u].w * TEXCOORD.y) * asfloat(sharpenParams.y)) + 0.5f;
@@ -60,10 +70,18 @@ void frag_main()
 		float3 _157 = TonemappedColorTexture.SampleLevel(Sampler1, float2(_147, _145), 0.0f);
 		float3 _162 = TonemappedColorTexture.SampleLevel(Sampler1, float2(_144, _149), 0.0f);
 		float3 _167 = TonemappedColorTexture.SampleLevel(Sampler1, float2(_147, _149), 0.0f);
+#if !ENABLE_HDR
+		_152 = GAMMA_TO_LINEAR(_152);
+		_157 = GAMMA_TO_LINEAR(_157);
+		_162 = GAMMA_TO_LINEAR(_162);
+		_167 = GAMMA_TO_LINEAR(_167);
+#endif
 		float3 sharpenedColor = (((_167 * _98) + (_162 * _87)) * _136) + (((_157 * _98) + (_152 * _87)) * _125);
-		outColor = ((inColor - sharpenedColor) * sharpenIntensity) + sharpenedColor;
-		//outColor = lerp(sharpenedColor, inColor, sharpenIntensity);
+		// It seems controls the amount of (manaually done) bilinear filtering vs nearest neightbor, so full sharpening is just bilinear
+		outColor = lerp(sharpenedColor, inColor, sharpenIntensity); 
 	}
+#if !ENABLE_HDR
+	outColor = LINEAR_TO_GAMMA(outColor);
 #endif
 	SV_Target.xyz = outColor;
 	SV_Target.w = 1.0f;
