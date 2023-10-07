@@ -94,7 +94,7 @@ float colorY = Luminance(tonemappedColor);
 	float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * inverseLuminance);
 #else
 	float additiveFilmGrain = ((randomNumber * 2.f) - 1.f) // (-1 to 1)
-		* (2.f* (0.5f - abs(colorY - 0.5f))) // Bias towards center (nothing if black or white)
+		* (2.f * (0.5f - abs(saturate(colorY) - 0.5f))) // Bias towards center (nothing if black or white)
 		* filmGrainColorAndIntensity.z
 		* 3.333f;
 #endif // FILM_GRAIN_TYPE != 2
