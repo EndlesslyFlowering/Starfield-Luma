@@ -35,8 +35,8 @@ struct StructHdrDllPluginConstants
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
 	uint FilmGrainType; // 0 is default
-	bool PostSharpening; // true is default
-	bool IsAtEndOfFrame;
+	uint PostSharpening; // true is default
+	uint IsAtEndOfFrame;
 	float DevSetting01; // 0-1 variable for development
 	float DevSetting02; // 0-1 variable for development
 	float DevSetting03; // 0-1 variable for development

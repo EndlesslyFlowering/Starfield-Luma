@@ -139,8 +139,8 @@ namespace Hooks
 				static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),  // 0-100 to 0-1
 				static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),   // 0-100 to 0-1
 				static_cast<uint32_t>(*settings->FilmGrainType.value),
-				static_cast<bool>(*settings->PostSharpening.value),
-				bIsAtEndOfFrame.load(),
+				static_cast<uint32_t>(*settings->PostSharpening.value),
+				static_cast<uint32_t>(bIsAtEndOfFrame.load()),
 				static_cast<float>(*settings->DevSetting01.value * 0.01f),           // 0-100 to 0-1
 				static_cast<float>(*settings->DevSetting02.value * 0.01f),           // 0-100 to 0-1
 				static_cast<float>(*settings->DevSetting03.value * 0.01f),           // 0-100 to 0-1
