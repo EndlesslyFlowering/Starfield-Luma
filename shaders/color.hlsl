@@ -27,6 +27,12 @@ static const float3x3 BT2020_2_BT709 = float3x3(
 	1.66049621914783, -0.587656444131135, -0.0728397750166941,
 	-0.124547095586012, 1.13289510924730, -0.00834801366128445,
 	-0.0181536813870718, -0.100597371685743, 1.11875105307281);
+	
+static const float PQ_constant_N = (2610.0 / 4096.0 / 4.0);
+static const float PQ_constant_M = (2523.0 / 4096.0 * 128.0);
+static const float PQ_constant_C1 = (3424.0 / 4096.0);
+static const float PQ_constant_C2 = (2413.0 / 4096.0 * 32.0);
+static const float PQ_constant_C3 = (2392.0 / 4096.0 * 32.0);
 
 float3 BT709_To_BT2020(float3 color)
 {
@@ -78,6 +84,26 @@ float3 gamma_sRGB_to_linear(float3 Color)
 	return float3(gamma_sRGB_to_linear(Color.r),
 	              gamma_sRGB_to_linear(Color.g),
 	              gamma_sRGB_to_linear(Color.b));
+}
+// HDR10 PQ (Perceptual Quantiser - ST.2084)
+float3 linear_to_PQ(float3 Color, const float PQMaxValue = PQMaxWhitePoint)
+{
+    Color /= PQMaxValue;
+    float3 colorPow = pow(Color, PQ_constant_N);
+    float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
+    float3 denominator = 1.f + PQ_constant_C3 * colorPow;
+    float3 pq = pow(numerator / denominator, PQ_constant_M);
+    return pq;
+}
+
+float3 PQ_to_Linear(float3 Color, const float PQMaxValue = PQMaxWhitePoint)
+{
+    float3 colorPow = pow(Color, 1.f / PQ_constant_M );
+    float3 numerator = max(colorPow - PQ_constant_C1, 0.f);
+    float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
+    float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_N);
+    linearColor *= PQMaxValue;
+    return linearColor;
 }
 
 float Luminance(float3 color)
