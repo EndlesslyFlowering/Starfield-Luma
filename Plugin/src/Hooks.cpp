@@ -34,6 +34,10 @@ namespace Hooks
 		if (const auto saturation = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Saturation))) {
 			saturation->m_Enabled.SetValue(a_bEnable);
 		}
+
+		if (const auto contrast = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Contrast))) {
+			contrast->m_Enabled.SetValue(a_bEnable);
+		}
     }
 
     void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
@@ -114,7 +118,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
-		CreateStepperSetting(a_settingList, settings->PostSharpening, true);
+		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
 
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
@@ -139,7 +143,7 @@ namespace Hooks
 				static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),  // 0-100 to 0-1
 				static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),   // 0-100 to 0-1
 				static_cast<uint32_t>(*settings->FilmGrainType.value),
-				static_cast<uint32_t>(*settings->PostSharpening.value),
+				static_cast<uint32_t>(*settings->PostSharpen.value),
 				static_cast<uint32_t>(bIsAtEndOfFrame.load()),
 				static_cast<float>(*settings->DevSetting01.value * 0.01f),           // 0-100 to 0-1
 				static_cast<float>(*settings->DevSetting02.value * 0.01f),           // 0-100 to 0-1
@@ -254,36 +258,66 @@ namespace Hooks
 
     void Hooks::Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
+		const auto settings = Settings::Main::GetSingleton();
+
+		auto HandleSetting = [&](Settings::Checkbox& a_setting) {
+			const auto prevValue = a_setting.value.get_data();
+			const auto newValue = a_eventData.m_Value.Bool;
+			if (prevValue != newValue) {
+				*a_setting.value = newValue;
+				settings->Save();
+			}
+		};
+
+		switch (a_eventData.m_SettingID) {
+		case static_cast<int>(Settings::SettingID::kPostSharpen):
+			HandleSetting(settings->PostSharpen);
+		    break;
+		}
+
 		_SettingsDataModelBoolEvent(a_arg1, a_eventData);
     }
 
     void Hooks::Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
-		if (a_eventData.m_SettingID == static_cast<int>(Settings::SettingID::kDisplayMode)) {
-			const auto settings = Settings::Main::GetSingleton();
+		const auto settings = Settings::Main::GetSingleton();
 
-			const auto prevValue = *settings->DisplayMode.value;
+		auto HandleSetting = [&](Settings::Stepper& a_setting) {
+			const auto prevValue = a_setting.value.get_data();
 			const auto newValue = a_eventData.m_Value.Int;
 			if (prevValue != newValue) {
-				*settings->DisplayMode.value = newValue;
-				
-				const RE::BS_DXGI_FORMAT newFormat = settings->GetDisplayModeFormat();
-
-				Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
-
-				if (prevValue == 0) {
-					ToggleEnableHDRSubSettings(a_eventData.m_Model, true);
-				} else if (newValue == 0) {
-					ToggleEnableHDRSubSettings(a_eventData.m_Model, false);
-				}
-
-				Settings::swapChainObject->format = newFormat;
-
-				// toggle vsync to force a swapchain recreation
-			    Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
-
+				*a_setting.value = newValue;
 				settings->Save();
+				return true;
 			}
+			return false;
+		};
+
+		switch (a_eventData.m_SettingID) {
+		case static_cast<int>(Settings::SettingID::kDisplayMode):
+			{
+				const auto prevDisplayMode = settings->DisplayMode.value.get_data();
+				if (HandleSetting(settings->DisplayMode)) {
+					const RE::BS_DXGI_FORMAT newFormat = settings->GetDisplayModeFormat();
+
+					Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
+
+					if (prevDisplayMode == 0) {
+						ToggleEnableHDRSubSettings(a_eventData.m_Model, true);
+					} else if (settings->DisplayMode.value.get_data() == 0) {
+						ToggleEnableHDRSubSettings(a_eventData.m_Model, false);
+					}
+
+					Settings::swapChainObject->format = newFormat;
+
+					// toggle vsync to force a swapchain recreation
+					Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
+				}
+			}
+			break;
+		case static_cast<int>(Settings::SettingID::kFilmGrainType):
+			HandleSetting(settings->FilmGrainType);
+			break;
 		}
 
 		_SettingsDataModelIntEvent(a_arg1, a_eventData);
@@ -326,12 +360,6 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
-			break;
-		case static_cast<int>(Settings::SettingID::kFilmGrainType):
-			HandleSetting(settings->FilmGrainType);
-			break;
-		case static_cast<int>(Settings::SettingID::kPostSharpening):
-			HandleSetting(settings->PostSharpening);
 			break;
 		}
 
