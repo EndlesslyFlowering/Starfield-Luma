@@ -2,6 +2,9 @@
 
 #include "structs.hlsl"
 
+// Turn on when developing to engage error checks and development setting variables
+#define DEVELOPMENT 1
+
 // Preset all defines to be as close as possible to the og game vanilla look
 #define FORCE_VANILLA_LOOK 0
 
