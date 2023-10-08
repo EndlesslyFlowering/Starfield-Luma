@@ -28,6 +28,7 @@ struct StructHdrDllPluginConstants
 {
     // SDR 0 (Rec.709 with 2.2 gamma, not sRGB), 1 HDR10 PQ BT.2020, 2 scRGB HDR
 	uint DisplayMode;
+	bool bIsAtEndOfFrame;
 	float HDRPeakBrightnessNits; // Set equal to the max nits your display can output
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
@@ -37,9 +38,12 @@ struct StructHdrDllPluginConstants
 	float ColorGradingStrength; // 1 is full strength
 	float DevSetting01; // 0-1 variable for development
 	float DevSetting02; // 0-1 variable for development
+	float DevSetting03; // 0-1 variable for development
+	float DevSetting04; // 0-1 variable for development
+	float DevSetting05; // 0-1 variable for development
 };
 
 //TODO: use this in the root signature files?
-#define HDR_PLUGIN_CONSTANTS_SIZE 10
+#define HDR_PLUGIN_CONSTANTS_SIZE 14
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);

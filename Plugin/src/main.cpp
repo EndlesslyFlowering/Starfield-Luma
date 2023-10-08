@@ -41,9 +41,9 @@ void LoadPlugin(bool a_bIsSFSE)
 	Settings::Main::GetSingleton()->Load();
 
 	if (a_bIsSFSE) {
-		SFSE::AllocTrampoline(1 << 7);
+		SFSE::AllocTrampoline(1 << 8);
 	} else {
-		dku::Hook::Trampoline::AllocTrampoline(1 << 7);
+		dku::Hook::Trampoline::AllocTrampoline(1 << 8);
 	}
 	
 	Offsets::Initialize();
