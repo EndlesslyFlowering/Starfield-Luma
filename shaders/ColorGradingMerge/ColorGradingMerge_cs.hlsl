@@ -31,7 +31,7 @@
 #define LUT_SDR_ON_CLIP 1u
 #define LUT_HDR_ON_CLIP 0u
 
-static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
+static const float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
