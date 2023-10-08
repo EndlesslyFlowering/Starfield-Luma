@@ -66,6 +66,7 @@ namespace Settings
 		void SetValueFromSlider(float a_percentage);
 	};
 
+	// Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.
 	struct ShaderConstants
 	{
 		uint32_t DisplayMode;
@@ -77,8 +78,8 @@ namespace Settings
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		uint32_t FilmGrainType;
-		bool     PostSharpening;
-		bool     bIsAtEndOfFrame;
+		uint32_t PostSharpening;
+		uint32_t bIsAtEndOfFrame;
 		float    DevSetting01;
 		float    DevSetting02;
 		float    DevSetting03;
