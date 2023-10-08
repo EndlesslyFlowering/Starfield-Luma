@@ -4,7 +4,7 @@
 #include "RootSignature.hlsl"
 
 // 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good and it's kinda broken in SDR)
-#define LUT_IMPROVEMENT_TYPE 1
+#define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 #define FORCE_SDR_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
@@ -31,7 +31,7 @@
 #define LUT_SDR_ON_CLIP 1u
 #define LUT_HDR_ON_CLIP 0u
 
-static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by HdrDllPluginConstants.LUTCorrectionStrength
+static float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {

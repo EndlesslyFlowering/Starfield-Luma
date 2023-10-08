@@ -2,6 +2,9 @@
 
 #include "structs.hlsl"
 
+// Preset all defines to be as close as possible to the og game vanilla look
+#define FORCE_VANILLA_LOOK 0
+
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
 #define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_BT709)
 
@@ -9,11 +12,11 @@
 // This implies there was a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
 // By turning this on, we emulate the SDR look in HDR by baking that assumption into our calculations.
 // This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping.
-#define SDR_USE_GAMMA_2_2 1
+#define SDR_USE_GAMMA_2_2 (FORCE_VANILLA_LOOK ? 0 : 1)
 
 // Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
 // This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
-#define LUT_FIX_GAMMA_MAPPING 1
+#define LUT_FIX_GAMMA_MAPPING (FORCE_VANILLA_LOOK ? 0 : 1)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 
