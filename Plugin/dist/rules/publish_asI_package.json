@@ -1,0 +1,75 @@
+[
+    {
+        "action": "copy",
+        "params": [
+            "{dist}\\{project_name}.dll",
+            "{dist}\\ASI\\{project_name}.asi"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "params": [
+            "{dist}\\SFShaderInjector.asi",
+            "{dist}\\ASI\\SFShaderInjector.asi"
+        ]
+    },
+    {
+        "action": "copy",
+        "params": [
+            "{dist}\\Data\\",
+            "{dist}\\ASI\\"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "config": "RelWithDebInfo",
+        "params": [
+            "{dist}\\*.pdb",
+            "{dist}\\ASI\\"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "params": [
+            "{dist}\\*.txt",
+            "{dist}\\ASI\\"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "params": [
+            "{dist}\\*.ini",
+            "{dist}\\ASI\\"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "params": [
+            "{dist}\\*.toml",
+            "{dist}\\ASI\\"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "params": [
+            "{dist}\\*.json",
+            "{dist}\\ASI\\"
+        ]
+    },
+    {
+        "action": "package",
+        "config": "Release",
+        "params": [
+            "{dist}\\ASI\\*",
+            "{dist}\\{project_name}-v{project_version}-ASI.zip"
+        ]
+    },
+    {
+        "action": "package",
+        "config": "RelWithDebInfo",
+        "params": [
+            "{dist}\\ASI\\*",
+            "{dist}\\{project_name}-v{project_version}-ASI.zip"
+        ]
+    }
+]

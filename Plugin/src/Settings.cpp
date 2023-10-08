@@ -56,7 +56,7 @@ namespace Settings
 	{
 		static std::once_flag ConfigInit;
 		std::call_once(ConfigInit, [&]() {
-			config.Bind(DisplayMode.value, 0);
+			config.Bind(DisplayMode.value, DisplayMode.defaultValue);
 			config.Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config.Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config.Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
@@ -65,7 +65,7 @@ namespace Settings
 			config.Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
 			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
 			config.Bind(FilmGrainType.value, FilmGrainType.defaultValue);
-			config.Bind(PostSharpening.value, PostSharpening.defaultValue);
+			config.Bind(PostSharpen.value, PostSharpen.defaultValue);
 			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config.Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config.Bind(DevSetting03.value, DevSetting03.defaultValue);

@@ -7,3 +7,7 @@ deploy-*.ps1
 
 shaders/target_folder.txt
 tools/dxc_analysis_tools/dndxc.settings.xml
+
+Plugin/dist/Data/*
+Plugin/dist/ASI/*
+Plugin/dist/SFSE/*

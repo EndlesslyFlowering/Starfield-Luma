@@ -3,7 +3,14 @@
         "action": "copy",
         "params": [
             "{dist}\\*.dll",
-            "{dist}\\Data\\SFSE\\Plugins\\"
+            "{dist}\\SFSE\\Data\\SFSE\\Plugins\\"
+        ]
+    },
+    {
+        "action": "copy",
+        "params": [
+            "{dist}\\Data\\",
+            "{dist}\\SFSE\\"
         ]
     },
     {
@@ -11,44 +18,51 @@
         "config": "RelWithDebInfo",
         "params": [
             "{dist}\\*.pdb",
-            "{dist}\\Data\\SFSE\\Plugins\\"
+            "{dist}\\SFSE\\Data\\SFSE\\Plugins\\"
+        ]
+    },
+    {
+        "action": "copy_if",
+        "params": [
+            "{dist}\\*.txt",
+            "{dist}\\SFSE\\"
         ]
     },
     {
         "action": "copy_if",
         "params": [
             "{dist}\\*.ini",
-            "{dist}\\Data\\SFSE\\Plugins\\"
+            "{dist}\\SFSE\\Data\\SFSE\\Plugins\\"
         ]
     },
     {
         "action": "copy_if",
         "params": [
             "{dist}\\*.toml",
-            "{dist}\\Data\\SFSE\\Plugins\\"
+            "{dist}\\SFSE\\Data\\SFSE\\Plugins\\"
         ]
     },
     {
         "action": "copy_if",
         "params": [
             "{dist}\\*.json",
-            "{dist}\\Data\\SFSE\\Plugins\\"
+            "{dist}\\SFSE\\Data\\SFSE\\Plugins\\"
         ]
     },
     {
         "action": "package",
         "config": "Release",
         "params": [
-            "{dist}\\Data\\",
-            "{dist}\\{project_name}.v{project_version}.zip"
+            "{dist}\\SFSE\\*",
+            "{dist}\\{project_name}-v{project_version}-SFSE.zip"
         ]
     },
     {
         "action": "package",
         "config": "RelWithDebInfo",
         "params": [
-            "{dist}\\Data\\",
-            "{dist}\\{project_name}.v{project_version}.zip"
+            "{dist}\\SFSE\\*",
+            "{dist}\\{project_name}-v{project_version}-SFSE.zip"
         ]
     }
 ]

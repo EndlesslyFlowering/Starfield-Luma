@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 
 
 $ShaderOutputDirectory = Get-Content "${PSScriptRoot}\target_folder.txt"
+$DistDirectory = "${PSScriptRoot}\..\Plugin\dist\Data\shadersfx\"
 $ShaderOutputEmbedPDB = $false
 
 
@@ -117,6 +118,11 @@ function Compile-Shader {
 	# TODO: Can extractrootsignature and Qstrip_rootsignature be used in the same operation?
 	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -extractrootsignature -Fo `"${stagedSigPath}`""
 	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
+
+    # Copy the resulting bins to the dist directory.
+    New-Item -Force -ItemType Directory -Path "${DistDirectory}\${TechniqueName}" | Out-Null
+    Copy-Item -Force -Path $stagedBinPath -Destination "${DistDirectory}\${TechniqueName}\${outputBinName}"
+    Copy-Item -Force -Path $stagedSigPath -Destination "${DistDirectory}\${TechniqueName}\${outputSigName}"
 
 	# Move the resulting bins to the game directory. Move-Item is to avoid partial reads when live shader editing
 	# is enabled.
