@@ -1,0 +1,32 @@
+[Dev]
+DevSetting01 = 0.0
+DevSetting02 = 0.0
+
+[HDR]
+Contrast = 50.0
+GamePaperWhite = 203.0
+PeakBrightness = 1000.0
+Saturation = 50.0
+UIPaperWhite = 203.0
+
+[Main]
+ColorGradingStrength = 100.0
+DisplayMode = 0
+LUTCorrectionStrength = 100.0
+
+[RenderTargets]
+RenderTargetsToUpgrade = [
+    'ImageSpaceBuffer',
+    'ScaleformCompositeBuffer',
+    'SF_ColorBuffer',
+    'HDRImagespaceBuffer',
+    'ImageSpaceHalfResBuffer',
+    'ImageProcessColorTarget',
+    'ImageSpaceBufferB10G11R11',
+    'ImageSpaceBufferE5B9G9R9',
+    'TAA_idTech7HistoryColorTarget',
+    'EnvBRDF',
+    'ImageSpaceBufferR10G10B10A2',
+    'NativeResolutionColorBuffer01',
+    'ColorBuffer01'
+]
