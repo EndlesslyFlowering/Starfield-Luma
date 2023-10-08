@@ -312,6 +312,7 @@ namespace Hooks
 
 			//case 0xFF94:
 			case 0x100FF94:
+			case 0x300FF94:
 				uploadRootConstants(14, true);  // ContrastAdaptiveSharpening
 				break;
 
