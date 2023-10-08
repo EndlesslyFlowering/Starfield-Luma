@@ -162,7 +162,7 @@ struct Hable_shoulderSegment
 	float B;
 };
 
-struct HableParamters
+struct HableParameters
 {
 	Hable_params          params;
 	Hable_dstParams       dstParams;
