@@ -15,7 +15,7 @@ List of features:
 
 How to use:
 Drop the content of the mod into the game root folder, or install it with a mod manager in the game root folder.
-The game needs to be started through "sfse_loader.exe".
+The game needs to be started through the SFSE loader on Steam and ASI loader on Microsoft Store (Game Pass).
 You can configure the mod from the game graphics setting menu. It also hooks to ReShade if you have installed, you will see the settings menu as a small ReShade widget.
 There's also a config file in the dll folders, delete it to reset settings.
 To uninstall, clear all the files (they are unique to the mod).
