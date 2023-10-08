@@ -20,6 +20,7 @@ $main =
 
 	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "FF94" -Entry "main"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "100FF94" -Defines "USE_PACKED_MATH" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "300FF94" -Defines "USE_PACKED_MATH", "USE_UPSCALING" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 
 	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "FF9A"
 
