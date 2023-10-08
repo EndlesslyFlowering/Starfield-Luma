@@ -18,8 +18,8 @@ float4 PS(PSInputs inputs) : SV_Target
 
     if (HdrDllPluginConstants.DisplayMode == 1 && HdrDllPluginConstants.IsAtEndOfFrame)
 	{
-        float3 pq = linear_to_PQ(color.rgb);
-        color.rgb = pq.rgb;
+        // There is no need to clamp if "CLAMP_INPUT_OUTPUT" is true here as the output buffer is int so it will clip anything beyond 0-1.
+        color.rgb = linear_to_PQ(BT709_To_BT2020(color.rgb));
     }
 
     return color;
