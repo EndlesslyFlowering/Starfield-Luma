@@ -77,9 +77,9 @@ namespace Settings
 				"ImageSpaceBufferE5B9G9R9",
 				"TAA_idTech7HistoryColorTarget",
 				"EnvBRDF",
-				"ImageSpaceBufferR10G10B10A2",
+				"ImageSpaceBufferR10G10B10A2"
 #if 0
-				'NativeResolutionColorBuffer01',
+				,'NativeResolutionColorBuffer01',
 				'ColorBuffer01'
 #endif
 				);
