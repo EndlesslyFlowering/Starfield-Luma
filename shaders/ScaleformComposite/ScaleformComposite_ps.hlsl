@@ -34,6 +34,7 @@ float4 PS(PSInputs inputs) : SV_Target
 
 	// Theoretically all UI is in sRGB (though it might have been designed on gamma 2.2 screens, we can't know that, but it was definately targeting gamma 2.2 as output anyway).
 	UIColor.xyz = gamma_sRGB_to_linear(UIColor.xyz);
+	// This multiplication is probably used by Bethesda to dim the UI when applying an AutoHDR pass at the very end (they don't have real HDR)
 	UIColor.xyz = UIColor.xyz * UIIntensity;
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{

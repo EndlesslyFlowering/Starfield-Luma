@@ -29,7 +29,6 @@
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
 // or to replicate the SDR tonemapper by luminance, though both would alter the look too much and break some scenes.
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
-#define CLAMP_INPUT_OUTPUT 1
 
 
 cbuffer CSharedFrameData : register(b0, space6)
