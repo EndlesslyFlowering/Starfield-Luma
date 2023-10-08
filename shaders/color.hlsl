@@ -85,20 +85,21 @@ float3 gamma_sRGB_to_linear(float3 Color)
 	              gamma_sRGB_to_linear(Color.g),
 	              gamma_sRGB_to_linear(Color.b));
 }
-// HDR10 PQ (Perceptual Quantiser - ST.2084)
-float3 linear_to_PQ(float3 Color, const float PQMaxValue = PQMaxWhitePoint)
+
+// PQ (Perceptual Quantizer - ST.2084) encode/decode used for HDR10 BT.2100
+float3 linear_to_PQ(float3 LinearColor, const float PQMaxValue = PQMaxWhitePoint)
 {
-    Color /= PQMaxValue;
-    float3 colorPow = pow(Color, PQ_constant_N);
+    LinearColor /= PQMaxValue;
+    float3 colorPow = pow(LinearColor, PQ_constant_N);
     float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
     float3 denominator = 1.f + PQ_constant_C3 * colorPow;
     float3 pq = pow(numerator / denominator, PQ_constant_M);
     return pq;
 }
 
-float3 PQ_to_Linear(float3 Color, const float PQMaxValue = PQMaxWhitePoint)
+float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue = PQMaxWhitePoint)
 {
-    float3 colorPow = pow(Color, 1.f / PQ_constant_M );
+    float3 colorPow = pow(ST2084Color, 1.f / PQ_constant_M );
     float3 numerator = max(colorPow - PQ_constant_C1, 0.f);
     float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
     float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_N);
