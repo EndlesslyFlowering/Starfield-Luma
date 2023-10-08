@@ -3,7 +3,8 @@
 #include "RootSignature.hlsl"
 
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
-#define HDR_UI_BLEND_POW 0.775f
+// We found the best value empirically and it seems to match gamma 2.2.
+#define HDR_UI_BLEND_POW (1.f / 2.2f)
 
 struct PushConstantWrapper_ScaleformCompositeLayout
 {
@@ -43,7 +44,12 @@ float4 PS(PSInputs inputs) : SV_Target
 		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
 		// this won't ever be perfect but it's close enough for most cases.
 		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
-		UIColor.a = pow(saturate(UIColor.a), HDR_UI_BLEND_POW); //TODO: base the percentage of application of "HDR_UI_BLEND_POW" based on how black/dark the UI color is.
+#if DEVELOPMENT && 0
+		const float HDRUIBlendPow = 1.f - HdrDllPluginConstants.DevSetting02;
+#else
+		const float HDRUIBlendPow = HDR_UI_BLEND_POW;
+#endif
+		UIColor.a = pow(saturate(UIColor.a), HDRUIBlendPow); //TODO: base the percentage of application of "HDR_UI_BLEND_POW" based on how black/dark the UI color is?
 	}
 	else
 	{
