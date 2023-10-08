@@ -9,4 +9,4 @@
 		"Sampler(s0, space=8) " \
 	"), " \
 	\
-	"RootConstants(num32BitConstants=14, b3), "
+	"RootConstants(num32BitConstants=16, b3), "
