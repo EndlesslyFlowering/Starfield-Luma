@@ -10,7 +10,7 @@
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
-#define FIX_WRONG_SRGB_GAMMA_FORMULA 1
+#define FIX_WRONG_SRGB_GAMMA_FORMULA (FORCE_VANILLA_LOOK ? 0 : 1)
 
 // This disables most other features (post process, LUTs, ...)
 #define ENABLE_TONEMAP 1
@@ -20,10 +20,10 @@
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
 // 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
 //   (optimisation left if contrastIntensity doesn't go below 1)
-#define POST_PROCESS_CONTRAST_TYPE 2
+#define POST_PROCESS_CONTRAST_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
-#define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION 1
+#define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
 #define ENABLE_REPLACED_TONEMAP 1
 // Only invert highlights, which helps conserve the SDR filmic look (shadow crush) and altered colors.
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
