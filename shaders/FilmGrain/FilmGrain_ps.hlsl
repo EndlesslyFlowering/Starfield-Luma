@@ -5,8 +5,8 @@
 
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
-// 0 Vanilla, 1 New Random (no flicker/repeating), 2 New random, no raised blacks 3 Kodak Filmic
-#define FILM_GRAIN_TYPE 3
+// 1 New Random (no flicker/repeating), 2 New random, no raised blacks 3 Kodak Filmic
+#define IMPROVED_FILM_GRAIN_TYPE 3
 
 cbuffer _13_15 : register(b0, space0)
 {
@@ -65,66 +65,81 @@ void frag_main()
 		linearColor = gamma_sRGB_to_linear(inputColor);
 	}
 
-#if FILM_GRAIN_TYPE == 0
-	const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
-	const float filmGrainHalfSize = 521.f; //TODO: rename in case we keep this as 521
-	// Applying modulus against 1023 will give value between 0 and 1023
-	// Same two values for all texels this frame
-	float randomFromRange1 = float(int(uint(filmGrainColorAndIntensity.x) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
-	float randomFromRange2 = float(int(uint(filmGrainColorAndIntensity.y) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
+	float randomNumber, customMultiplier;
 
-	// Divide by 1023 to get a number between 0 and 1
-	float randomNormalized1 = randomFromRange1 * filmGrainInvSize;
-	float randomNormalized2 = randomFromRange1 * filmGrainInvSize;
+	if (HdrDllPluginConstants.FilmGrainType == 0)
+	{
+		const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
+		const float filmGrainHalfSize = 521.f; //TODO: rename in case we keep this as 521
+		// Applying modulus against 1023 will give value between 0 and 1023
+		// Same two values for all texels this frame
+		float randomFromRange1 = float(int(uint(filmGrainColorAndIntensity.x) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
+		float randomFromRange2 = float(int(uint(filmGrainColorAndIntensity.y) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
 
-	// Offset by x/y position
-	float uniqueX = randomNormalized1 + TEXCOORD.x;
-	float uniqueY = (randomNormalized2 + TEXCOORD.y) * filmGrainHalfSize;
+		// Divide by 1023 to get a number between 0 and 1
+		float randomNormalized1 = randomFromRange1 * filmGrainInvSize;
+		float randomNormalized2 = randomFromRange1 * filmGrainInvSize;
 
-	// Unique each frame and texel. (Is it though?)
-	float seed = (uniqueX + uniqueY);
+		// Offset by x/y position
+		float uniqueX = randomNormalized1 + TEXCOORD.x;
+		float uniqueY = (randomNormalized2 + TEXCOORD.y) * filmGrainHalfSize;
 
-	// Generate a random number between 0 and 1;
-	float randomNumber = bethesdaRandom(seed);
-#else
-	float randomNumber = rand(TEXCOORD.xy
-		+ frac(filmGrainColorAndIntensity.x / 2147483647.f)
-		+ frac(filmGrainColorAndIntensity.y / 2147483647.f)
-	);
-#endif // FILM_GRAIN_TYPE == 0
+		// Unique each frame and texel. (Is it though?)
+		float seed = (uniqueX + uniqueY);
+
+		// Generate a random number between 0 and 1;
+		randomNumber = bethesdaRandom(seed);
+
+		float colorLuma = Luminance(srgbColor);
+		customMultiplier = saturate(1.f - colorLuma); // inverseLuma
+	}
+	else
+	{
+		randomNumber = rand(TEXCOORD.xy
+			+ frac(filmGrainColorAndIntensity.x / 2147483647.f)
+			+ frac(filmGrainColorAndIntensity.y / 2147483647.f)
+		);
+
+#if IMPROVED_FILM_GRAIN_TYPE == 1
+		float colorLuma = Luminance(srgbColor);
+		customMultiplier = saturate(1.f - colorLuma); // inverseLuma
+#elif IMPROVED_FILM_GRAIN_TYPE == 2
+		float colorLuma = Luminance(srgbColor);
+		customMultiplier = (-2.f * (0.5f - abs(saturate(colorLuma) - 0.5f))) // Bias towards center (nothing if black or white)
+			* 3.333f; // Bump to 10%
+#elif IMPROVED_FILM_GRAIN_TYPE == 3
+		float colorY = Luminance(linearColor);
+		float midToneStart = 0.022f; // Kodak Gray Scale B (Shadow)
+		float midToneMid = 0.178f; // Kodak Gray Scale M (Gray)
+		float midToneEnd = 0.891f; // Kodak Gray Scale A (Highlight)
+		float midPointScaling;
+		if (colorY > midToneStart && colorY < midToneEnd)
+		{
+			if (colorY < midToneMid)
+			{
+				// Lerp?
+				midPointScaling = linearNormalization(colorY, midToneStart, midToneMid, 0.f, 1.f);
+			}
+			else
+			{
+				// Lerp?
+				midPointScaling = linearNormalization(colorY, midToneMid, midToneEnd, 1.f, 0.f);
+			}
+		}
+		else
+		{
+			midPointScaling = 0.f;
+		}
+		customMultiplier = midPointScaling
+			* 3.333f; // Bump to 10%
+#endif
+	}
+
 	// luminanceShift at -1 is black, 0 unchanged, 1 negative of current texel
 	float luminanceShift = (randomNumber * 2.f) - 1.f;
 
-#if FILM_GRAIN_TYPE == 0 || FILM_GRAIN_TYPE == 1
-	float colorLuma = Luminance(srgbColor);
-	float customMulitplier = saturate(1.f - colorLuma); // inverseLuma
-#elif FILM_GRAIN_TYPE == 2
-	float colorLuma = Luminance(srgbColor);
-	float customMulitplier = (-2.f * (0.5f - abs(saturate(colorLuma) - 0.5f))) // Bias towards center (nothing if black or white)
-		* 3.333f; // Bump to 10%
-#elif FILM_GRAIN_TYPE == 3
-	float colorY = Luminance(linearColor);
-	float midToneStart = 0.022f; // Kodak Gray Scale B (Shadow)
-	float midToneMid = 0.178f; // Kodak Gray Scale M (Gray)
-	float midToneEnd = 0.891f; // Kodak Gray Scale A (Highlight)
-	float midPointScaling;
-	if (colorY > midToneStart && colorY < midToneEnd) {
-		if (colorY < midToneMid) {
-			// Lerp?
-			midPointScaling = linearNormalization(colorY, midToneStart, midToneMid, 0.f, 1.f); 
-		} else {
-			// Lerp?
-			midPointScaling = linearNormalization(colorY, midToneMid, midToneEnd, 1.f, 0.f); 
-		}
-	} else {
-		midPointScaling = 0.f;
-	}
-	float customMulitplier = midPointScaling
-			* 3.333f; // Bump to 10%
 
-#endif // FILM_GRAIN_TYPE != 2
-
-	float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * customMulitplier);
+	float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * customMultiplier);
 	float3 newColor = float3(additiveFilmGrain, additiveFilmGrain,additiveFilmGrain);
 
 	// Use addition to overlay color on top

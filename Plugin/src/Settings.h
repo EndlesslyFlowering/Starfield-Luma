@@ -24,7 +24,7 @@ namespace Settings
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
 		kFilmGrainType,
-		kPostSharpening,
+		kPostSharpen,
 
 		kEND,
 
@@ -45,20 +45,22 @@ namespace Settings
 	struct Checkbox : Setting
 	{
 	    Boolean value;
+		bool defaultValue;
 	};
 
 	struct Stepper : Setting
 	{
 		Integer value;
+		int32_t defaultValue;
 		std::vector<std::string> optionNames;
 	};
 
 	struct Slider : Setting
 	{
 	    Double value;
+		float  defaultValue;
 		float sliderMin;
 		float sliderMax;
-		float defaultValue;
 
 		float GetSliderPercentage() const;
 		std::string GetSliderText() const;
@@ -78,7 +80,7 @@ namespace Settings
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		uint32_t FilmGrainType;
-		uint32_t PostSharpening;
+		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
 		float    DevSetting01;
 		float    DevSetting02;
@@ -91,18 +93,86 @@ namespace Settings
     class Main : public DKUtil::model::Singleton<Main>
     {
     public:
-		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB. HDR scRGB offers the highest quality but might not be compatible with technologies like DLSS Super Resolution", { "DisplayMode", "Main" }, { "SDR", "HDR10", "HDR scRGB" } };
+		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation", { "DisplayMode", "Main" }, 0, { "SDR", "HDR10", "HDR scRGB" } };
 
-		Slider PeakBrightness{ SettingID::kHDR_PeakBrightness, "Peak Brightness", "Sets the peak nits brightness in HDR modes, this should match your display peak brightness. This will not influence the game average brightness", { "PeakBrightness", "HDR" }, 80.f, 10000.f, 1000.f };
-		Slider GamePaperWhite{ SettingID::kHDR_GamePaperWhite, "Game Paper White", "Sets the game paper white nits brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness. Change it to what looks best to you, the reference default is 203", { "GamePaperWhite", "HDR" }, 80.f, 500.f, 203.f };
-		Slider UIPaperWhite{ SettingID::kHDR_UIPaperWhite, "UI Paper White", "Sets the UI paper white nits brightness in HDR modes. Change it to what looks best to you, the reference default is 203", { "UIPaperWhite", "HDR" }, 80.f, 500.f, 203.f };
-		Slider Saturation{ SettingID::kHDR_Saturation, "Saturation", "Sets the saturation strength in HDR modes (only applies if \"LUT Correction\" is on) (neutral at 50)", { "Saturation", "HDR" }, 0.f, 100.f, 50.f };
-		Slider Contrast{ SettingID::kHDR_Contrast, "Contrast", "Sets the contrast strength in HDR modes (neutral at 50)", { "Contrast", "HDR" }, 0.f, 100.f, 50.f };
-		Slider LUTCorrectionStrength{ SettingID::kLUTCorrectionStrength, "LUT Correction Strength", "Sets the LUT correction (normalization) strength, this removes the fogginess from the game vanilla LUTs", { "LUTCorrectionStrength", "Main" }, 0.f, 100.f, 100.f };
-		Slider ColorGradingStrength{ SettingID::kColorGradingStrength, "Color Grading Strength", "Sets the color grading strength (e.g. it disables LUTs)", { "ColorGradingStrength", "Main" }, 0.f, 100.f, 100.f };
-		Stepper FilmGrainType{ SettingID::kFilmGrainType, "Film Grain Type", "Change the Film Grain type, pick the one that looks best to you", { "FilmGrainType", "Main" }, { "Vanilla", "Improved" } };
-		Stepper PostSharpening{ SettingID::kPostSharpening, "Post Sharpening", "Allows you to disable the game default forced post sharpening pass", { "PostSharpening", "Main" }, { "Off", "On" } };
-
+		Slider PeakBrightness{
+			SettingID::kHDR_PeakBrightness,
+			"Peak Brightness",
+			"Sets the peak brightness in HDR modes, this should match your display peak brightness. This will not influence the game average brightness.",
+			{ "PeakBrightness", "HDR" },
+			1000.f,
+		    80.f,
+			10000.f
+		};
+		Slider GamePaperWhite{
+			SettingID::kHDR_GamePaperWhite,
+			"Game Paper White",
+			"Sets the game paper white brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness. The reference default is 203.",
+			{ "GamePaperWhite", "HDR" },
+			203.f,
+		    80.f,
+			500.f
+		};
+		Slider UIPaperWhite{
+			SettingID::kHDR_UIPaperWhite,
+			"UI Paper White",
+			"Sets the UI paper white brightness in HDR modes. The reference default is 203.",
+			{ "UIPaperWhite", "HDR" },
+			203.f,
+			80.f,
+			500.f
+		};
+		Slider   Saturation{
+		    SettingID::kHDR_Saturation,
+		    "Saturation",
+		    "Sets the saturation strength in HDR modes with \"LUT Correction\" enabled. Neutral default at 50.",
+		    { "Saturation", "HDR" },
+		    50.f,
+		    0.f,
+		    100.f
+		};
+		Slider   Contrast{
+		    SettingID::kHDR_Contrast,
+		    "Contrast",
+		    "Sets the contrast strength in HDR modes. Neutral default at 50.",
+		    { "Contrast", "HDR" },
+		    50.f,
+		    0.f,
+		    100.f
+		};
+		Slider   LUTCorrectionStrength{
+		    SettingID::kLUTCorrectionStrength,
+		    "LUT Correction Strength",
+		    "Sets the LUT correction (normalization) strength. This removes the fogginess from the game vanilla LUTs.",
+		    { "LUTCorrectionStrength", "Main" },
+		    100.f,
+		    0.f,
+		    100.f
+		};
+		Slider   ColorGradingStrength{
+		    SettingID::kColorGradingStrength,
+		    "Color Grading Strength",
+		    "Sets the color grading strength - how much the LUTs influence the final image.",
+		    { "ColorGradingStrength", "Main" },
+		    100.f,
+		    0.f,
+		    100.f
+		};
+		Stepper  FilmGrainType{
+		    SettingID::kFilmGrainType,
+		    "Film Grain Type",
+		    "Sets the film grain type.",
+		    { "FilmGrainType", "Main" },
+		    1,
+		    { "Vanilla", "Improved" }
+		};
+		Checkbox PostSharpen{
+			SettingID::kPostSharpen,
+			"Post Sharpening",
+			"Enables the game default forced post sharpen pass.",
+			{ "PostSharpen", "Main" },
+			true,
+		};
 #if 1
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", { "DevSetting01", "Dev" }, 0.f, 100.f, 0.f };
 		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", { "DevSetting02", "Dev" }, 0.f, 100.f, 0.f };
@@ -127,6 +197,17 @@ namespace Settings
 	static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
 
 	// settings reshade overlay
+	inline bool DrawReshadeCheckbox(Settings::Main* a_settings, Checkbox& a_checkbox)
+	{
+		bool tempValue = *a_checkbox.value;
+		if (ImGui::Checkbox(a_checkbox.name.c_str(), &tempValue)) {
+			*a_checkbox.value = tempValue;
+			a_settings->Save();
+			return true;
+		}
+		return false;
+	}
+
 	inline bool DrawReshadeStepper(Settings::Main* a_settings, Stepper& a_stepper)
     {
 		int tempValue = *a_stepper.value;
@@ -169,8 +250,8 @@ namespace Settings
 		DrawReshadeSlider(settings, settings->Contrast);
 		DrawReshadeSlider(settings, settings->LUTCorrectionStrength);
 		DrawReshadeSlider(settings, settings->ColorGradingStrength);
-		DrawReshadeSlider(settings, settings->FilmGrainType);
-		DrawReshadeSlider(settings, settings->DisablePostSharpening);
+		DrawReshadeStepper(settings, settings->FilmGrainType);
+		DrawReshadeCheckbox(settings, settings->PostSharpen);
 #if 1
 		DrawReshadeSlider(settings, settings->DevSetting01);
 		DrawReshadeSlider(settings, settings->DevSetting02);

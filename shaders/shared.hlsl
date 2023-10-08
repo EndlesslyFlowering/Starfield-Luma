@@ -34,8 +34,8 @@ struct StructHdrDllPluginConstants
 	float HDRSecondaryContrast; // 1 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
-	uint FilmGrainType; // 0 is default
-	uint PostSharpening; // true is default
+	uint FilmGrainType; // 1 is default
+	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
 	float DevSetting01; // 0-1 variable for development
 	float DevSetting02; // 0-1 variable for development
