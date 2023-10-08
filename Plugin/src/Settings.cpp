@@ -66,6 +66,9 @@ namespace Settings
 			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
 			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config.Bind(DevSetting02.value, DevSetting02.defaultValue);
+			config.Bind(DevSetting03.value, DevSetting03.defaultValue);
+			config.Bind(DevSetting04.value, DevSetting04.defaultValue);
+			config.Bind(DevSetting05.value, DevSetting05.defaultValue);
 			config.Bind(RenderTargetsToUpgrade,
 			    "ImageSpaceBuffer",
 				"ScaleformCompositeBuffer",

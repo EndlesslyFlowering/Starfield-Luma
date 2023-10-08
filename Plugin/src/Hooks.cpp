@@ -104,6 +104,7 @@ namespace Hooks
 		const auto settings = Settings::Main::GetSingleton();
 
 		CreateSeparator(a_settingList, Settings::SettingID::kSTART);
+
 		CreateStepperSetting(a_settingList, settings->DisplayMode, true);
 		CreateSliderSetting(a_settingList, settings->PeakBrightness, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->GamePaperWhite, settings->IsHDREnabled());
@@ -112,11 +113,89 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
-#if 1
-		CreateSliderSetting(a_settingList, settings->DevSetting01, true);
-		CreateSliderSetting(a_settingList, settings->DevSetting02, true);
-#endif
+
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
+    }
+
+    void Hooks::UploadRootConstants(void* a1, void* a2)
+    {
+		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8);
+		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x78);
+
+		auto uploadRootConstants = [&](uint32_t RootParameterIndex, bool Compute) {
+			auto       commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
+			const auto settings = Settings::Main::GetSingleton();
+
+			// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
+			const Settings::ShaderConstants data{
+				static_cast<uint32_t>(*settings->DisplayMode.value),
+				bIsAtEndOfFrame.load(),
+				static_cast<float>(*settings->PeakBrightness.value),
+				static_cast<float>(*settings->GamePaperWhite.value),
+				static_cast<float>(*settings->UIPaperWhite.value),
+				static_cast<float>(*settings->Saturation.value * 0.02f),             // 0-100 to 0-2
+				static_cast<float>(*settings->Contrast.value * 0.02f),               // 0-100 to 0-2
+				static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),  // 0-100 to 0-1
+				static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),   // 0-100 to 0-1
+				static_cast<float>(*settings->DevSetting01.value * 0.01f),           // 0-100 to 0-1
+				static_cast<float>(*settings->DevSetting02.value * 0.01f),           // 0-100 to 0-1
+				static_cast<float>(*settings->DevSetting03.value * 0.01f),           // 0-100 to 0-1
+				static_cast<float>(*settings->DevSetting04.value * 0.01f),           // 0-100 to 0-1
+				static_cast<float>(*settings->DevSetting05.value * 0.01f)            // 0-100 to 0-1
+			};
+
+			if (!Compute)
+				commandList->SetGraphicsRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
+			else
+				commandList->SetComputeRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
+		};
+
+		// Note: The following switch statement may be called several thousand times per frame. Additionally, it'll be called from multiple
+		// threads concurrently. The individual cases are called at most once or twice per frame. Keep the amount of code here fairly light.
+		//
+		// RootParameterIndex is the index of our custom RootConstants() entry in the root signature. It's taken from the corresponding
+		// RootSignature.hlsl file stored next to each technique hlsl file.
+		switch (techniqueId) {
+		case 0xFF1A:
+		case 0x600FF1A:
+		case 0x700FF1A:
+		//case 0x800FF1A:
+		case 0xE00FF1A:
+		case 0xF00FF1A:
+			uploadRootConstants(14, false);  // HDRComposite
+			break;
+
+		case 0x400FF59:
+		//case 0x2000FF59:
+		    uploadRootConstants(2, false);  // Copy
+			break;
+
+		case 0xFF75:
+			uploadRootConstants(2, false);  // FilmGrain
+			break;
+
+		case 0xFF81:
+			uploadRootConstants(7, true);  // ColorGradingMerge
+			break;
+
+		//case 0xFF94:
+		case 0x100FF94:
+		case 0x300FF94:
+			uploadRootConstants(14, true);  // ContrastAdaptiveSharpening
+			break;
+
+		case 0xFF9A:
+			uploadRootConstants(14, false);  // PostSharpen
+			break;
+
+		case 0xFFAA:
+			uploadRootConstants(2, false);  // ScaleformComposite
+			break;
+
+		case 0xFFAB:
+			uploadRootConstants(1, false);  // BinkMovie
+			break;
+		}
     }
 
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
@@ -244,94 +323,44 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
 			break;
-		case static_cast<int>(Settings::SettingID::kDevSetting01):
-			HandleSetting(settings->DevSetting01);
-			break;
-		case static_cast<int>(Settings::SettingID::kDevSetting02):
-			HandleSetting(settings->DevSetting02);
-			break;
 		}
 
 		_SettingsDataModelFloatEvent(a_arg1, a_eventData);
     }
 
-	bool Hooks::Hook_ApplyRenderPassRenderState(void* a_arg1, void* a_arg2)
+	bool Hooks::Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2)
 	{
-		const bool result = _ApplyRenderPassRenderState(a_arg1, a_arg2);
+		const bool result = _ApplyRenderPassRenderState1(a_arg1, a_arg2);
 
 		if (result) {
-			const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg2) + 0x8);
-			const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x78);
-
-			auto uploadRootConstants = [&](uint32_t RootParameterIndex, bool Compute) {
-				auto       commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_arg1) + 0x10);
-				const auto settings = Settings::Main::GetSingleton();
-
-				// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
-				const Settings::ShaderConstants data {
-					static_cast<uint32_t>(*settings->DisplayMode.value),
-					static_cast<float>(*settings->PeakBrightness.value),
-					static_cast<float>(*settings->GamePaperWhite.value),
-					static_cast<float>(*settings->UIPaperWhite.value),
-					static_cast<float>(*settings->Saturation.value * 0.02f), // 0-100 to 0-2
-					static_cast<float>(*settings->Contrast.value * 0.02f), // 0-100 to 0-2
-					static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f), // 0-100 to 0-1
-					static_cast<float>(*settings->ColorGradingStrength.value * 0.01f), // 0-100 to 0-1
-					static_cast<float>(*settings->DevSetting01.value * 0.01f), // 0-100 to 0-1
-					static_cast<float>(*settings->DevSetting02.value * 0.01f) // 0-100 to 0-1
-				};
-
-				if (!Compute)
-					commandList->SetGraphicsRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
-				else
-					commandList->SetComputeRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
-			};
-
-			// Note: The following switch statement may be called several thousand times per frame. Additionally, it'll be called from multiple
-			// threads concurrently. The individual cases are called at most once or twice per frame. Keep the amount of code here fairly light.
-			//
-			// RootParameterIndex is the index of our custom RootConstants() entry in the root signature. It's taken from the corresponding
-			// RootSignature.hlsl file stored next to each technique hlsl file.
-			switch (techniqueId) {
-			case 0xFF1A:
-			case 0x600FF1A:
-			case 0x700FF1A:
-			//case 0x800FF1A:
-			case 0xE00FF1A:
-			case 0xF00FF1A:
-				uploadRootConstants(14, false); // HDRComposite
-				break;
-
-			case 0xFF75:
-				uploadRootConstants(2, false);  // FilmGrain
-				break;
-
-			case 0xFF81:
-				uploadRootConstants(7, true);  // ColorGradingMerge
-				break;
-
-			//case 0xFF94:
-			case 0x100FF94:
-			case 0x300FF94:
-				uploadRootConstants(14, true);  // ContrastAdaptiveSharpening
-				break;
-
-			case 0xFF9A:
-				uploadRootConstants(14, false);  // PostSharpen
-				break;
-
-			case 0xFFAA:
-				uploadRootConstants(2, false);  // ScaleformComposite
-				break;
-
-			case 0xFFAB:
-				uploadRootConstants(1, false);  // BinkMovie
-				break;
-			}
+			UploadRootConstants(a_arg1, a_arg2);
 		}
 
 		return result;
 	}
+
+    bool Hooks::Hook_ApplyRenderPassRenderState2(void* a_arg1, void* a_arg2)
+    {
+		const bool result = _ApplyRenderPassRenderState2(a_arg1, a_arg2);
+
+		if (result) {
+			UploadRootConstants(a_arg1, a_arg2);
+		}
+
+		return result;
+    }
+
+    void Hooks::Hook_EndOfFrame(void* a1, void* a2, const char* a3)
+    {
+		bIsAtEndOfFrame.store(true);
+		_EndOfFrame(a1, a2, a3);
+    }
+
+    void Hooks::Hook_PostEndOfFrame(void* a1)
+    {
+		_PostEndOfFrame(a1);
+		bIsAtEndOfFrame.store(false);
+    }
 
     void Install()
 	{
