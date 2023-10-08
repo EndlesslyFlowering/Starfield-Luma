@@ -113,6 +113,8 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
+		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
+		CreateStepperSetting(a_settingList, settings->PostSharpening, true);
 
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
@@ -129,7 +131,6 @@ namespace Hooks
 			// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
 			const Settings::ShaderConstants data{
 				static_cast<uint32_t>(*settings->DisplayMode.value),
-				bIsAtEndOfFrame.load(),
 				static_cast<float>(*settings->PeakBrightness.value),
 				static_cast<float>(*settings->GamePaperWhite.value),
 				static_cast<float>(*settings->UIPaperWhite.value),
@@ -137,6 +138,9 @@ namespace Hooks
 				static_cast<float>(*settings->Contrast.value * 0.02f),               // 0-100 to 0-2
 				static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),  // 0-100 to 0-1
 				static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),   // 0-100 to 0-1
+				static_cast<uint32_t>(*settings->FilmGrainType.value),
+				static_cast<bool>(*settings->PostSharpening.value),
+				bIsAtEndOfFrame.load(),
 				static_cast<float>(*settings->DevSetting01.value * 0.01f),           // 0-100 to 0-1
 				static_cast<float>(*settings->DevSetting02.value * 0.01f),           // 0-100 to 0-1
 				static_cast<float>(*settings->DevSetting03.value * 0.01f),           // 0-100 to 0-1
@@ -322,6 +326,12 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
+			break;
+		case static_cast<int>(Settings::SettingID::kFilmGrainType):
+			HandleSetting(settings->FilmGrainType);
+			break;
+		case static_cast<int>(Settings::SettingID::kPostSharpening):
+			HandleSetting(settings->PostSharpening);
 			break;
 		}
 

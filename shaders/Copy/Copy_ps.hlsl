@@ -16,7 +16,7 @@ float4 PS(PSInputs inputs) : SV_Target
 {
 	float4 color = inputTexture.Sample(inputSampler, float2(inputs.uv.x, inputs.uv.y));
 
-    if (HdrDllPluginConstants.DisplayMode == 1 && HdrDllPluginConstants.bIsAtEndOfFrame)
+    if (HdrDllPluginConstants.DisplayMode == 1 && HdrDllPluginConstants.IsAtEndOfFrame)
 	{
         float3 pq = linear_to_PQ(color.rgb);
         color.rgb = pq.rgb;
