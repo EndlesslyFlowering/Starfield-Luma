@@ -193,7 +193,8 @@ float3 Hable(
 {
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
-	// the 2.2 is so you don't have to input very small numbers
+	// Note that all these variables can vary depending on the level.
+	// The 2.2 pow is so you don't have to input very small numbers, it's not related to gamma.
 	const float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
 	const float toeStrength      = saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
 	const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
@@ -281,12 +282,10 @@ float3 Hable(
 
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L6
 	// Eval
-	float evalY0 = 0.f;
-#if 0 // Fixes full black output in some location (due to "invScale" being 0)
-	if (params_overshootX > 0.f)
-#endif
+	float evalY0 = params_overshootY;
+	if (params_overshootX > 0.f) // log2(0) goes towards -INF, exp2(-INF) is 0. "params_overshootX" cannot be < 0 but it can occasionally be 0.
 	{
-		evalY0 = -exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + hableParams.shoulderSegment.lnA) * LOG2_E) + params_overshootY;
+		evalY0 -= exp2(((shoulderSegment_B_optimised * log2(params_overshootX)) + hableParams.shoulderSegment.lnA) * LOG2_E);
 	}
 	// Eval end
 	hableParams.invScale = 1.f / evalY0;
