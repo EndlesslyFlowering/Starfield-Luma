@@ -1,11 +1,12 @@
+#include "../math.hlsl"
 #include "../shared.hlsl"
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
-// 0 Vanilla, 1 New Random (no flicker/repeating), 2 New random, no raised blacks
-#define FILM_GRAIN_TYPE 2
+// 0 Vanilla, 1 New Random (no flicker/repeating), 2 New random, no raised blacks 3 Kodak Filmic
+#define FILM_GRAIN_TYPE 3
 
 cbuffer _13_15 : register(b0, space0)
 {
@@ -50,14 +51,19 @@ void frag_main()
 //   .y = randomInt32? changed every frame?
 //   .z = Film Grading Intensity (0 - 0.03)
 
-	float3 tonemappedColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
+	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
 	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+	// sRGBColor gets the luminance shift
+	float3 srgbColor = inputColor;
+	// linearColor is used to compute Y
+	float3 linearColor = inputColor;
+	
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
-		tonemappedColor /= paperWhite;
-		tonemappedColor = gamma_linear_to_sRGB(tonemappedColor);
+		srgbColor = gamma_linear_to_sRGB(inputColor / paperWhite);
+	} else {
+		linearColor = gamma_sRGB_to_linear(inputColor);
 	}
-float colorY = Luminance(tonemappedColor);
 
 #if FILM_GRAIN_TYPE == 0
 	const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
@@ -86,30 +92,50 @@ float colorY = Luminance(tonemappedColor);
 		+ frac(filmGrainColorAndIntensity.y / 2147483647.f)
 	);
 #endif // FILM_GRAIN_TYPE == 0
-
-#if FILM_GRAIN_TYPE != 2
-	float inverseLuminance = saturate(1.f - colorY);
 	// luminanceShift at -1 is black, 0 unchanged, 1 negative of current texel
 	float luminanceShift = (randomNumber * 2.f) - 1.f;
-	float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * inverseLuminance);
-#else
-	float additiveFilmGrain = ((randomNumber * 2.f) - 1.f) // (-1 to 1)
-		* (2.f * (0.5f - abs(saturate(colorY) - 0.5f))) // Bias towards center (nothing if black or white)
-		* filmGrainColorAndIntensity.z
-		* 3.333f;
+
+#if FILM_GRAIN_TYPE == 0 || FILM_GRAIN_TYPE == 1
+	float colorLuma = Luminance(srgbColor);
+	float customMulitplier = saturate(1.f - colorLuma); // inverseLuma
+#elif FILM_GRAIN_TYPE == 2
+	float colorLuma = Luminance(srgbColor);
+	float customMulitplier = (-2.f * (0.5f - abs(saturate(colorLuma) - 0.5f))) // Bias towards center (nothing if black or white)
+		* 3.333f; // Bump to 10%
+#elif FILM_GRAIN_TYPE == 3
+	float colorY = Luminance(linearColor);
+	float midToneStart = 0.022f; // Kodak Gray Scale B (Shadow)
+	float midToneMid = 0.178f; // Kodak Gray Scale M (Gray)
+	float midToneEnd = 0.891f; // Kodak Gray Scale A (Highlight)
+	float midPointScaling;
+	if (colorY > midToneStart && colorY < midToneEnd) {
+		if (colorY < midToneMid) {
+			// Lerp?
+			midPointScaling = linearNormalization(colorY, midToneStart, midToneMid, 0.f, 1.f); 
+		} else {
+			// Lerp?
+			midPointScaling = linearNormalization(colorY, midToneMid, midToneEnd, 1.f, 0.f); 
+		}
+	} else {
+		midPointScaling = 0.f;
+	}
+	float customMulitplier = midPointScaling
+			* 3.333f; // Bump to 10%
+
 #endif // FILM_GRAIN_TYPE != 2
 
+	float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * customMulitplier);
 	float3 newColor = float3(additiveFilmGrain, additiveFilmGrain,additiveFilmGrain);
 
 	// Use addition to overlay color on top
 	// Note: we let this possibly generate colors below 1 for scRGB
-	float3 tonemappedColorWithFilmGrain = tonemappedColor + newColor;
+	float3 tonemappedColorWithFilmGrain = srgbColor + newColor;
 
 
 #if 0 // WIP fixes
 	// Right side only
 	if (TEXCOORD.x < 0.5f) {
-		tonemappedColorWithFilmGrain = tonemappedColor;
+		tonemappedColorWithFilmGrain = inputColor;
 	}
 #endif
 
