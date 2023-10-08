@@ -4,6 +4,7 @@
 
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 // We found the best value empirically and it seems to match gamma 2.2.
+// Note that this make the look more towards SDR sRGB gamma blends when the background is white and the UI is dark, but in the opposite case, it will have the inverse effect (or something like that).
 #define HDR_UI_BLEND_POW (1.f / 2.2f)
 
 struct PushConstantWrapper_ScaleformCompositeLayout
