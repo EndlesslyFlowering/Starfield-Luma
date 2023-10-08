@@ -9,6 +9,8 @@ Contrast = 50.0
 DisplayMode = 2
 ColorGradingStrength = 100.0
 LUTCorrectionStrength = 100.0
+FilmGrainType = 0
+PostSharpening = true
 
 [Dev]
 DevSetting01 = 0.0

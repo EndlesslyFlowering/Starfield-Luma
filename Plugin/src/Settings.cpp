@@ -64,6 +64,8 @@ namespace Settings
 			config.Bind(Contrast.value, Contrast.defaultValue);
 			config.Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
 			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
+			config.Bind(FilmGrainType.value, FilmGrainType.defaultValue);
+			config.Bind(PostSharpening.value, PostSharpening.defaultValue);
 			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config.Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config.Bind(DevSetting03.value, DevSetting03.defaultValue);
