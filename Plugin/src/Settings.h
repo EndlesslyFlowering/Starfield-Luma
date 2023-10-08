@@ -23,10 +23,14 @@ namespace Settings
 		kHDR_Contrast,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
+
+		kEND,
+
 		kDevSetting01,
 		kDevSetting02,
-
-		kEND
+		kDevSetting03,
+		kDevSetting04,
+		kDevSetting05,
     };
 
 	struct Setting
@@ -63,6 +67,7 @@ namespace Settings
 	struct ShaderConstants
 	{
 		uint32_t DisplayMode;
+		bool     bIsAtEndOfFrame;
 		float    PeakBrightness;
 		float    GamePaperWhite;
 		float    UIPaperWhite;
@@ -72,8 +77,11 @@ namespace Settings
 		float    ColorGradingStrength;
 		float    DevSetting01;
 		float    DevSetting02;
+		float    DevSetting03;
+		float    DevSetting04;
+		float    DevSetting05;
 	};
-	static inline uint32_t shaderConstantsSize = 10;
+	static inline uint32_t shaderConstantsSize = 14;
 
     class Main : public DKUtil::model::Singleton<Main>
     {
@@ -90,6 +98,9 @@ namespace Settings
 #if 1
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", { "DevSetting01", "Dev" }, 0.f, 100.f, 0.f };
 		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", { "DevSetting02", "Dev" }, 0.f, 100.f, 0.f };
+		Slider DevSetting03{ SettingID::kDevSetting03, "DevSetting03", "Development setting", { "DevSetting03", "Dev" }, 0.f, 100.f, 0.f };
+		Slider DevSetting04{ SettingID::kDevSetting04, "DevSetting04", "Development setting", { "DevSetting04", "Dev" }, 0.f, 100.f, 0.f };
+		Slider DevSetting05{ SettingID::kDevSetting05, "DevSetting05", "Development setting", { "DevSetting05", "Dev" }, 0.f, 100.f, 0.f };
 #endif
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
 
@@ -153,6 +164,9 @@ namespace Settings
 #if 1
 		DrawReshadeSlider(settings, settings->DevSetting01);
 		DrawReshadeSlider(settings, settings->DevSetting02);
+		DrawReshadeSlider(settings, settings->DevSetting03);
+		DrawReshadeSlider(settings, settings->DevSetting04);
+		DrawReshadeSlider(settings, settings->DevSetting05);
 #endif
 	}
 
@@ -161,9 +175,13 @@ namespace Settings
 	static void RegisterReshadeOverlay()
 	{
 		if (!bReshadeSettingsOverlayRegistered) {
-			if (reshade::register_addon(GetModuleHandle(L"NativeHDR"))) {
-				reshade::register_overlay("NativeHDR Settings", &DrawSettingsReshade);
-				bReshadeSettingsOverlayRegistered = true;
+			HMODULE hModule = nullptr;
+			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(Main::GetSingleton()), &hModule);
+			if (hModule) {
+				if (reshade::register_addon(hModule)) {
+					reshade::register_overlay("NativeHDR Settings", &DrawSettingsReshade);
+					bReshadeSettingsOverlayRegistered = true;
+				}
 			}
 		}
 	}

@@ -14,6 +14,9 @@ $main =
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "E00FF1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "F00FF1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
 
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "400FF59"
+	#Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "2000FF59"
+
 	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "FF75" -Entry "main"
 
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF81"
