@@ -47,19 +47,20 @@ struct PSOutput
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
 {
-#if 0
+#if 0 // Disable post sharpen
 	float3 outColor = TonemappedColorTexture.Sample(Sampler0, psInput.TEXCOORD.xy).rgb;
 #else
 	float3 inColor = TonemappedColorTexture.Sample(Sampler0, psInput.TEXCOORD.xy).rgb;
-	if (HdrDllPluginConstants.DisplayMode <= 0)
-	{
-		inColor = GAMMA_TO_LINEAR(inColor);
-	}
 	float3 outColor = inColor;
 	float4 sharpenParams = PcwPostSharpen.params0;
 	float sharpenIntensity = sharpenParams.z;
-	if (sharpenIntensity > 0.f)
+	if (sharpenIntensity > 0.f && sharpenIntensity != 1.f)
 	{
+		// Sharpening is best done in linear space, even if Bethesda made in gamma space
+		if (HdrDllPluginConstants.DisplayMode <= 0)
+		{
+			inColor = GAMMA_TO_LINEAR(inColor);
+		}
 		float _70 = ((_15_m0[161u].z * psInput.TEXCOORD.x) * sharpenParams.x) + 0.5f;
 		float _72 = ((_15_m0[161u].w * psInput.TEXCOORD.y) * sharpenParams.y) + 0.5f;
 		float _76 = frac(_70);
@@ -89,13 +90,21 @@ PSOutput PS(PSInput psInput)
 			_162 = GAMMA_TO_LINEAR(_162);
 			_167 = GAMMA_TO_LINEAR(_167);
 		}
-		float3 sharpenedColor = (((_167 * _98) + (_162 * _87)) * _136) + (((_157 * _98) + (_152 * _87)) * _125);
-		// It seems controls the amount of (manaually done) bilinear filtering vs nearest neightbor, so full sharpening is just bilinear
-		outColor = lerp(sharpenedColor, inColor, sharpenIntensity);
-	}
-	if (HdrDllPluginConstants.DisplayMode <= 0)
-	{
-		outColor = LINEAR_TO_GAMMA(outColor);
+		float3 unsharpenedColor = (((_167 * _98) + (_162 * _87)) * _136) + (((_157 * _98) + (_152 * _87)) * _125);
+		// Controls the amount of a custom blurred bilinear filtering vs HW bilinear (which is blurry if there's upscaling),
+		// by lerping beyond 1 in the opposite direction of the blurred image, we apply sharpening.
+		outColor = lerp(unsharpenedColor, inColor, sharpenIntensity);
+#if CLAMP_INPUT_OUTPUT
+		// Note: the sharpening multiplication above generates arbitrary colors and shifts the hue to be invalid
+		if (Luminance(outColor) < 0.f)
+		{
+			outColor = 0.f;
+		}
+#endif
+		if (HdrDllPluginConstants.DisplayMode <= 0)
+		{
+			outColor = LINEAR_TO_GAMMA(outColor);
+		}
 	}
 #endif
 	PSOutput psOutput;
