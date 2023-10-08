@@ -189,7 +189,7 @@ T ACESParametric_Inverse(T Color, float modE, float modA)
 // This is NOT the Uncharted 2 tonemapper, which was also by Hable.
 float3 Hable(
 	in  float3         InputColor,
-	out HableParamters hableParams)
+	out HableParameters hableParams)
 {
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
@@ -312,7 +312,7 @@ float3 Hable(
 				returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA_optimised);
 			}
 		}
-		// Highlight
+		// Shoulder (highlight)
 		else
 		{
 			// Note that this will "clip" to 1 way before +INF
@@ -354,7 +354,7 @@ float HableEval_Inverse(
 
 void Hable_Inverse_Channel(
 	inout float          ColorChannel,
-	in    HableParamters hableParams)
+	in    HableParameters hableParams)
 {
 	// scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
 	// toe
@@ -400,7 +400,7 @@ template<class T>
 T Hable_Inverse(
 	T              InputColor,
 	uint           Channels /*1 to 3*/, //there has to be better solution than this
-	HableParamters hableParams)
+	HableParameters hableParams)
 {
 	// There's no inverse formula for colors beyond the 0-1 range
 	InputColor = saturate(InputColor);
@@ -826,7 +826,7 @@ PSOutput PS(PSInput psInput)
 	float acesParam_modE;
 	float acesParam_modA;
 
-	HableParamters hableParams;
+	HableParameters hableParams;
 
 	const bool clampACES = false;
 
@@ -998,9 +998,6 @@ PSOutput PS(PSInput psInput)
 
 #if CLAMP_INPUT_OUTPUT
 		outputColor = clamp(outputColor, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
-#else
-		if (Luminance(outputColor) < 0.f)
-			outputColor = 0.f;
 #endif // CLAMP_INPUT_OUTPUT
 	}
 	else // SDR
@@ -1019,6 +1016,11 @@ PSOutput PS(PSInput psInput)
 		outputColor = saturate(outputColor);
 #endif // CLAMP_INPUT_OUTPUT
 	}
+
+#if !CLAMP_INPUT_OUTPUT
+	if (Luminance(outputColor) < 0.f) // Remove invalid colors
+		outputColor = 0.f;
+#endif
 
 	PSOutput psOutput;
 	psOutput.SV_Target.rgb = outputColor;
