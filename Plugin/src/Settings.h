@@ -84,7 +84,7 @@ namespace Settings
 		uint32_t FilmGrainType;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
-		float    DeltaTime;
+		uint32_t RuntimeMS;
 		float    DevSetting01;
 		float    DevSetting02;
 		float    DevSetting03;
