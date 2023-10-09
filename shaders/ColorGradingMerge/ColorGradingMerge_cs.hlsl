@@ -177,14 +177,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// While it unclear how exactly the floor was raised, remove the tint to floor
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
 	// Sample and hold targetChroma
-	const float3 colorGain = linearNormalization<float3>(
-			neutralLUTColor,
-			0.f,
-			1.f,
-			1.f + analysis.black,
-			1.f);
+	const float3 reduceFactor = linearNormalization<float3>(
+		neutralLUTColor,
+		0.f,
+		1.f,
+		1.f / (1.f - analysis.black),
+		1.f);
 
-	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * colorGain));
+	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
 
 	// The saturation multiplier is restricted to HDR as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRLUTCorrectionSaturation, 0.f, 2.f, 0.5f, 1.5f);
@@ -193,7 +193,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
 
-	const float3 retintedColor = detintedColor * colorGain;
+	const float3 increaseFactor = linearNormalization<float3>(
+			neutralLUTColor,
+			0.f,
+			1.f,
+			1.f + analysis.black,
+			1.f);
+
+	const float3 retintedColor = detintedColor * increaseFactor;
 
 	float targetL = linear_srgb_to_oklch(retintedColor)[0];
 
