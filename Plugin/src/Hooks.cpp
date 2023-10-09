@@ -117,6 +117,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
+		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
 
@@ -128,34 +129,13 @@ namespace Hooks
 		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8);
 		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x78);
 
-		auto uploadRootConstants = [&](uint32_t RootParameterIndex, bool Compute) {
+		auto uploadRootConstants = [&](const Settings::ShaderConstants& a_shaderConstants, uint32_t a_rootParameterIndex, bool a_bCompute) {
 			auto       commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
-			const auto settings = Settings::Main::GetSingleton();
 
-			// This can be any data type, even a struct. It just has to match StructHdrDllPluginConstants in HLSL.
-			const Settings::ShaderConstants data{
-				static_cast<uint32_t>(*settings->DisplayMode.value),
-				static_cast<float>(*settings->PeakBrightness.value),
-				static_cast<float>(*settings->GamePaperWhite.value),
-				static_cast<float>(*settings->UIPaperWhite.value),
-				static_cast<float>(*settings->Saturation.value * 0.02f),             // 0-100 to 0-2
-				static_cast<float>(*settings->Contrast.value * 0.02f),               // 0-100 to 0-2
-				static_cast<float>(*settings->LUTCorrectionStrength.value * 0.01f),  // 0-100 to 0-1
-				static_cast<float>(*settings->ColorGradingStrength.value * 0.01f),   // 0-100 to 0-1
-				static_cast<uint32_t>(*settings->FilmGrainType.value),
-				static_cast<uint32_t>(*settings->PostSharpen.value),
-				static_cast<uint32_t>(bIsAtEndOfFrame.load()),
-				static_cast<float>(*settings->DevSetting01.value * 0.01f),           // 0-100 to 0-1
-				static_cast<float>(*settings->DevSetting02.value * 0.01f),           // 0-100 to 0-1
-				static_cast<float>(*settings->DevSetting03.value * 0.01f),           // 0-100 to 0-1
-				static_cast<float>(*settings->DevSetting04.value * 0.01f),           // 0-100 to 0-1
-				static_cast<float>(*settings->DevSetting05.value * 0.01f)            // 0-100 to 0-1
-			};
-
-			if (!Compute)
-				commandList->SetGraphicsRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
+			if (!a_bCompute)
+				commandList->SetGraphicsRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsSize, &a_shaderConstants, 0);
 			else
-				commandList->SetComputeRoot32BitConstants(RootParameterIndex, Settings::shaderConstantsSize, &data, 0);
+				commandList->SetComputeRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsSize, &a_shaderConstants, 0);
 		};
 
 		// Note: The following switch statement may be called several thousand times per frame. Additionally, it'll be called from multiple
@@ -170,39 +150,76 @@ namespace Hooks
 		//case 0x800FF1A:
 		case 0xE00FF1A:
 		case 0xF00FF1A:
-			uploadRootConstants(14, false);  // HDRComposite
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 14, false);  // HDRComposite
+				break;
+			}
 
 		case 0x400FF59:
-		//case 0x2000FF59:
-		    uploadRootConstants(2, false);  // Copy
-			break;
+			//case 0x2000FF59:
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 2, false);  // Copy
+				break;
+			}
 
 		case 0xFF75:
-			uploadRootConstants(2, false);  // FilmGrain
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 2, false);  // FilmGrain
+				break;
+			}
 
 		case 0xFF81:
-			uploadRootConstants(7, true);  // ColorGradingMerge
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				const auto settings = Settings::Main::GetSingleton();
+				settings->GetShaderConstants(shaderConstants);
+				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
+				    shaderConstants.LUTCorrectionStrength = 0.f;
+				    shaderConstants.ColorGradingStrength = 1.f;
+				}
+				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge
+				break;
+			}
 
 		//case 0xFF94:
 		case 0x100FF94:
 		case 0x300FF94:
-			uploadRootConstants(14, true);  // ContrastAdaptiveSharpening
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 14, true);  // ContrastAdaptiveSharpening
+				break;
+			}
 
 		case 0xFF9A:
-			uploadRootConstants(14, false);  // PostSharpen
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 14, false);  // PostSharpen
+				break;
+			}
 
 		case 0xFFAA:
-			uploadRootConstants(2, false);  // ScaleformComposite
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 2, false);  // ScaleformComposite
+				break;
+			}
 
 		case 0xFFAB:
-			uploadRootConstants(1, false);  // BinkMovie
-			break;
+			{
+				Settings::ShaderConstants shaderConstants;
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				uploadRootConstants(shaderConstants, 1, false);  // BinkMovie
+				break;
+			}
 		}
     }
 
@@ -268,6 +285,12 @@ namespace Hooks
 				settings->Save();
 			}
 		};
+
+		switch (a_eventData.m_SettingID) {
+		case static_cast<int>(Settings::SettingID::kVanillaMenuLUTs):
+			HandleSetting(settings->VanillaMenuLUTs);
+			break;
+		}
 
 		switch (a_eventData.m_SettingID) {
 		case static_cast<int>(Settings::SettingID::kPostSharpen):
@@ -390,14 +413,14 @@ namespace Hooks
 
     void Hooks::Hook_EndOfFrame(void* a1, void* a2, const char* a3)
     {
-		bIsAtEndOfFrame.store(true);
+		Settings::Main::GetSingleton()->SetAtEndOfFrame(true);
 		_EndOfFrame(a1, a2, a3);
     }
 
     void Hooks::Hook_PostEndOfFrame(void* a1)
     {
 		_PostEndOfFrame(a1);
-		bIsAtEndOfFrame.store(false);
+		Settings::Main::GetSingleton()->SetAtEndOfFrame(false);
     }
 
     void Install()

@@ -23,6 +23,7 @@ namespace Settings
 		kHDR_Contrast,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
+        kVanillaMenuLUTs,
 		kFilmGrainType,
 		kPostSharpen,
 
@@ -68,6 +69,7 @@ namespace Settings
 		void SetValueFromSlider(float a_percentage);
 	};
 
+	// Has to match StructHdrDllPluginConstants in HLSL.
 	// Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.
 	struct ShaderConstants
 	{
@@ -82,18 +84,19 @@ namespace Settings
 		uint32_t FilmGrainType;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
+		float    DeltaTime;
 		float    DevSetting01;
 		float    DevSetting02;
 		float    DevSetting03;
 		float    DevSetting04;
 		float    DevSetting05;
 	};
-	static inline uint32_t shaderConstantsSize = 14;
+	static inline uint32_t shaderConstantsSize = 17;
 
     class Main : public DKUtil::model::Singleton<Main>
     {
     public:
-		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation", { "DisplayMode", "Main" }, 0, { "SDR", "HDR10", "HDR scRGB" } };
+		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation.", { "DisplayMode", "Main" }, 0, { "SDR", "HDR10", "HDR scRGB" } };
 
 		Slider PeakBrightness{
 			SettingID::kHDR_PeakBrightness,
@@ -158,6 +161,13 @@ namespace Settings
 		    0.f,
 		    100.f
 		};
+		Checkbox VanillaMenuLUTs{
+			SettingID::kVanillaMenuLUTs,
+			"Vanilla Menu LUTs",
+			"When enabled, menu LUTs will be unaffected by the \"LUT Correction Strength\" and \"Color Grading Strength\" settings.",
+			{ "VanillaMenuLUTs", "Main" },
+			true,
+		};
 		Stepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
 		    "Film Grain Type",
@@ -184,14 +194,19 @@ namespace Settings
 
         bool IsHDREnabled() const;
 
+		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
+
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
+
+		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
 
         void Load() noexcept;
 		void Save() noexcept;
 
     private:
 		TomlConfig config = COMPILE_PROXY("NativeHDR.toml"sv);
+		std::atomic_bool bIsAtEndOfFrame = false;
     };
 
 	static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
@@ -250,6 +265,7 @@ namespace Settings
 		DrawReshadeSlider(settings, settings->Contrast);
 		DrawReshadeSlider(settings, settings->LUTCorrectionStrength);
 		DrawReshadeSlider(settings, settings->ColorGradingStrength);
+		DrawReshadeCheckbox(settings, settings->VanillaMenuLUTs);
 		DrawReshadeStepper(settings, settings->FilmGrainType);
 		DrawReshadeCheckbox(settings, settings->PostSharpen);
 #if 1

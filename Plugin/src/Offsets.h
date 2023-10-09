@@ -1,6 +1,9 @@
 #pragma once
+#include "RE/BSFixedString.h"
 #include "RE/Buffers.h"
 #include "RE/MessageBoxData.h"
+
+#include "sfse/GameUI.h"
 
 class Offsets
 {
@@ -17,6 +20,11 @@ public:
 
 	using tPhotoMode_ToggleUI = bool (*)(uintptr_t a1);
 	static inline tPhotoMode_ToggleUI PhotoMode_ToggleUI = nullptr;
+
+	using tUI_IsMenuOpen = bool (*)(UI* a_ui, const RE::BSFixedString& a_menuName);
+	static inline tUI_IsMenuOpen UI_IsMenuOpen = nullptr;
+
+	static inline float* g_deltaTimeRealTime = nullptr;
 
 	//test
 	static inline uintptr_t* unkToggleVsyncArg1Ptr = nullptr;
@@ -36,5 +44,9 @@ public:
 		MessageMenuManagerPtr = reinterpret_cast<void**>(dku::Hook::IDToAbs(878772));
 		ShowMessageBox = reinterpret_cast<tShowMessageBox>(dku::Hook::IDToAbs(167094));
 		PhotoMode_ToggleUI = reinterpret_cast<tPhotoMode_ToggleUI>(dku::Hook::IDToAbs(139734));
+
+		UI_IsMenuOpen = reinterpret_cast<tUI_IsMenuOpen>(dku::Hook::IDToAbs(187049));
+
+		g_deltaTimeRealTime = reinterpret_cast<float*>(dku::Hook::IDToAbs(871870));
 	}
 };

@@ -2,6 +2,43 @@
 
 namespace RE
 {
+	class BSFixedString
+	{
+	private:
+		void* m_EntryPoolData = nullptr;
+
+	public:
+		BSFixedString() = default;
+
+		BSFixedString(const char* String)
+		{
+			auto addr = dku::Hook::IDToAbs(198219);
+			auto func = reinterpret_cast<void (*)(BSFixedString*, const char*)>(addr);
+			func(this, String);
+		}
+
+		BSFixedString(const BSFixedString& Other) = delete;
+
+		~BSFixedString()
+		{
+			auto addr = dku::Hook::IDToAbs(36754);
+			auto func = reinterpret_cast<void (*)(BSFixedString*)>(addr);
+			func(this);
+		}
+
+		BSFixedString& operator=(const BSFixedString& Other) = delete;
+
+		bool operator==(const BSFixedString& Other) const
+		{
+			return m_EntryPoolData == Other.m_EntryPoolData;
+		}
+
+		bool operator!=(const BSFixedString& Other) const
+		{
+			return m_EntryPoolData != Other.m_EntryPoolData;
+		}
+	};
+
 	class BSFixedStringCS
 	{
 	private:
