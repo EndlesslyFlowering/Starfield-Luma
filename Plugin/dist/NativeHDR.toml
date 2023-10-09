@@ -1,20 +1,24 @@
-[HDR]
-PeakBrightness = 1000.0
-GamePaperWhite = 203.0
-UIPaperWhite = 203.0
-Saturation = 50.0
-Contrast = 50.0
-
-[Main]
-DisplayMode = 2
-ColorGradingStrength = 100.0
-LUTCorrectionStrength = 100.0
-FilmGrainType = 0
-PostSharpening = true
-
 [Dev]
 DevSetting01 = 0.0
 DevSetting02 = 0.0
+DevSetting03 = 0.0
+DevSetting04 = 0.0
+DevSetting05 = 0.0
+
+[HDR]
+Contrast = 50.0
+GamePaperWhite = 203.0
+PeakBrightness = 1000.0
+Saturation = 50.0
+UIPaperWhite = 203.0
+
+[Main]
+ColorGradingStrength = 100.0
+DisplayMode = 0
+FilmGrainType = 1
+LUTCorrectionStrength = 100.0
+PostSharpen = true
+VanillaMenuLUTs = true
 
 [RenderTargets]
 RenderTargetsToUpgrade = [

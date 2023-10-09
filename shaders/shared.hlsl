@@ -37,6 +37,7 @@ struct StructHdrDllPluginConstants
 	uint FilmGrainType; // 1 is default
 	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
+	float DeltaTime;
 	float DevSetting01; // 0-1 variable for development
 	float DevSetting02; // 0-1 variable for development
 	float DevSetting03; // 0-1 variable for development
@@ -45,6 +46,6 @@ struct StructHdrDllPluginConstants
 };
 
 //TODO: use this in the root signature files?
-#define HDR_PLUGIN_CONSTANTS_SIZE 14
+#define HDR_PLUGIN_CONSTANTS_SIZE 17
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);

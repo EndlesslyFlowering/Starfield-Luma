@@ -52,6 +52,27 @@ namespace Settings
 		}
     }
 
+    void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
+    {
+		a_outShaderConstants.DisplayMode = static_cast<uint32_t>(DisplayMode.value.get_data());
+		a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
+		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
+		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
+		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                        // 0-100 to 0-2
+		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                            // 0-100 to 0-2
+		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
+		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
+		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
+		a_outShaderConstants.bIsAtEndOfFrame = static_cast<uint32_t>(bIsAtEndOfFrame.load());
+		a_outShaderConstants.DeltaTime = *Offsets::g_deltaTimeRealTime;
+		a_outShaderConstants.DevSetting01 = static_cast<float>(DevSetting01.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting02 = static_cast<float>(DevSetting02.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting03 = static_cast<float>(DevSetting03.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting04 = static_cast<float>(DevSetting04.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting05 = static_cast<float>(DevSetting05.value.get_data() * 0.01f);  // 0-100 to 0-1
+    }
+
     void Main::Load() noexcept
 	{
 		static std::once_flag ConfigInit;
@@ -64,6 +85,7 @@ namespace Settings
 			config.Bind(Contrast.value, Contrast.defaultValue);
 			config.Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
 			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
+			config.Bind(VanillaMenuLUTs.value, VanillaMenuLUTs.defaultValue);
 			config.Bind(FilmGrainType.value, FilmGrainType.defaultValue);
 			config.Bind(PostSharpen.value, PostSharpen.defaultValue);
 			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
@@ -83,10 +105,8 @@ namespace Settings
 				"TAA_idTech7HistoryColorTarget",
 				"EnvBRDF",
 				"ImageSpaceBufferR10G10B10A2"
-#if 0
-				,'NativeResolutionColorBuffer01',
-				'ColorBuffer01'
-#endif
+				//"NativeResolutionColorBuffer01",  // issues on AMD
+				//"ColorBuffer01"
 				);
 		});
 

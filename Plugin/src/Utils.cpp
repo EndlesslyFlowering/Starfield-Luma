@@ -182,4 +182,32 @@ namespace Utils
 		const auto buffer = (*Offsets::bufferArray)[static_cast<uint32_t>(a_buffer)];
 		return buffer->format;
     }
+
+	bool ShouldCorrectLUTs()
+	{
+		const auto ui = UI::GetSingleton();
+		// make sure we do indeed correct luts in these menus, even though DataMenu is in the menu stack
+		if (Offsets::UI_IsMenuOpen(ui, "GalaxyStarMapMenu")) {
+			return true;
+		}
+		if (Offsets::UI_IsMenuOpen(ui, "SpaceshipEditorMenu")) {
+			return true;
+		}
+
+		// don't correct luts while we're in menus that have a LUT
+		if (Offsets::UI_IsMenuOpen(ui, "DataMenu")) {
+			return false;
+		}
+		if (Offsets::UI_IsMenuOpen(ui, "InventoryMenu")) {
+			return false;
+		}
+		if (Offsets::UI_IsMenuOpen(ui, "ContainerMenu")) {
+			return false;
+		}
+		if (Offsets::UI_IsMenuOpen(ui, "BarterMenu")) {
+			return false;
+		}
+
+		return true;
+	}
 }
