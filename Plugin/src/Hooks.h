@@ -96,8 +96,6 @@ namespace Hooks
 
 		static void Hook_PostEndOfFrame(void* a1);
 		static inline std::add_pointer_t<decltype(Hook_PostEndOfFrame)> _PostEndOfFrame;
-
-		static inline std::atomic_bool bIsAtEndOfFrame = false;
 	};
 
 	void Install();
