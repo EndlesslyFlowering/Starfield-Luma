@@ -113,7 +113,7 @@ float Luminance(float3 color)
 	return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
-float3 saturation(float3 color, float saturation)
+float3 Saturation(float3 color, float saturation)
 {
     float3 luminance = Luminance(color);
     return lerp(luminance, color, saturation);

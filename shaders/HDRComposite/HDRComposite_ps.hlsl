@@ -47,7 +47,7 @@ cbuffer CPushConstantWrapper_HDRComposite : register(b0, space0)
 };
 
 
-Texture2D<float3> InputColor : register(t0, space9);
+Texture2D<float3> InputColorTexture : register(t0, space9);
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 
@@ -102,6 +102,8 @@ static const float SDRTonemapHDRStrength = 1.f;
 static const float PostProcessStrength = 1.f;
 // 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
+// 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
+static const float HDRHighlightsModulation = 1.f;
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
@@ -426,18 +428,19 @@ T Hable_Inverse(
 float3 DICETonemap(
 	float3 Color,
 	float  MaxOutputLuminance,
-	float  HighlightsShoulderStart = 0.f)
+	float  HighlightsShoulderStart = 0.f,
+	float  HighlightsModulationPow = 1.f)
 {
 #if 0 // Even if all SDR tonemappers work by channel, in HDR we prefer to maintain the hue and to match the screen peak brightness in absolute (luminance) nits, not as channel values.
-	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart);
-	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart);
-	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart);
+	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
+	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
+	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
 	return Color;
 #else
 	const float sourceLuminance = Luminance(Color);
 	if (sourceLuminance > 0.0f)
 	{
-		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, HighlightsShoulderStart);
+		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
 		Color *= compressedLuminance / sourceLuminance;
 	}
 	return Color;
@@ -765,9 +768,9 @@ float3 GradingLUT(float3 color, float2 uv)
 	LUTColor = gamma_sRGB_to_linear(LUTColor);
 #endif // !LUT_FIX_GAMMA_MAPPING
 
-	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" in the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
-	const float LUTMaskAlpha = saturate(LUTMaskTexture.Sample(Sampler0, uv).x + (1.f - HdrDllPluginConstants.ColorGradingStrength));
-	LUTColor = lerp(LUTColor, color, LUTMaskAlpha);
+	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
+	const float LUTMaskAlpha = (1.f - LUTMaskTexture.Sample(Sampler0, uv).x) * HdrDllPluginConstants.ColorGradingStrength;
+	LUTColor = lerp(color, LUTColor, LUTMaskAlpha);
 
 	return LUTColor;
 }
@@ -787,7 +790,7 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 #if 1 // Note: in case "INVERT_TONEMAP_HIGHLIGHTS_ONLY" was false, we might want to test the "postProcessedOffsetColor" blend in range more carefully
 	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
 #else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values
-	return select(tonemappedColor == 0, postProcessedOffsetColor, postProcessedRatioColor);
+	return select(tonemappedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
 #endif
 }
 
@@ -795,7 +798,7 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 PSOutput PS(PSInput psInput)
 {
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
-	float3 inputColor = InputColor.Load(int3(int2(psInput.SV_Position.xy), 0));
+	float3 inputColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
 
 #if CLAMP_INPUT_OUTPUT
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
@@ -980,14 +983,18 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), secondaryContrast) * (MidGray * midGrayScale);
 #endif
 
+		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization.
+		const float saturation = linearNormalization(HdrDllPluginConstants.HDRLUTCorrectionSaturation, 0.f, 2.f, 0.5f, 1.5f);
+		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength));
+
 		// Bring back the color to the same range as SDR by dividing by the mid gray change.
 		inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
 		minHighlightsColorOut *= paperWhite / midGrayScale;
 
 		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709;
-		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness
+		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness (found empircally)
 		const float highlightsShoulderStart = onlyInvertHighlights ? min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut) : 0.f;
-  	  	outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart);
+  	  	outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
 
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 

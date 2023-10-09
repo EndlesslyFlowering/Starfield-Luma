@@ -14,9 +14,11 @@
 
 // Make sure LUTs are normalized by linearizing them with gamma 2.2, so they work with values closer to the expected ones. Their mixed output is still kept in sRGB.
 // There's a chance that LUTs had correctly been made on sRGB gamma monitors, so in that case this would be wrong (LUTs were likely made with external tools).
-#if SDR_USE_GAMMA_2_2 && 0 // Disabled as this does indeed look too bright.
+#if SDR_USE_GAMMA_2_2 && 1 // If it's disabled is because this makes LUTs look too bright.
 	#define LINEARIZE(x) pow(x, 2.2f)
-	#define CORRECT_GAMMA(x) gamma_sRGB_to_linear(pow(x, 1.f / 2.2f))
+	// NOTE: to somehow conserve some HDR colors and not generate NaNs, we are doing inverse pow as gamma on negative numbers.
+	// Alternatively we could skip gamma correction beyond the 0-1 range.
+	#define CORRECT_GAMMA(x) gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f) * (sign(x)))
 #else
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
