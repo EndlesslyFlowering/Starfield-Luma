@@ -25,6 +25,7 @@ public:
 	static inline tUI_IsMenuOpen UI_IsMenuOpen = nullptr;
 
 	static inline float* g_deltaTimeRealTime = nullptr;
+	static inline uint32_t* g_durationOfApplicationRunTimeMS = nullptr;
 
 	//test
 	static inline uintptr_t* unkToggleVsyncArg1Ptr = nullptr;
@@ -48,5 +49,6 @@ public:
 		UI_IsMenuOpen = reinterpret_cast<tUI_IsMenuOpen>(dku::Hook::IDToAbs(187049));
 
 		g_deltaTimeRealTime = reinterpret_cast<float*>(dku::Hook::IDToAbs(871870));
+		g_durationOfApplicationRunTimeMS = reinterpret_cast<uint32_t*>(dku::Hook::IDToAbs(871872));
 	}
 };

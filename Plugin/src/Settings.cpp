@@ -65,7 +65,7 @@ namespace Settings
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
 		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
 		a_outShaderConstants.bIsAtEndOfFrame = static_cast<uint32_t>(bIsAtEndOfFrame.load());
-		a_outShaderConstants.DeltaTime = *Offsets::g_deltaTimeRealTime;
+		a_outShaderConstants.RuntimeMS = *Offsets::g_durationOfApplicationRunTimeMS;
 		a_outShaderConstants.DevSetting01 = static_cast<float>(DevSetting01.value.get_data() * 0.01f);  // 0-100 to 0-1
 		a_outShaderConstants.DevSetting02 = static_cast<float>(DevSetting02.value.get_data() * 0.01f);  // 0-100 to 0-1
 		a_outShaderConstants.DevSetting03 = static_cast<float>(DevSetting03.value.get_data() * 0.01f);  // 0-100 to 0-1
