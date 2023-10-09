@@ -29,3 +29,4 @@ Issues:
 -The UI blends in slightly differently in HDR, usually it's not noticeable
 -scRGB HDR doesn't work with DLSS Frame Generation
 -You can not take screenshots directly from Starfield in photo mode
+-FSR2 clips all non Rec.709 (SDR) colors
