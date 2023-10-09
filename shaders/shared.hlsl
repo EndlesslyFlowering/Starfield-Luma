@@ -37,7 +37,7 @@ struct StructHdrDllPluginConstants
 	uint FilmGrainType; // 1 is default
 	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
-	float DeltaTime;
+	uint RuntimeMS;
 	float DevSetting01; // 0-1 variable for development
 	float DevSetting02; // 0-1 variable for development
 	float DevSetting03; // 0-1 variable for development
