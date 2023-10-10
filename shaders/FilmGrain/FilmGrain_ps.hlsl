@@ -40,6 +40,28 @@ float bethesdaRandom(float seed) {
 	return frac(sin(seed) * 493013.f);
 }
 
+// This is an attempt to replicate Kodak Vision 5242 with (0,3) range:
+// Should be channel independent (R/G/B), but just using R curve for now
+// Reference target is actually just luminance * 2.046f;
+// (0, 0)
+// (0.5, 0.2)
+// (1, 0.65)
+// (2, 1.6)
+// (3, 2.38)
+float computeFilmDensity(float luminance) {
+	float scaledX = luminance * 3.0f;
+	float result = 4.118015f + (-0.00282387f - 4.118015f)/pow(1.f + pow(scaledX/3.024177f,1.75339f),1.262519f);
+	return result;
+}
+
+// Bartleson
+// https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2003/PICS-0-287/8583.pdf
+float computeFilmGraininess(float density) {
+	float preComputedMin = 7.5857757502918375f;
+	float bofDOverC = 0.880f - (0.736f * density) - (0.003f * pow(density, 7.6f));
+	return linearNormalization(pow(10.f, bofDOverC), preComputedMin, 0.f, 1.f, 0.f);
+}
+
 
 void frag_main()
 {
@@ -64,6 +86,12 @@ void frag_main()
 	} else {
 		linearColor = gamma_sRGB_to_linear(inputColor);
 	}
+
+#if 0 // Debug Gradient
+	float pixelNumber = 1.f - (TEXCOORD.y);
+	linearColor = float3(pixelNumber, pixelNumber, pixelNumber);
+	srgbColor = gamma_linear_to_sRGB(linearColor);
+#endif
 
 	float randomNumber, customMultiplier;
 
@@ -95,10 +123,13 @@ void frag_main()
 	}
 	else
 	{
-		randomNumber = rand(TEXCOORD.xy
-			+ frac(filmGrainColorAndIntensity.x / 2147483647.f)
-			+ frac(filmGrainColorAndIntensity.y / 2147483647.f)
-		);
+		float fps = 24.f; // TODO: Make external option
+		// Mod by FPS to ensure consistent range
+		float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
+		// TODO: Use iteration? Use only if repeating is noticeable
+		// float iteration = fmod(frameNumber, (fps * fps));
+		float frame = fmod(frameNumber, fps); 
+		randomNumber = rand(TEXCOORD.xy + (frame / fps));
 
 #if IMPROVED_FILM_GRAIN_TYPE == 1
 		float colorLuma = Luminance(srgbColor);
@@ -108,30 +139,20 @@ void frag_main()
 		customMultiplier = (-2.f * (0.5f - abs(saturate(colorLuma) - 0.5f))) // Bias towards center (nothing if black or white)
 			* 3.333f; // Bump to 10%
 #elif IMPROVED_FILM_GRAIN_TYPE == 3
+		// Film grain is based on film density
+		// Film works in negative, meaning black has no density
+		// The greater the film density (lighter), more perceived grain
+		// Simplified, grain scales with Y
+
+		// Scaling is not not linear
+		// We can estimate based on film stock.
 		float colorY = Luminance(linearColor);
-		float midToneStart = 0.022f; // Kodak Gray Scale B (Shadow)
-		float midToneMid = 0.178f; // Kodak Gray Scale M (Gray)
-		float midToneEnd = 0.891f; // Kodak Gray Scale A (Highlight)
-		float midPointScaling;
-		if (colorY > midToneStart && colorY < midToneEnd)
-		{
-			if (colorY < midToneMid)
-			{
-				// Lerp?
-				midPointScaling = linearNormalization(colorY, midToneStart, midToneMid, 0.f, 1.f);
-			}
-			else
-			{
-				// Lerp?
-				midPointScaling = linearNormalization(colorY, midToneMid, midToneEnd, 1.f, 0.f);
-			}
-		}
-		else
-		{
-			midPointScaling = 0.f;
-		}
-		customMultiplier = midPointScaling
-			* 3.333f; // Bump to 10%
+		float density = max(0.f, computeFilmDensity(colorY));
+		float graininess = computeFilmGraininess(density);
+		customMultiplier = graininess
+			* Luminance(srgbColor) // Scale by perceived luma
+			* 5.f; // Don't see a need to bump this more, 10.f for enthusiasts?
+
 #endif
 	}
 
