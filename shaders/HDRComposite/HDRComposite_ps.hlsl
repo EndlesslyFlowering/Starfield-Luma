@@ -29,6 +29,7 @@
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
 // or to replicate the SDR tonemapper by luminance, though both would alter the look too much and break some scenes.
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
+#define DRAW_LUT 0
 
 
 cbuffer CSharedFrameData : register(b0, space6)
@@ -800,6 +801,44 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
 {
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
+	static const uint DrawLUTScale = 10u; // Pixel scale
+	const uint2 LUTPixelPosition2D = psInput.SV_Position.xy / DrawLUTScale;
+	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % LUT_SIZE_UINT, LUTPixelPosition2D.y, LUTPixelPosition2D.x / LUT_SIZE_UINT);
+	bool drawLUT = false;
+	float3 LUTColor;
+	if (!any(LUTPixelPosition3D < 0u) && !any(LUTPixelPosition3D > LUT_SIZE_UINT - 1u))
+	{
+		drawLUT = true;
+		LUTColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
+	}
+		
+	if (drawLUT)
+	{
+#if !LUT_FIX_GAMMA_MAPPING
+		LUTColor = gamma_sRGB_to_linear(LUTColor);
+#endif
+		float3 outputColor = LUTColor;
+		if (HdrDllPluginConstants.DisplayMode <= 0) // SDR
+		{
+#if SDR_USE_GAMMA_2_2
+			outputColor = pow(outputColor, 1.f / 2.2f);
+#else
+			outputColor = gamma_linear_to_sRGB(outputColor);
+#endif // SDR_USE_GAMMA_2_2
+		}
+		else
+		{
+			outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+		}
+
+		PSOutput psOutput;
+		psOutput.SV_Target.rgb = outputColor; 
+		psOutput.SV_Target.a = 1.f;
+		return psOutput;
+	}
+#endif
+
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
 	float3 inputColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
 
