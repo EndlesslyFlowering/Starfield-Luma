@@ -13,6 +13,8 @@
 // By turning this on, we emulate the SDR look in HDR by baking that assumption into our calculations.
 // This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping.
 #define SDR_USE_GAMMA_2_2 (FORCE_VANILLA_LOOK ? 0 : 1)
+ // Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
+#define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
 // Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
 // This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.

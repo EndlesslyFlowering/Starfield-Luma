@@ -874,15 +874,23 @@ PSOutput PS(PSInput psInput)
 	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD);
 #endif // ENABLE_LUT
 
+#if GAMMA_CORRECT_SDR_RANGE_ONLY && (FIX_WRONG_SRGB_GAMMA_FORMULA || SDR_USE_GAMMA_2_2)
+	const float3 tonemappedPostProcessedGradedColorSDRColors = saturate(tonemappedPostProcessedGradedColor);
+	const float3 tonemappedPostProcessedGradedColorHDRColors = tonemappedPostProcessedGradedColor - tonemappedPostProcessedGradedColorSDRColors;
+	tonemappedPostProcessedGradedColor = tonemappedPostProcessedGradedColorSDRColors;
+#endif
 // Do these even if "ENABLE_LUT" is false, for consistency
 #if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it
 	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
 	tonemappedPostProcessedGradedColor = gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor));
-#endif
+#endif // FIX_WRONG_SRGB_GAMMA_FORMULA
 #if SDR_USE_GAMMA_2_2
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays
 	tonemappedPostProcessedGradedColor = pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f);
-#endif
+#endif // SDR_USE_GAMMA_2_2
+#if GAMMA_CORRECT_SDR_RANGE_ONLY && (FIX_WRONG_SRGB_GAMMA_FORMULA || SDR_USE_GAMMA_2_2)
+	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedColorHDRColors;
+#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
