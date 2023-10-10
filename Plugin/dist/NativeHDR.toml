@@ -17,6 +17,8 @@ ColorGradingStrength = 100.0
 DisplayMode = 0
 FilmGrainType = 1
 LUTCorrectionStrength = 100.0
+GammaCorrectionStrength = 100.0
+SecondaryGamma = 50.0
 PostSharpen = true
 VanillaMenuLUTs = true
 
