@@ -152,7 +152,11 @@ namespace Hooks
 		case 0xF00FF1A:
 			{
 				Settings::ShaderConstants shaderConstants;
-				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
+				const auto settings = Settings::Main::GetSingleton();
+				settings->GetShaderConstants(shaderConstants);
+				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
+					shaderConstants.ColorGradingStrength = 1.f;
+				}
 				uploadRootConstants(shaderConstants, 14, false);  // HDRComposite
 				break;
 			}
@@ -181,7 +185,6 @@ namespace Hooks
 				settings->GetShaderConstants(shaderConstants);
 				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
 				    shaderConstants.LUTCorrectionStrength = 0.f;
-				    shaderConstants.ColorGradingStrength = 1.f;
 				}
 				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge
 				break;
