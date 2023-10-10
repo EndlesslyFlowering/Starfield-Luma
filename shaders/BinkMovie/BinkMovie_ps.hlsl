@@ -32,9 +32,9 @@ float4 PS(PSInputs inputs) : SV_Target
 	// Cr: 0.0-1.0
 	// the formula adjusts for that but was for BT.601 limited range while the video is definitely BT.709 full range
 	// matrix paramters have been adjusted for BT.709 full range
-	color.r = Y - 0.790487825870513916015625f + (Cr * 1.574800014495849609375f);
+	color.r = Y - 0.790487825870513916015625f + (Cr * 1.5748f);
 	color.g = Y + 0.329009473323822021484375f - (Cb * 0.18732427060604095458984375f) - (Cr * 0.46812427043914794921875f);
-	color.b = Y - 0.931438446044921875f       + (Cb * 1.85559999942779541015625f);
+	color.b = Y - 0.931438446044921875f       + (Cb * 1.8556f);
 
 	// Clamp for safety as YCbCr<->RGB is not 100% accurate in float and can produce negative/invalid colors,
 	// this breaks the UI pass if we are using R16G16B16A16F textures,
