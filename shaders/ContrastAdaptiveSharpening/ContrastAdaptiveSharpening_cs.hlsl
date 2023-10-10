@@ -133,22 +133,15 @@ void CS(CSInput csInput)
 	uint _95 = uint(_85);
 	uint _96 = uint(_86);
 
-	uint4 _101 = CASData.rectLimits1;
+	uint _131 = _95 - 1;
+	uint _114 = _95;
+	uint _148 = _95 + 1;
+	uint _163 = _95 + 2;
 
-	uint _102 = _101.x;
-	uint _103 = _101.y;
-	uint _104 = _101.z;
-	uint _105 = _101.w;
-
-	uint _131 = max(min(_95 - 1, _104), _102);
-	uint _114 = max(min(_95,     _104), _102);
-	uint _148 = max(min(_95 + 1, _104), _102);
-	uint _163 = max(min(_95 + 2, _104), _102);
-
-	uint _116 = max(min(_96 - 1, _105), _103);
-	uint _133 = max(min(_96,     _105), _103);
-	uint _173 = max(min(_96 + 1, _105), _103);
-	uint _187 = max(min(_96 + 2, _105), _103);
+	uint _116 = _96 - 1;
+	uint _133 = _96;
+	uint _173 = _96 + 1;
+	uint _187 = _96 + 2;
 
 	half3 _118 = ColorIn.Load(int3(_114, _116, 0)).rgb;
 	half3 _134 = ColorIn.Load(int3(_131, _133, 0)).rgb;
@@ -169,10 +162,10 @@ void CS(CSInput csInput)
 
 	uint _209 = uint(_205);
 
-	uint _228 = max(min(_209 - 1, _104), _102);
-	uint _214 = max(min(_209,     _104), _102);
-	uint _250 = max(min(_209 + 1, _104), _102);
-	uint _272 = max(min(_209 + 2, _104), _102);
+	uint _228 = _209 - 1;
+	uint _214 = _209;
+	uint _250 = _209 + 1;
+	uint _272 = _209 + 2;
 
 	half3 _215 = ColorIn.Load(int3(_214, _116, 0)).rgb;
 	half3 _229 = ColorIn.Load(int3(_228, _133, 0)).rgb;
@@ -395,10 +388,10 @@ void CS(CSInput csInput)
 
 	uint _1160 = uint(_1156);
 
-	uint _1177 = max(min(_1160 - 1, _105), _103);
-	uint _1191 = max(min(_1160,     _105), _103);
-	uint _1225 = max(min(_1160 + 1, _105), _103);
-	uint _1239 = max(min(_1160 + 2, _105), _103);
+	uint _1177 = _1160 - 1;
+	uint _1191 = _1160;
+	uint _1225 = _1160 + 1;
+	uint _1239 = _1160 + 2;
 
 	half3 _1179 = ColorIn.Load(int3(_114, _1177, 0)).rgb;
 	half3 _1192 = ColorIn.Load(int3(_131, _1191, 0)).rgb;
@@ -652,24 +645,17 @@ void CS(CSInput csInput)
 
 	uint2 pp = uint2(_58, _59);
 
-	uint4 _69 = CASData.rectLimits1;
+	uint _107 = pp.x - 1;
+	uint  _87 = pp.x;
+	uint _118 = pp.x + 1;
 
-	uint _70 = _69.x;
-	uint _71 = _69.y;
-	uint _72 = _69.z;
-	uint _73 = _69.w;
+	uint  _89 = pp.y - 1;
+	uint _105 = pp.y;
+	uint _127 = pp.y + 1;
 
-	uint _107 = max(min(pp.x - 1, _72), _70);
-	uint  _87 = max(min(pp.x,     _72), _70);
-	uint _118 = max(min(pp.x + 1, _72), _70);
-
-	uint  _89 = max(min(pp.y - 1, _73), _71);
-	uint _105 = max(min(pp.y,     _73), _71);
-	uint _127 = max(min(pp.y + 1, _73), _71);
-
-	uint _150 = max(min(pp.x + 7, _72), _70);
-	uint _138 = max(min(pp.x + 8, _72), _70);
-	uint _167 = max(min(pp.x + 9, _72), _70);
+	uint _150 = pp.x + 7;
+	uint _138 = pp.x + 8;
+	uint _167 = pp.x + 9;
 
 	half3  _91 = ColorIn.Load(int3( _87,  _89, 0)).rgb;
 	half3 _106 = ColorIn.Load(int3(_107, _105, 0)).rgb;
@@ -763,9 +749,9 @@ void CS(CSInput csInput)
 
 	pp.y += 8;
 
-	uint _507 = max(min(pp.y - 1, _73), _71);
-	uint _520 = max(min(pp.y,     _73), _71);
-	uint _539 = max(min(pp.y + 1, _73), _71);
+	uint _507 = pp.y - 1;
+	uint _520 = pp.y;
+	uint _539 = pp.y + 1;
 
 	half3 _509 = ColorIn.Load(int3( _87, _507, 0)).rgb;
 	half3 _521 = ColorIn.Load(int3(_107, _520, 0)).rgb;
