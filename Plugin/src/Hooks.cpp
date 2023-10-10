@@ -39,7 +39,6 @@ namespace Hooks
 			contrast->m_Enabled.SetValue(a_bEnable);
 		}
 		
-		// There is no reason this wouldn't work in HDR, but for now it's disabled
 		if (const auto secondaryGammaSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryGamma))) {
 			secondaryGammaSetting->m_Enabled.SetValue(!a_bEnable);
 		}
@@ -192,6 +191,7 @@ namespace Hooks
 				settings->GetShaderConstants(shaderConstants);
 				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
 				    shaderConstants.LUTCorrectionStrength = 0.f;
+				    shaderConstants.ColorGradingStrength = 1.f;
 				}
 				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge
 				break;
