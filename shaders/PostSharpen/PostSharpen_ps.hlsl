@@ -35,7 +35,10 @@ struct PSOutput
 	float4 SV_Target : SV_Target0;
 };
 
-#if SDR_USE_GAMMA_2_2
+#if SDR_LINEAR_INTERMEDIARY
+	#define GAMMA_TO_LINEAR(x) x
+	#define LINEAR_TO_GAMMA(x) x
+#elif SDR_USE_GAMMA_2_2
 	#define GAMMA_TO_LINEAR(x) pow(x, 2.2f)
 	#define LINEAR_TO_GAMMA(x) pow(x, 1.f / 2.2f)
 #else

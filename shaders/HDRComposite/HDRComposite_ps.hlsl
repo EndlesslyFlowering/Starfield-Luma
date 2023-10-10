@@ -833,11 +833,13 @@ PSOutput PS(PSInput psInput)
 		float3 outputColor = LUTColor;
 		if (HdrDllPluginConstants.DisplayMode <= 0) // SDR
 		{
+#if !SDR_LINEAR_INTERMEDIARY
 #if SDR_USE_GAMMA_2_2
 			outputColor = pow(outputColor, 1.f / 2.2f);
 #else
 			outputColor = gamma_linear_to_sRGB(outputColor);
 #endif // SDR_USE_GAMMA_2_2
+#endif // SDR_LINEAR_INTERMEDIARY
 		}
 		else
 		{
@@ -1143,6 +1145,7 @@ PSOutput PS(PSInput psInput)
 	{
 		outputColor = finalOriginalColor;
 
+#if !SDR_LINEAR_INTERMEDIARY
 		// Note that gamma was never applied if LUTs were disabled, but we don't care about that as the affected shaders permutations were never used
 #if SDR_USE_GAMMA_2_2
 		outputColor = pow(outputColor, 1.f / 2.2f);
@@ -1150,6 +1153,7 @@ PSOutput PS(PSInput psInput)
 		// Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
 		outputColor = gamma_linear_to_sRGB(outputColor);
 #endif // SDR_USE_GAMMA_2_2
+#endif // SDR_LINEAR_INTERMEDIARY
 
 #if CLAMP_INPUT_OUTPUT
 		outputColor = saturate(outputColor);
