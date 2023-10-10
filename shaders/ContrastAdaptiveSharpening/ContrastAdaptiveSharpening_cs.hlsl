@@ -44,7 +44,10 @@ struct CSInput
 //	return f16tof32(uint2(value & 0xffff, value >> 16));
 //}
 
-#if SDR_USE_GAMMA_2_2
+#if SDR_LINEAR_INTERMEDIARY
+	#define GAMMA_TO_LINEAR(x) x
+	#define LINEAR_TO_GAMMA(x) x
+#elif SDR_USE_GAMMA_2_2
 	#define GAMMA_TO_LINEAR(x) pow(x, 2.2h)
 	#define LINEAR_TO_GAMMA(x) pow(x, 1.h / 2.2h)
 #else //TODO: make this use half instead of float

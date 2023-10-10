@@ -26,7 +26,7 @@
 #else
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
-#endif
+#endif // SDR_USE_GAMMA_2_2
 
 // Behaviour when the color luminance goes beyond 1
 // -0: As is, keep the normalized value that could be beyond the 0-1

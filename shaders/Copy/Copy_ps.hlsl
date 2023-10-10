@@ -16,10 +16,23 @@ float4 PS(PSInputs inputs) : SV_Target
 {
 	float4 color = inputTexture.Sample(inputSampler, float2(inputs.uv.x, inputs.uv.y));
 
-    if (HdrDllPluginConstants.DisplayMode == 1 && HdrDllPluginConstants.IsAtEndOfFrame)
+    if (HdrDllPluginConstants.IsAtEndOfFrame)
 	{
         // There is no need to clamp if "CLAMP_INPUT_OUTPUT" is true here as the output buffer is int so it will clip anything beyond 0-1.
-        color.rgb = linear_to_PQ(BT709_To_BT2020(color.rgb));
+        if (HdrDllPluginConstants.DisplayMode == 1)
+        {
+            color.rgb = linear_to_PQ(BT709_To_BT2020(color.rgb));
+        }
+#if SDR_LINEAR_INTERMEDIARY
+        else if (HdrDllPluginConstants.DisplayMode <= 0)
+        {
+#if SDR_USE_GAMMA_2_2
+		    color.rgb = pow(color.rgb, 1.f / 2.2f);
+#else
+		    color.rgb = gamma_linear_to_sRGB(color.rgb);
+#endif // SDR_USE_GAMMA_2_2
+        }
+#endif // SDR_LINEAR_INTERMEDIARY
     }
 
     return color;
