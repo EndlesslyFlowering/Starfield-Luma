@@ -14,4 +14,6 @@ namespace Utils
 	RE::BS_DXGI_FORMAT GetBufferFormat(RE::Buffers a_buffer);
 
 	bool ShouldCorrectLUTs();
+
+	bool CheckCompatibility();
 }

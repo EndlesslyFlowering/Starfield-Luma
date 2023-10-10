@@ -210,4 +210,24 @@ namespace Utils
 
 		return true;
 	}
+
+    bool CheckCompatibility()
+    {
+		auto isModuleLoaded = [&](LPCWSTR a_moduleName) {
+			HMODULE hModule = nullptr;
+			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, a_moduleName, &hModule);
+			return hModule != nullptr;
+		};
+
+		constexpr std::array moduleNames = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
+
+		for (auto& moduleName : moduleNames) {
+			if (isModuleLoaded(moduleName)) {
+				ERROR("An old version of the Native(Auto)HDR plugin is loaded. Please remove it while using Luma. It is a successor to the previous mod.")
+				return false;
+			}
+		}
+
+		return true;
+    }
 }
