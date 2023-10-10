@@ -24,6 +24,7 @@
 #define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_BT709)
 
 // Custom push constants uploaded by the HDR DLL plugin code. Do note that register space comes at a premium when adding members. Bit/byte packing is advised.
+// Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.
 struct StructHdrDllPluginConstants
 {
 	uint DisplayMode; // SDR 0 (Rec.709 with 2.2 gamma, not sRGB), 1 HDR10 PQ BT.2020, 2 scRGB HDR
@@ -38,11 +39,11 @@ struct StructHdrDllPluginConstants
 	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
 	uint RuntimeMS;
-	float DevSetting01; // 0-1 variable for development
-	float DevSetting02; // 0-1 variable for development
-	float DevSetting03; // 0-1 variable for development
-	float DevSetting04; // 0-1 variable for development
-	float DevSetting05; // 0-1 variable for development
+	float DevSetting01; // 0-1 variable for development. Default 0
+	float DevSetting02; // 0-1 variable for development. Default 0
+	float DevSetting03; // 0-1 variable for development. Default 0
+	float DevSetting04; // 0-1 variable for development. Default 0.5
+	float DevSetting05; // 0-1 variable for development. Default 0.5
 };
 
 //TODO: use this in the root signature files?
