@@ -273,6 +273,9 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	if (SDRRange) {
 		color = saturate(color);
 	}
+	else if (Luminance(color) < 0.f) {
+		color = 0.f;
+	}
 
 	color = lerp(originalColor, color, HdrDllPluginConstants.LUTCorrectionStrength);
 
