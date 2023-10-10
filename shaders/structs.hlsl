@@ -170,6 +170,7 @@ struct HableParameters
 	Hable_midSigment      midSegment;
 	Hable_shoulderSegment shoulderSegment;
 	float                 invScale;
+	float                 shoulderStart;
 };
 //HDRComposite shader structs end
 //HDRComposite end
