@@ -55,6 +55,6 @@ struct StructHdrDllPluginConstants
 };
 
 //TODO: use this in the root signature files?
-#define HDR_PLUGIN_CONSTANTS_SIZE 17
+#define HDR_PLUGIN_CONSTANTS_SIZE 19
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);
