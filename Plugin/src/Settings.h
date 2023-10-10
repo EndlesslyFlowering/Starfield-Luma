@@ -19,10 +19,12 @@ namespace Settings
         kHDR_PeakBrightness,
         kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
-		kHDR_Saturation,
 		kHDR_Contrast,
+		kHDR_Saturation,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
+		kGammaCorrectionStrength,
+		kSecondaryGamma,
         kVanillaMenuLUTs,
 		kFilmGrainType,
 		kPostSharpen,
@@ -81,6 +83,8 @@ namespace Settings
 		float    Contrast;
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
+		float    GammaCorrectionStrength;
+		float    SDRSecondaryGamma;
 		uint32_t FilmGrainType;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
@@ -143,6 +147,15 @@ namespace Settings
 		    0.f,
 		    100.f
 		};
+		Slider   SecondaryGamma{
+		    SettingID::kSecondaryGamma,
+		    "Brightness",
+		    "Modulates the brightness in SDR modes. Leave at 50\% if unsure.",
+		    { "SecondaryGamma", "Main" },
+		    50.f,
+		    0.f,
+		    100.f
+		};
 		Slider   LUTCorrectionStrength{
 		    SettingID::kLUTCorrectionStrength,
 		    "LUT Correction Strength",
@@ -161,12 +174,21 @@ namespace Settings
 		    0.f,
 		    100.f
 		};
+		Slider   GammaCorrectionStrength{
+		    SettingID::kGammaCorrectionStrength,
+		    "Gamma Correction Strength",
+		    "Sets the gamma correction strength. The game used the sRGB gamma formula but was calibrated on gamma 2.2 displays. Only applies if \"Color Grading\" is enabled. Leave at 100\% if unsure.",
+		    { "GammaCorrectionStrength", "Main" },
+		    100.f,
+		    0.f,
+		    100.f
+		};
 		Checkbox VanillaMenuLUTs{
 			SettingID::kVanillaMenuLUTs,
 			"Vanilla Menu LUTs",
 			"When enabled, menu LUTs will be unaffected by the \"LUT Correction Strength\" and \"Color Grading Strength\" settings.",
 			{ "VanillaMenuLUTs", "Main" },
-			true,
+			true
 		};
 		Stepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
@@ -181,7 +203,7 @@ namespace Settings
 			"Post Sharpening",
 			"Enables the game default forced post sharpen pass.",
 			{ "PostSharpen", "Main" },
-			true,
+			true
 		};
 #if 1
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", { "DevSetting01", "Dev" }, 0.f, 0.f, 100.f };
@@ -263,6 +285,8 @@ namespace Settings
 		DrawReshadeSlider(settings, settings->UIPaperWhite);
 		DrawReshadeSlider(settings, settings->Saturation);
 		DrawReshadeSlider(settings, settings->Contrast);
+		DrawReshadeSlider(settings, settings->GammaCorrectionStrength);
+		DrawReshadeSlider(settings, settings->SecondaryGamma);
 		DrawReshadeSlider(settings, settings->LUTCorrectionStrength);
 		DrawReshadeSlider(settings, settings->ColorGradingStrength);
 		DrawReshadeCheckbox(settings, settings->VanillaMenuLUTs);

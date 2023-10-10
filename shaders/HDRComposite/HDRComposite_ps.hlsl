@@ -111,8 +111,6 @@ static const float PostProcessStrength = 1.f;
 static const uint ForceTonemapper = 0;
 // 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
 static const float HDRHighlightsModulation = 1.f;
-static const float GammaCorrection = 1.f; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs.
-static const float SecondaryGamma = 1.f; // Between 0.75 and 1.25. Mostly meant for SDR.
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
@@ -951,19 +949,19 @@ PSOutput PS(PSInput psInput)
 // Do these even if "ENABLE_LUT" is false, for consistency
 #if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it
 	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), HdrDllPluginConstants.ColorGradingStrength * GammaCorrection);
+	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
 #endif // FIX_WRONG_SRGB_GAMMA_FORMULA
 #if SDR_USE_GAMMA_2_2
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
 	// If there's no color grading, we don't do this adjustment, as we assume the error was part of the LUTs setup, including on neutral LUTs
 	// (this is not entirely true, but the world is too black with this adjustment if there's no color grading).
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.ColorGradingStrength * GammaCorrection);
+	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
 #endif // SDR_USE_GAMMA_2_2
 #if GAMMA_CORRECT_SDR_RANGE_ONLY && (FIX_WRONG_SRGB_GAMMA_FORMULA || SDR_USE_GAMMA_2_2)
 	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
 #endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
-	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, SecondaryGamma);
+	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, HdrDllPluginConstants.SecondaryGamma);
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
@@ -1115,7 +1113,7 @@ PSOutput PS(PSInput psInput)
 #endif
 
 		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization.
-		const float saturation = linearNormalization(HdrDllPluginConstants.HDRLUTCorrectionSaturation, 0.f, 2.f, 0.5f, 1.5f);
+		const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
 		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength));
 		
 		// Secondary user driven contrast

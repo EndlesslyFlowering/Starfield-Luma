@@ -38,6 +38,11 @@ namespace Hooks
 		if (const auto contrast = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Contrast))) {
 			contrast->m_Enabled.SetValue(a_bEnable);
 		}
+		
+		// There is no reason this wouldn't work in HDR, but for now it's disabled
+		if (const auto secondaryGammaSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryGamma))) {
+			secondaryGammaSetting->m_Enabled.SetValue(!a_bEnable);
+		}
     }
 
     void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
@@ -115,8 +120,10 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->UIPaperWhite, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsHDREnabled());
+		CreateSliderSetting(a_settingList, settings->SecondaryGamma, !settings->IsHDREnabled());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
+		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
 		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
@@ -386,6 +393,12 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
+			break;
+		case static_cast<int>(Settings::SettingID::kGammaCorrectionStrength):
+			HandleSetting(settings->GammaCorrectionStrength);
+			break;
+		case static_cast<int>(Settings::SettingID::kSecondaryGamma):
+			HandleSetting(settings->SecondaryGamma);
 			break;
 		}
 
