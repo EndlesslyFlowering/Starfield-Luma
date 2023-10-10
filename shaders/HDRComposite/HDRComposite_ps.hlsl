@@ -961,7 +961,8 @@ PSOutput PS(PSInput psInput)
 	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
 #endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
-	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, HdrDllPluginConstants.SecondaryGamma);
+	// The dll makes sure this is 1 when we are in HDR
+	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, HdrDllPluginConstants.SDRSecondaryGamma);
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
