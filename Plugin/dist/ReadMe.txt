@@ -8,7 +8,7 @@ List of features:
 -Native HDR (scRGB and HDR10)
 -Increased buffers accuracy in SDR and HDR, which reduced banding all around (SDR is now 10bit instead of 8bit)
 -Normalized LUTs, the grey/flat look is mostly gone, but the color tint is still there (this mod includes a runtime version of https://www.nexusmods.com/starfield/mods/2407)
--Fixed bink fullscreen videos playing back with the wrong colors (BT.709 instead of BT.601)
+-Fixed bink fullscreen videos playing back with the wrong colors (BT.601 instead of BT.709)
 -Improved the sharpening passes
 -Improved film grain to be more realistic and nice to look at (e.g. rebalancing the grain size and strength on white/black colors)
 -Fixed the game using very wrong gamma formulas
@@ -23,11 +23,19 @@ To uninstall, clear all the files (they are unique to the mod).
 
 Compatibility:
 This mod should work with any other mod, including DLSS Super Resolution and DLSS Frame Generation (scRGB is NOT supported by FG).
-You can also use customized LUTs mods, but if you do, make sure to disable "LUTs Correction" in the mods settings, or they will be corrected twice. Our suggestion is to use the LUT correction that is built in with the mod.
+You can also use customized LUTs mods, but if you do, make sure to disable "LUTs Correction" in the mods settings, or they will be corrected twice.
+Our suggestion is to use the LUT correction that is built in with the mod, as our LUTs correction code extracts HDR detail when normalizing them, something that could not be otherwise achieved.
+Additionally this mod should be compatible with any story content and new location, whether official added by Bethesda as DLCs, or unofficial mods.
 You do NOT need any other HDR related mod, like AutoHDR, or "HUD for HDR" (which dimmed the UI for AutoHDR).
 
-Issues:
+Issues and limitations:
 -The UI blends in slightly differently in HDR, usually it's not noticeable
--scRGB HDR doesn't work with DLSS Frame Generation
+-scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)
 -You can not take screenshots directly from Starfield in photo mode
 -FSR2 clips all non Rec.709 (SDR) colors
+
+Comparison with other "HDR" methods:
+-Starfield Xbox HDR: Starfield on Xbox uses an integrated for of AutoHDR, the output image in HDR is extracted from an SDR one, thus its visual quality is still bottlenecked by that.
+-Windows 11 AutoHDR: Windows 11 can apply a post process AutoHDR filter, but this is still limited by 8bits output (causing banding), interprets games as gamma sRGB instead of 2.2, and doesn't go anywhere beyond 1000 nits. Additionally, it makes the game UI too bright.
+-SpecialK HDR Retrofit: It can upgrade all buffers to 16bit but the game tonemapping remains SDR, and highlights gets mushed together and clipped.
+-Pumbo's Advanced Auto HDR + DXVK: Same problems as SpecialK HDR.
