@@ -62,7 +62,9 @@ struct CSInput
 #else
 	static const float blueFactor = 0.0722f;
 #endif
-static const float normalizationFactor = (HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709) / blueFactor;
+// Always normalize around the whole HDR10 range (anything beyond might get clipped here),
+// as even if we tonemapped to e.g. 800 nits, we want 500 nits to be treated the same independently of the peak nits.
+static const float normalizationFactor = (PQMaxNits / WhiteNits_BT709) / blueFactor;
 
 
 half3 PrepareForProcessing(half3 Color)
