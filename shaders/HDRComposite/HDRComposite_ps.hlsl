@@ -979,7 +979,7 @@ PSOutput PS(PSInput psInput)
 	}
 #endif
 
-	const float3 postProcessColorRatio = finalOriginalColor / tonemappedColor;
+	const float3 postProcessColorRatio = safeDivision(finalOriginalColor, tonemappedColor);
 	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
 #endif
 
