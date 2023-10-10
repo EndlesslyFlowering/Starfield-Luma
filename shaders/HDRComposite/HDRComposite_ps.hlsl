@@ -300,13 +300,15 @@ float3 Hable(
 	for (uint channel = 0; channel < 3; channel++)
 	{
 		float normX = InputColor[channel] * dstCurve_invW;
-		bool isToeSegment = normX < params_x0;
 		float returnChannel = 0.f;
 
 		// Toe
-		if (isToeSegment && normX > 0.f)
+		if (normX < params_x0)
 		{
-			returnChannel = exp2(((((log2(normX) * hableParams.toeSegment.B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
+			if (normX > 0.f)
+			{
+				returnChannel = exp2(((((log2(normX) * hableParams.toeSegment.B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
+			}
 		}
 		// Mid
 		else if (normX < params_x1)
