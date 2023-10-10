@@ -22,6 +22,7 @@ public:
 	static inline tPhotoMode_ToggleUI PhotoMode_ToggleUI = nullptr;
 
 	using tUI_IsMenuOpen = bool (*)(UI* a_ui, const RE::BSFixedString& a_menuName);
+	static inline UI** uiPtr = nullptr;
 	static inline tUI_IsMenuOpen UI_IsMenuOpen = nullptr;
 
 	static inline float* g_deltaTimeRealTime = nullptr;
@@ -46,6 +47,7 @@ public:
 		ShowMessageBox = reinterpret_cast<tShowMessageBox>(dku::Hook::IDToAbs(167094));
 		PhotoMode_ToggleUI = reinterpret_cast<tPhotoMode_ToggleUI>(dku::Hook::IDToAbs(139734));
 
+		uiPtr = reinterpret_cast<UI**>(dku::Hook::IDToAbs(878339));
 		UI_IsMenuOpen = reinterpret_cast<tUI_IsMenuOpen>(dku::Hook::IDToAbs(187049));
 
 		g_deltaTimeRealTime = reinterpret_cast<float*>(dku::Hook::IDToAbs(871870));
