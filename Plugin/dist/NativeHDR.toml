@@ -2,8 +2,8 @@
 DevSetting01 = 0.0
 DevSetting02 = 0.0
 DevSetting03 = 0.0
-DevSetting04 = 0.0
-DevSetting05 = 0.0
+DevSetting04 = 0.5
+DevSetting05 = 0.5
 
 [HDR]
 Contrast = 50.0
