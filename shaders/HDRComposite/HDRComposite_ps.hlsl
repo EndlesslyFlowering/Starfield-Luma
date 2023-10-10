@@ -3,10 +3,11 @@
 #include "../math.hlsl"
 #include "RootSignature.hlsl"
 
-// These are defined at compile time (shaders permutations)
+// These are defined at compile time (shaders permutations),
+// they are generally all on by default, you can undefine them manually below if necessary.
 //#define APPLY_BLOOM
 //#define APPLY_TONEMAPPING
-//#define APPLY_CINEMATICS // this is post processing
+//#define APPLY_CINEMATICS
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
@@ -940,11 +941,12 @@ PSOutput PS(PSInput psInput)
 	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD);
 #endif // ENABLE_LUT
 
-#if GAMMA_CORRECT_SDR_RANGE_ONLY && (FIX_WRONG_SRGB_GAMMA_FORMULA || SDR_USE_GAMMA_2_2)
+#if GAMMA_CORRECT_SDR_RANGE_ONLY
 	const float3 tonemappedPostProcessedGradedSDRColors = saturate(tonemappedPostProcessedGradedColor);
 	const float3 tonemappedPostProcessedGradedSDRExcessColors = tonemappedPostProcessedGradedColor - tonemappedPostProcessedGradedSDRColors;
 	tonemappedPostProcessedGradedColor = tonemappedPostProcessedGradedSDRColors;
-#endif
+#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+
 // Do these even if "ENABLE_LUT" is false, for consistency
 #if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it
 	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
@@ -956,12 +958,13 @@ PSOutput PS(PSInput psInput)
 	// (this is not entirely true, but the world is too black with this adjustment if there's no color grading).
 	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
 #endif // SDR_USE_GAMMA_2_2
-#if GAMMA_CORRECT_SDR_RANGE_ONLY && (FIX_WRONG_SRGB_GAMMA_FORMULA || SDR_USE_GAMMA_2_2)
-	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
-#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
 	// The dll makes sure this is 1 when we are in HDR
 	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, -(HdrDllPluginConstants.SDRSecondaryGamma - 1.f) + 1.f);
+
+#if GAMMA_CORRECT_SDR_RANGE_ONLY
+	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
+#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
