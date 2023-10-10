@@ -962,7 +962,7 @@ PSOutput PS(PSInput psInput)
 #endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
 	// The dll makes sure this is 1 when we are in HDR
-	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, HdrDllPluginConstants.SDRSecondaryGamma);
+	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, -(HdrDllPluginConstants.SDRSecondaryGamma - 1.f) + 1.f);
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
@@ -1114,8 +1114,9 @@ PSOutput PS(PSInput psInput)
 #endif
 
 		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization.
-		const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
-		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength));
+		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
+		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
+		inverseTonemappedPostProcessedColor = Saturation(saturate(inverseTonemappedPostProcessedColor), saturation);
 		
 		// Secondary user driven contrast
 		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
