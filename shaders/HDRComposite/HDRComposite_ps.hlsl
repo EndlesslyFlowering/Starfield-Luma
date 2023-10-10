@@ -29,6 +29,12 @@
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
 // or to replicate the SDR tonemapper by luminance, though both would alter the look too much and break some scenes.
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY 1
+// If we are running in HDR, and we are keeping the SDR tonemapped shadow and midtones ("INVERT_TONEMAP_HIGHLIGHTS_ONLY" true),
+// then if this is true, we replace the SDR tonemapped image with one tonemapped by channel instead than by luminance, to maintain more saturation.
+#define HDR_TONEMAP_BY_LUMINANCE 1
+// Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
+// It also dampens colors, making them darker and less saturation, especially bright colors.
+#define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
 
 
@@ -295,6 +301,8 @@ float3 Hable(
 	// Eval end
 	hableParams.invScale = 1.f / evalY0;
 
+	hableParams.shoulderStart = (max(params_x0, params_x1) / dstCurve_invW) / hableParams.invScale;
+
 	float3 toneMapped;
 
 	for (uint channel = 0; channel < 3; channel++)
@@ -403,6 +411,7 @@ void Hable_Inverse_Channel(
 }
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L45-L52
+// NOTE: the precision of this inverse formula is within an offset of 0.0005 on most pixels, with highlights struggling more to being recovered.
 template<class T>
 T Hable_Inverse(
 	T              InputColor,
@@ -437,7 +446,7 @@ float3 DICETonemap(
 	float  HighlightsShoulderStart = 0.f,
 	float  HighlightsModulationPow = 1.f)
 {
-#if 0 // Even if all SDR tonemappers work by channel, in HDR we prefer to maintain the hue and to match the screen peak brightness in absolute (luminance) nits, not as channel values.
+#if !HDR_TONEMAP_BY_LUMINANCE // Even if all SDR tonemappers work by channel, in HDR we prefer to maintain the hue and to match the screen peak brightness in absolute (luminance) nits, not as channel values.
 	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
 	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
 	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
@@ -784,18 +793,19 @@ float3 GradingLUT(float3 color, float2 uv)
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
 // Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
-// "midGrayScale" is how much mid gray shifted when doing tm->inv_tm.
-float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColorRatio, float3 postProcessColorOffset, float3 tonemappedColor, float midGrayScale)
+float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColorRatio, float3 postProcessColorOffset, float3 tonemappedColor)
 {
 	float3 postProcessedRatioColor = inverseTonemappedColor;
 	float3 postProcessedOffsetColor = inverseTonemappedColor;
 	postProcessedRatioColor *= postProcessColorRatio;
-	postProcessedOffsetColor += postProcessColorOffset * midGrayScale;
-	// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
-	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
-#if 1 // Note: in case "INVERT_TONEMAP_HIGHLIGHTS_ONLY" was false, we might want to test the "postProcessedOffsetColor" blend in range more carefully
+	postProcessedOffsetColor += postProcessColorOffset;
+// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
+// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
+// Note: in case "INVERT_TONEMAP_HIGHLIGHTS_ONLY" was false, we might want to test the "postProcessedOffsetColor" blend in range more carefully.
+// For the "INVERT_TONEMAP_HIGHLIGHTS_ONLY" true case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
+#if 1
 	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
-#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values
+#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_BY_LUMINANCE"
 	return select(tonemappedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
 #endif
 }
@@ -863,9 +873,11 @@ PSOutput PS(PSInput psInput)
 	float3 outputColor = inputColor;
 
 	float3 tonemappedColor;
+	float3 tonemappedByLuminanceColor;
 
 #if !ENABLE_TONEMAP
 	tonemappedColor = inputColor;
+	tonemappedByLuminanceColor = inputColor;
 	float3 tonemappedPostProcessedColor = tonemappedColor;
 #else
 
@@ -878,28 +890,37 @@ PSOutput PS(PSInput psInput)
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
 
+	const float untonemappedColorLuminance = Luminance(inputColor);
+	float tonemappedColorLuminance;
+
 	switch (tonemapperIndex)
 	{
 		case 1:
 		{
-			tonemappedColor = ACESReference(inputColor, clampACES);
+			tonemappedColor          = ACESReference(inputColor, clampACES);
+			tonemappedColorLuminance = ACESReference(untonemappedColorLuminance, clampACES);
 		} break;
 
 		case 2:
 		{
-			tonemappedColor = ACESParametric(inputColor, clampACES, acesParam_modE, acesParam_modA);
+			tonemappedColor          = ACESParametric(inputColor, clampACES, acesParam_modE, acesParam_modA);
+			tonemappedColorLuminance = ACESParametric(untonemappedColorLuminance, clampACES, acesParam_modE, acesParam_modA);
 		} break;
 
 		case 3:
 		{
-			tonemappedColor = Hable(inputColor, hableParams);
+			tonemappedColor          = Hable(inputColor, hableParams);
+			tonemappedColorLuminance = Hable(untonemappedColorLuminance.xxx, hableParams).x; //TODO: make hable templatable
 		} break;
 
 		default:
 		{
-			tonemappedColor = inputColor;
+			tonemappedColor          = inputColor;
+			tonemappedColorLuminance = untonemappedColorLuminance;
 		} break;
 	}
+
+	tonemappedByLuminanceColor = inputColor * safeDivision(tonemappedColorLuminance, untonemappedColorLuminance);
 
 #if ENABLE_POST_PROCESS
 	float prePostProcessColorLuminance;
@@ -941,6 +962,14 @@ PSOutput PS(PSInput psInput)
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+	const bool SDRTonemapByLuminance = (bool)HDR_TONEMAP_BY_LUMINANCE && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
+#if 1 // This is delicate and could make things worse, especially within "RestorePostProcess()", but without it, highlights have uncontiguos gradients that shift color (due to strong LUTs)
+	if (SDRTonemapByLuminance)
+	{
+		tonemappedColor = tonemappedByLuminanceColor;
+	}
+#endif
+
 	const float3 postProcessColorRatio = finalOriginalColor / tonemappedColor;
 	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
 #endif
@@ -954,98 +983,150 @@ PSOutput PS(PSInput psInput)
 		const float midGrayIn = MidGray;
 		float midGrayOut = midGrayIn;
 
-		float3 inverseTonemappedColor = tonemappedColor;
-
-		float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception space
+		float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception SDR space
 		float minHighlightsColorOut = minHighlightsColorIn;
+#if DEVELOPMENT
+        const float localSDRTonemapHDRStrength = 1.f - HdrDllPluginConstants.DevSetting01;
+#else
+        const float localSDRTonemapHDRStrength = SDRTonemapHDRStrength;
+#endif
 		const bool onlyInvertHighlights = (bool)INVERT_TONEMAP_HIGHLIGHTS_ONLY;
+		// If true, we need to calculate the inverse tonemap
+        const bool needsInverseTonemap = !onlyInvertHighlights || localSDRTonemapHDRStrength != 1.f;
+
+        float3 inverseTonemappedColor = needsInverseTonemap ? tonemappedColor : inputColor;
 
 		// Restore a color very close to the original linear one (some information might get close in the direct tonemapper)
 		switch (tonemapperIndex)
 		{
 			case 1:
 			{
-				inverseTonemappedColor        = ACESReference_Inverse(inverseTonemappedColor);
-				midGrayOut                    = ACESReference_Inverse(midGrayIn);
+				if (needsInverseTonemap)
+				{
+					inverseTonemappedColor    = ACESReference_Inverse(inverseTonemappedColor);
+					midGrayOut                = ACESReference_Inverse(midGrayIn);
+				}
 				minHighlightsColorOut         = ACESReference_Inverse(minHighlightsColorIn);
 			} break;
 
 			case 2:
 			{
-				inverseTonemappedColor        = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
-				midGrayOut                    = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
+				if (needsInverseTonemap)
+				{
+					inverseTonemappedColor    = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
+					midGrayOut                = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
+				}
 				minHighlightsColorOut         = ACESParametric_Inverse(minHighlightsColorIn, acesParam_modE, acesParam_modA);
 			} break;
 
 			case 3:
 			{
-				// Setup highlights for Hable, we use the official param based highlights shoulder start for it
-				minHighlightsColorIn = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
+				// Setup highlights for Hable, we use the official param based highlights shoulder start for it, so that we switch tonemapper in the same place where the hable curve would change direction (or so I think)
+                const float shoulderOutStart = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
+                minHighlightsColorIn         = shoulderOutStart;
 
-				inverseTonemappedColor = Hable_Inverse(inverseTonemappedColor, 3, hableParams);
-				midGrayOut             = Hable_Inverse(midGrayIn, 1, hableParams);
-				minHighlightsColorOut  = Hable_Inverse(minHighlightsColorIn, 1, hableParams);
+				if (needsInverseTonemap)
+				{
+					inverseTonemappedColor   = Hable_Inverse(inverseTonemappedColor, 3, hableParams);
+					midGrayOut               = Hable_Inverse(midGrayIn, 1, hableParams);
+				}
+#if 1 // Optimized and more "accurate"
+                minHighlightsColorOut        = hableParams.shoulderStart;
+#else
+                minHighlightsColorOut        = Hable_Inverse(minHighlightsColorIn, 1, hableParams);
+#endif
 			} break;
 
 			default:
 				break;
 		}
 
-		for (uint channel = 0; channel < 3; channel++)
+		if (!SDRTonemapByLuminance)
 		{
-			// Scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
-			if (onlyInvertHighlights && inverseTonemappedColor[channel] < minHighlightsColorOut)
+			for (uint channel = 0; channel < 3; channel++)
 			{
-				inverseTonemappedColor[channel] = tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn);
-			}
-			// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
-			// If there were problems with this (a disconnect in gradients), directly compare "inputColor" against "minHighlightsColorOut".
-			if (inverseTonemappedColor[channel] >= minHighlightsColorOut)
-			{
-				inverseTonemappedColor[channel] = inputColor[channel];
+#if 1 // Directly use the input/source non tonemapped color for comparisons against the highlights, hopefully this won't cause any gradients disconnects
+				const bool isHighlight = inputColor[channel] >= minHighlightsColorOut;
+#elif 0
+				const bool isHighlight = (needsInverseTonemap ? inverseTonemappedColor[channel] : inputColor[channel]) >= minHighlightsColorOut;
+#else // The least precise of them all
+				const bool isHighlight = tonemappedColor[channel] >= minHighlightsColorIn;
+#endif
+				// Restore the SDR tonemapped colors for non highlights,
+				// We scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
+				if (onlyInvertHighlights && !isHighlight)
+				{
+					inverseTonemappedColor[channel] = tonemappedColor[channel] * (minHighlightsColorOut / minHighlightsColorIn);
+				}
+				// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
+				if (needsInverseTonemap && isHighlight)
+				{
+					inverseTonemappedColor[channel] = inputColor[channel];
+				}
 			}
 		}
-		const float previousMidGrayOut = midGrayOut;
-		// If we only inverted highlights, the mid gray in and out should have the same value, so we need to base it on the highlights in/out change
-		if (onlyInvertHighlights && midGrayOut < minHighlightsColorOut) // This is probably always true
+		else
 		{
-			midGrayOut = midGrayIn * (minHighlightsColorOut / minHighlightsColorIn);
+#if 1
+			const bool isHighlight = untonemappedColorLuminance >= minHighlightsColorOut;
+#else
+			const bool isHighlight = (needsInverseTonemap ? Luminance(inverseTonemappedColor) : untonemappedColorLuminance) >= minHighlightsColorOut;
+#endif
+			if (onlyInvertHighlights && !isHighlight)
+			{
+				inverseTonemappedColor = tonemappedByLuminanceColor * (minHighlightsColorOut / minHighlightsColorIn);
+			}
+			if (needsInverseTonemap && isHighlight)
+			{
+				inverseTonemappedColor = inputColor;
+			}
 		}
-		// Shift back to the original linear color if we want to ignore the SDR tonemapper
-		if (onlyInvertHighlights && SDRTonemapHDRStrength != 1.f)
+
+        if (onlyInvertHighlights)
 		{
-			inverseTonemappedColor = lerp(inputColor, inverseTonemappedColor, SDRTonemapHDRStrength);
-			midGrayOut = lerp(previousMidGrayOut, midGrayOut, SDRTonemapHDRStrength);
-			minHighlightsColorOut = lerp(minHighlightsColorIn, minHighlightsColorOut, SDRTonemapHDRStrength);
+        	// If we only inverted highlights, the mid gray in and out should follow the same scale of the highlightd in/out change, otherwise the curves wouldn't connect.
+			// In the extremely unlikely case that "midGrayOut" was higher than "minHighlightsColorOut", this calculaton should still be ok.
+			midGrayOut = lerp(midGrayOut, midGrayIn * (minHighlightsColorOut / minHighlightsColorIn), localSDRTonemapHDRStrength);
+			// Shift back to the original linear color if we want to ignore the SDR tonemapper
+			if (localSDRTonemapHDRStrength != 1.f)
+			{
+				inverseTonemappedColor = lerp(inputColor, inverseTonemappedColor, localSDRTonemapHDRStrength);
+				minHighlightsColorOut = lerp(minHighlightsColorIn, minHighlightsColorOut, localSDRTonemapHDRStrength);
+			}
 		}
 
 		const float midGrayScale = midGrayOut / midGrayIn;
 
-		float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale);
+		// Bring back the color to the same range as SDR by matching the mid gray level.
+        inverseTonemappedColor /= midGrayScale;
+        minHighlightsColorOut /= midGrayScale;
+		
+		float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
-		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor, midGrayScale);
-#endif
-	
-		// Secondary user driven contrast
-		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
-#if 0 // By luminance (no hue shift) (looks off)
-		float inverseTonemappedPostProcessedColorLuminance = Luminance(inverseTonemappedPostProcessedColor);
-		inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / (MidGray * midGrayScale), secondaryContrast) * (MidGray * midGrayScale), inverseTonemappedPostProcessedColorLuminance);
-#else // By channel (also increases saturation)
-		inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / (MidGray * midGrayScale), secondaryContrast) * (MidGray * midGrayScale);
+		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #endif
 
 		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization.
 		const float saturation = linearNormalization(HdrDllPluginConstants.HDRLUTCorrectionSaturation, 0.f, 2.f, 0.5f, 1.5f);
 		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength));
+		
+		// Secondary user driven contrast
+		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
+#if 0 // By luminance (no hue shift) (looks off)
+		float inverseTonemappedPostProcessedColorLuminance = Luminance(inverseTonemappedPostProcessedColor);
+		inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / MidGray, secondaryContrast) * MidGray, inverseTonemappedPostProcessedColorLuminance);
+#else // By channel (also increases saturation)
+		inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / MidGray, secondaryContrast) * MidGray;
+#endif
 
-		// Bring back the color to the same range as SDR by dividing by the mid gray change.
-		inverseTonemappedPostProcessedColor *= paperWhite / midGrayScale;
-		minHighlightsColorOut *= paperWhite / midGrayScale;
+        //TODO: put BT.709->BT.2020 gamut expansion here if necessary (e.g. after the midGrayScale division)
+
+        inverseTonemappedPostProcessedColor *= paperWhite;
+        minHighlightsColorOut *= paperWhite;
 
 		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709;
 		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness (found empircally)
-		const float highlightsShoulderStart = onlyInvertHighlights ? min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut) : 0.f;
+		const float highlightsShoulderStart = onlyInvertHighlights ? lerp(0.f, min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut), localSDRTonemapHDRStrength) : 0.f;
   	  	outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
 
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP

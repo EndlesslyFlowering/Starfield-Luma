@@ -136,7 +136,7 @@ void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 		}
 	}
 
-	//TODO: either store min/max channels merged or separately, but not both
+	// TODO: either store min/max channels merged or separately, but not both
 	Analysis.minChannel = min(minColor.r, min(minColor.g, minColor.b));
 	Analysis.maxChannel = max(maxColor.r, max(maxColor.g, maxColor.b));
 	Analysis.minRed = minRed;
