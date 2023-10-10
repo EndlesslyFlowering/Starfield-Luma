@@ -112,8 +112,9 @@ static const float ACES_d = 0.59f;
 static const float ACES_e = 0.14f;
 
 
-float3 ACES(
-	float3 Color,
+template<class T>
+T ACES(
+	T Color,
 	bool   Clamp,
 	float  modE,
 	float  modA)
@@ -126,16 +127,18 @@ float3 ACES(
 
 // ACESFilm by Krzysztof Narkowicz (https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
 // (color * ((a * color) + b)) / (color * ((c * color) + d) + e)
-float3 ACESReference(
-	float3 Color,
+template<class T>
+T ACESReference(
+	T Color,
 	bool   Clamp)
 {
 	return ACES(Color, Clamp, ACES_e, ACES_a);
 }
 
 // ACESFilm "per scene"
-float3 ACESParametric(
-	in    float3 Color,
+template<class T>
+T ACESParametric(
+	in    T Color,
 	in    bool   Clamp,
 	inout float  modE,
 	inout float  modA)
