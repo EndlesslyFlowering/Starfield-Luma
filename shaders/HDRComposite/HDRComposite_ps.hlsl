@@ -6,15 +6,14 @@
 // These are defined at compile time (shaders permutations)
 //#define APPLY_BLOOM
 //#define APPLY_TONEMAPPING
-//#define APPLY_CINEMATICS
+//#define APPLY_CINEMATICS // this is post processing
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
 #define FIX_WRONG_SRGB_GAMMA_FORMULA (FORCE_VANILLA_LOOK ? 0 : 1)
 
-// This disables most other features (post process, LUTs, ...)
+// This disables most other features (LUTs, ...)
 #define ENABLE_TONEMAP 1
-#define ENABLE_POST_PROCESS 1
 // 0 disable contrast adjustment
 // 1 original (weak, generates values beyond 0-1 which then might get clipped)
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
@@ -824,7 +823,7 @@ PSOutput PS(PSInput psInput)
 		drawLUT = true;
 		LUTColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
 	}
-		
+
 	if (drawLUT)
 	{
 #if !LUT_FIX_GAMMA_MAPPING
@@ -847,7 +846,7 @@ PSOutput PS(PSInput psInput)
 		}
 
 		PSOutput psOutput;
-		psOutput.SV_Target.rgb = outputColor; 
+		psOutput.SV_Target.rgb = outputColor;
 		psOutput.SV_Target.a = 1.f;
 		return psOutput;
 	}
@@ -924,12 +923,12 @@ PSOutput PS(PSInput psInput)
 
 	tonemappedByLuminanceColor = inputColor * safeDivision(tonemappedColorLuminance, untonemappedColorLuminance);
 
-#if ENABLE_POST_PROCESS
+#if APPLY_CINEMATICS
 	float prePostProcessColorLuminance;
 	float3 tonemappedPostProcessedColor = lerp(tonemappedColor, PostProcess(tonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
 #else
 	float3 tonemappedPostProcessedColor = tonemappedColor; // No need to do anything (not even a saturate here)
-#endif //ENABLE_POST_PROCESS
+#endif //APPLY_CINEMATICS
 
 #endif // ENABLE_TONEMAP
 
@@ -1107,7 +1106,7 @@ PSOutput PS(PSInput psInput)
 		// Bring back the color to the same range as SDR by matching the mid gray level.
         inverseTonemappedColor /= midGrayScale;
         minHighlightsColorOut /= midGrayScale;
-		
+
 		float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
@@ -1117,7 +1116,7 @@ PSOutput PS(PSInput psInput)
 		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
 		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
 		inverseTonemappedPostProcessedColor = Saturation(saturate(inverseTonemappedPostProcessedColor), saturation);
-		
+
 		// Secondary user driven contrast
 		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
 #if 0 // By luminance (no hue shift) (looks off)
