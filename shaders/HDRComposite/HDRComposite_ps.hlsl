@@ -1112,10 +1112,10 @@ PSOutput PS(PSInput psInput)
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #endif
 
-		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization.
+		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
 		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
 		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
-		inverseTonemappedPostProcessedColor = Saturation(saturate(inverseTonemappedPostProcessedColor), saturation);
+		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, saturation);
 
 		// Secondary user driven contrast
 		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
