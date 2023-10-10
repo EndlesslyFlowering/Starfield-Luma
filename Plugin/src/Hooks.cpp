@@ -235,6 +235,8 @@ namespace Hooks
 
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
+		Utils::CheckCompatibility();
+
 		// save the pointer for later
 		Settings::swapChainObject = a_bgsSwapchainObject;
 
@@ -242,7 +244,7 @@ namespace Hooks
 
 		a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(settings->GetDisplayModeColorSpaceType());
 
-		Settings::RegisterReshadeOverlay();
+		settings->RegisterReshadeOverlay();
 
 		return _UnkFunc(a1, a_bgsSwapchainObject);		
     }

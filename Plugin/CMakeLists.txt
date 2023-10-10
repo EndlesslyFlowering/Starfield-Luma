@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.21)
 
 # info
 project(
-	NativeHDR
-	VERSION 1.0.0
+	Luma
+	VERSION 0.1.0
 	LANGUAGES CXX
 )
 

@@ -76,6 +76,20 @@ namespace Settings
 		a_outShaderConstants.DevSetting05 = static_cast<float>(DevSetting05.value.get_data() * 0.01f);  // 0-100 to 0-1
     }
 
+    void Main::RegisterReshadeOverlay()
+    {
+		if (!bReshadeSettingsOverlayRegistered) {
+			HMODULE hModule = nullptr;
+			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(Main::GetSingleton()), &hModule);
+			if (hModule) {
+				if (reshade::register_addon(hModule)) {
+					reshade::register_overlay("Starfield Luma Settings", DrawReshadeSettings);
+					bReshadeSettingsOverlayRegistered = true;
+				}
+			}
+		}
+    }
+
     void Main::Load() noexcept
 	{
 		static std::once_flag ConfigInit;
@@ -124,5 +138,75 @@ namespace Settings
     {
 		config.Generate();
 		config.Write();
+    }
+
+    void Main::DrawReshadeSettings(reshade::api::effect_runtime*)
+    {
+        const auto settings = Settings::Main::GetSingleton();
+		settings->DrawReshadeSettings();
+    }
+
+    bool Main::DrawReshadeCheckbox(Checkbox& a_checkbox)
+    {
+		bool tempValue = *a_checkbox.value;
+		if (ImGui::Checkbox(a_checkbox.name.c_str(), &tempValue)) {
+			*a_checkbox.value = tempValue;
+			Save();
+			return true;
+		}
+		return false;
+    }
+
+    bool Main::DrawReshadeStepper(Stepper& a_stepper)
+    {
+		int tempValue = *a_stepper.value;
+		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, 0, a_stepper.optionNames.size() - 1, a_stepper.optionNames[tempValue].c_str(), ImGuiSliderFlags_NoInput)) {
+			*a_stepper.value = tempValue;
+			Save();
+			return true;
+		}
+		return false;
+    }
+
+    bool Main::DrawReshadeSlider(Slider& a_slider)
+    {
+		float tempValue = *a_slider.value;
+		if (ImGui::SliderFloat(a_slider.name.c_str(), &tempValue, a_slider.sliderMin, a_slider.sliderMax, "%.0f")) {
+			*a_slider.value = tempValue;
+			Save();
+			return true;
+		}
+		return false;
+    }
+
+    void Main::DrawReshadeSettings()
+    {
+		if (DrawReshadeStepper(DisplayMode)) {
+			const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
+
+			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
+			swapChainObject->format = newFormat;
+
+			// toggle vsync to force a swapchain recreation
+			Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
+		}
+		DrawReshadeSlider(PeakBrightness);
+		DrawReshadeSlider(GamePaperWhite);
+		DrawReshadeSlider(UIPaperWhite);
+		DrawReshadeSlider(Saturation);
+		DrawReshadeSlider(Contrast);
+		DrawReshadeSlider(GammaCorrectionStrength);
+		DrawReshadeSlider(SecondaryGamma);
+		DrawReshadeSlider(LUTCorrectionStrength);
+		DrawReshadeSlider(ColorGradingStrength);
+		DrawReshadeCheckbox(VanillaMenuLUTs);
+		DrawReshadeStepper(FilmGrainType);
+		DrawReshadeCheckbox(PostSharpen);
+
+		DrawReshadeSlider(DevSetting01);
+		DrawReshadeSlider(DevSetting02);
+		DrawReshadeSlider(DevSetting03);
+		DrawReshadeSlider(DevSetting04);
+		DrawReshadeSlider(DevSetting05);
     }
 }

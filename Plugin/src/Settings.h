@@ -223,97 +223,23 @@ namespace Settings
 
 		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
 
+		void RegisterReshadeOverlay();
+
         void Load() noexcept;
 		void Save() noexcept;
 
+		static void DrawReshadeSettings(reshade::api::effect_runtime*);
+
     private:
-		TomlConfig config = COMPILE_PROXY("NativeHDR.toml"sv);
+		TomlConfig config = COMPILE_PROXY("Luma.toml"sv);
 		std::atomic_bool bIsAtEndOfFrame = false;
+		bool bReshadeSettingsOverlayRegistered = false;
+
+		bool DrawReshadeCheckbox(Checkbox& a_checkbox);
+		bool DrawReshadeStepper(Stepper& a_stepper);
+		bool DrawReshadeSlider(Slider& a_slider);
+		void DrawReshadeSettings();
     };
 
 	static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
-
-	// settings reshade overlay
-	inline bool DrawReshadeCheckbox(Settings::Main* a_settings, Checkbox& a_checkbox)
-	{
-		bool tempValue = *a_checkbox.value;
-		if (ImGui::Checkbox(a_checkbox.name.c_str(), &tempValue)) {
-			*a_checkbox.value = tempValue;
-			a_settings->Save();
-			return true;
-		}
-		return false;
-	}
-
-	inline bool DrawReshadeStepper(Settings::Main* a_settings, Stepper& a_stepper)
-    {
-		int tempValue = *a_stepper.value;
-		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, 0, a_stepper.optionNames.size() - 1, a_stepper.optionNames[tempValue].c_str(), ImGuiSliderFlags_NoInput)) {
-		    *a_stepper.value = tempValue;
-			a_settings->Save();
-			return true;
-		}
-		return false;
-    }
-
-	inline bool DrawReshadeSlider(Settings::Main* a_settings, Slider& a_slider)
-    {
-		float tempValue = *a_slider.value;
-		if (ImGui::SliderFloat(a_slider.name.c_str(), &tempValue, a_slider.sliderMin, a_slider.sliderMax, "%.0f")) {
-		    *a_slider.value = tempValue;
-			a_settings->Save();
-			return true;
-		}
-		return false;
-    }
-	
-	static void DrawSettingsReshade(reshade::api::effect_runtime*)
-	{
-		const auto settings = Settings::Main::GetSingleton();
-
-		if (DrawReshadeStepper(settings, settings->DisplayMode)) {
-			const RE::BS_DXGI_FORMAT newFormat = settings->GetDisplayModeFormat();
-
-			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
-			swapChainObject->format = newFormat;
-
-			// toggle vsync to force a swapchain recreation
-			Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
-		}
-		DrawReshadeSlider(settings, settings->PeakBrightness);
-		DrawReshadeSlider(settings, settings->GamePaperWhite);
-		DrawReshadeSlider(settings, settings->UIPaperWhite);
-		DrawReshadeSlider(settings, settings->Saturation);
-		DrawReshadeSlider(settings, settings->Contrast);
-		DrawReshadeSlider(settings, settings->GammaCorrectionStrength);
-		DrawReshadeSlider(settings, settings->SecondaryGamma);
-		DrawReshadeSlider(settings, settings->LUTCorrectionStrength);
-		DrawReshadeSlider(settings, settings->ColorGradingStrength);
-		DrawReshadeCheckbox(settings, settings->VanillaMenuLUTs);
-		DrawReshadeStepper(settings, settings->FilmGrainType);
-		DrawReshadeCheckbox(settings, settings->PostSharpen);
-#if 1
-		DrawReshadeSlider(settings, settings->DevSetting01);
-		DrawReshadeSlider(settings, settings->DevSetting02);
-		DrawReshadeSlider(settings, settings->DevSetting03);
-		DrawReshadeSlider(settings, settings->DevSetting04);
-		DrawReshadeSlider(settings, settings->DevSetting05);
-#endif
-	}
-
-	static inline bool bReshadeSettingsOverlayRegistered = false;
-
-	static void RegisterReshadeOverlay()
-	{
-		if (!bReshadeSettingsOverlayRegistered) {
-			HMODULE hModule = nullptr;
-			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(Main::GetSingleton()), &hModule);
-			if (hModule) {
-				if (reshade::register_addon(hModule)) {
-					reshade::register_overlay("NativeHDR Settings", &DrawSettingsReshade);
-					bReshadeSettingsOverlayRegistered = true;
-				}
-			}
-		}
-	}
 }
