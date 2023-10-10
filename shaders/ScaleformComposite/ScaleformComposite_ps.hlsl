@@ -57,10 +57,10 @@ float4 PS(PSInputs inputs) : SV_Target
 	}
 #if !SDR_LINEAR_INTERMEDIARY
 	else // in SDR, output the UI as it was, independently of "SDR_USE_GAMMA_2_2", there's no need to ever adjust it really
-#endif // SDR_LINEAR_INTERMEDIARY
 	{
 		UIColor.xyz = gamma_linear_to_sRGB(UIColor.xyz);
 	}
+#endif // SDR_LINEAR_INTERMEDIARY
 
 	return UIColor;
 }
