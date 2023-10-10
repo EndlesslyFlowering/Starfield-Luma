@@ -185,7 +185,7 @@ namespace Utils
 
 	bool ShouldCorrectLUTs()
 	{
-		const auto ui = UI::GetSingleton();
+		const auto ui = *Offsets::uiPtr;
 		// make sure we do indeed correct luts in these menus, even though DataMenu is in the menu stack
 		if (Offsets::UI_IsMenuOpen(ui, "GalaxyStarMapMenu")) {
 			return true;
