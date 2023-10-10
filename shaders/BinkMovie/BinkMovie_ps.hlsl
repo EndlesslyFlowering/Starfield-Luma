@@ -14,6 +14,27 @@ struct PSInputs
 	float2 TEXCOORD : TEXCOORD0;
 };
 
+//TODO: exposure to user? At least the on/off bool, and maybe the shoulder pow and max nits, but it's probably better to simply pick a default that looks nice on most movies.
+static const bool BinkVideosAutoHDR = true;
+static const float BinkVideosAutoHDRMaxOutputNits = 750.f;
+// The higher it is, the "later" highlights start
+static const float BinkVideosAutoHDRShoulderPow = 2.75f; // A somewhat conservative value
+
+// AutoHDR pass to generate some HDR brightess out of an SDR signal (it has no effect if HDR is not engaged).
+// This is hue conserving and only really affects highlights.
+// https://github.com/Filoppi/PumboAutoHDR
+float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
+{
+    const float SDRRatio = Luminance(Color);
+    // Limit AutoHDR brightness, it won't look good beyond a certain level.
+    // The paper white multiplier is applied later so we account for that.
+    const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, WhiteNits_BT709) / WhiteNits_BT709;
+    const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
+    const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, BinkVideosAutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
+    const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
+    return Color * (AutoHDRTotalRatio / SDRRatio);
+}
+
 [RootSignature(ShaderRootSignature)]
 float4 PS(PSInputs inputs) : SV_Target
 {
@@ -53,9 +74,11 @@ float4 PS(PSInputs inputs) : SV_Target
 
 		if (HdrDllPluginConstants.DisplayMode > 0)
 		{
-			//TODO: AutoHDR on movies???
+			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+			if (BinkVideosAutoHDR)
+				color = PumboAutoHDR(color, HdrDllPluginConstants.HDRPeakBrightnessNits, paperWhite);
 
-			color *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709; // Use the game brightness, not the UI one, as these are usually videos that are seamless with gameplay
+			color *= paperWhite; // Use the game brightness, not the UI one, as these are usually videos that are seamless with gameplay
 		}
 	}
 
