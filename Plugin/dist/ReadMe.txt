@@ -2,6 +2,7 @@ This mod was created by 5 (HDR passionate) developers (Ersh, Pumbo (Filoppi / Fi
 The main thing the mod does is adding Native HDR support to the game, which is not the same as the one seen on Xbox, this version changes the game tonemapper and color correction phase to give a much more HDR look, while also trying to retaining the look and feel of the vanilla game. This was achieved by replacing the game shaders.
 This mod also improves the look of the game in SDR, so benefits are not restricted to HDR users.
 This is a follow up to https://www.nexusmods.com/starfield/mods/588, which just increased the quality of the game buffers to 10bit+, leaving more room for AutoHDR to work.
+Join our discord here: https://discord.gg/DNGfMZgH3f
 
 List of features:
 -Native HDR (scRGB and HDR10)
@@ -29,3 +30,4 @@ Issues:
 -The UI blends in slightly differently in HDR, usually it's not noticeable
 -scRGB HDR doesn't work with DLSS Frame Generation
 -You can not take screenshots directly from Starfield in photo mode
+-FSR2 clips all non Rec.709 (SDR) colors
