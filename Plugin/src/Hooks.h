@@ -45,9 +45,10 @@ namespace Hooks
 
 			// Settings UI
 			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136113, 0x62F), Hook_CreateMonitorSetting);
-			_SettingsDataModelBoolEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelBoolEvent);
-			_SettingsDataModelIntEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelIntEvent);
-			_SettingsDataModelFloatEvent = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136130, 0x37), Hook_SettingsDataModelFloatEvent);
+			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
+			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
+			_SettingsDataModelSliderChanged = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135739, 0xA3), Hook_SettingsDataModelSliderChanged);
+			_SettingsDataModelSliderChanged = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135956, 0x4), Hook_SettingsDataModelSliderChanged);
 
 			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x89), Hook_RecreateSwapchain);
 
@@ -79,12 +80,12 @@ namespace Hooks
 
 		static void Hook_CreateMonitorSetting(void* a1, void* a2);
 		static inline std::add_pointer_t<decltype(Hook_CreateMonitorSetting)> _CreateMonitorSetting;
-		static void Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
-		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelBoolEvent)> _SettingsDataModelBoolEvent;
-		static void Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
-		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelIntEvent)> _SettingsDataModelIntEvent;
-		static void Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
-		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelFloatEvent)> _SettingsDataModelFloatEvent;
+		static void Hook_SettingsDataModelCheckboxChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelCheckboxChanged)> _SettingsDataModelCheckboxChanged;
+		static void Hook_SettingsDataModelStepperChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelStepperChanged)> _SettingsDataModelStepperChanged;
+		static void Hook_SettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelSliderChanged)> _SettingsDataModelSliderChanged;
 
 		static bool Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2);
 		static bool Hook_ApplyRenderPassRenderState2(void* a_arg1, void* a_arg2);
