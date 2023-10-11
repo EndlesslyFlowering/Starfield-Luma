@@ -212,3 +212,23 @@ float3 linear_srgb_to_oklch(float3 rgb) {
 		linear_srgb_to_oklab(rgb)
 	);
 }
+
+float3 gamma_linear_to_sRGB_Bethesda_Optimized(float3 Color, float InverseGamma = 1.f / 2.4f)
+{
+#if 0
+	return (pow(Color, InverseGamma) * 1.055f) - 0.055f;
+#else // Fixes up the clipped blacks caused by the subtraction
+	return (pow(Color, InverseGamma) * 1.055f) - (0.055f * Color);
+#endif
+}
+
+float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
+{
+#if 0 // Original exact inverse formula, this is heavily broken, especially in its inverse form
+	return (pow(Color, Gamma) / 1.055f) + 0.055f;
+#elif 1 // Fixes up the raised blacks caused by the addition
+	return (pow(Color, Gamma) / 1.055f) + (0.055f * Color);
+#else // The most simplified version, which possibly works best
+	return pow(Color, Gamma);
+#endif
+}
