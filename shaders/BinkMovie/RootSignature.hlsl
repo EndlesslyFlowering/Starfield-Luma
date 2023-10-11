@@ -1,3 +1,5 @@
+#include "../shared.hlsl"
+
 #define ShaderRootSignature \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT), " \
 	\
@@ -7,5 +9,5 @@
 		"SRV(t2, space=8) " \
 	"), " \
 	\
-	"RootConstants(num32BitConstants=19, b3), " \
+	"RootConstants(num32BitConstants=" HDR_PLUGIN_CONSTANTS_SIZE ", b3), " \
 	"StaticSampler(s0, filter=FILTER_MIN_MAG_MIP_LINEAR, addressU=TEXTURE_ADDRESS_CLAMP, addressV=TEXTURE_ADDRESS_CLAMP, addressW=TEXTURE_ADDRESS_CLAMP, maxAnisotropy=1, comparisonFunc=COMPARISON_NEVER, space=8) "
