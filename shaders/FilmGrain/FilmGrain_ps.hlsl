@@ -80,10 +80,16 @@ void frag_main()
 	// linearColor is used to compute Y
 	float3 linearColor = inputColor;
 	
-	if (HdrDllPluginConstants.DisplayMode > 0)
+	bool isInOutColorLinear = HdrDllPluginConstants.DisplayMode > 0;
+#if SDR_LINEAR_INTERMEDIARY
+	isInOutColorLinear |= HdrDllPluginConstants.DisplayMode <= 0;
+#endif // SDR_LINEAR_INTERMEDIARY
+	if (isInOutColorLinear)
 	{
 		srgbColor = gamma_linear_to_sRGB(inputColor / paperWhite);
-	} else {
+	}
+	else
+	{
 		linearColor = gamma_sRGB_to_linear(inputColor);
 	}
 
@@ -167,7 +173,6 @@ void frag_main()
 	// Note: we let this possibly generate colors below 1 for scRGB
 	float3 tonemappedColorWithFilmGrain = srgbColor + newColor;
 
-
 #if 0 // WIP fixes
 	// Right side only
 	if (TEXCOORD.x < 0.5f) {
@@ -175,7 +180,7 @@ void frag_main()
 	}
 #endif
 
-	if (HdrDllPluginConstants.DisplayMode > 0)
+	if (isInOutColorLinear)
 	{
 		tonemappedColorWithFilmGrain = gamma_sRGB_to_linear(tonemappedColorWithFilmGrain) * paperWhite;
 	}
