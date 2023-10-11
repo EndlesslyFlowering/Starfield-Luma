@@ -1,5 +1,6 @@
 #pragma once
 
+#define FLT_MIN 1.175494351e-38f
 #define FLT_MAX 3.402823466e+38F
 #define FLT10_MAX 64512.f
 #define FLT11_MAX 65024.f

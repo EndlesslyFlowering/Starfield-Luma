@@ -753,16 +753,6 @@ float3 TetrahedralInterpolation(
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 
-float3 gamma_linear_to_sRGB_Bethesda_Optimized(float3 Color, float InverseGamma = 1.f / 2.4f)
-{
-	return (pow(Color, InverseGamma) * 1.055f) - 0.055f;
-}
-
-float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
-{
-	return (pow(Color, Gamma) / 1.055f) + 0.055f;
-}
-
 // In/Out linear space
 float3 GradingLUT(float3 color, float2 uv)
 {
@@ -1121,7 +1111,9 @@ PSOutput PS(PSInput psInput)
 
 		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
 		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
 		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
+#endif
 		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, saturation);
 
 		// Secondary user driven contrast
@@ -1130,7 +1122,7 @@ PSOutput PS(PSInput psInput)
 		float inverseTonemappedPostProcessedColorLuminance = Luminance(inverseTonemappedPostProcessedColor);
 		inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / MidGray, secondaryContrast) * MidGray, inverseTonemappedPostProcessedColorLuminance);
 #else // By channel (also increases saturation)
-		inverseTonemappedPostProcessedColor = pow(inverseTonemappedPostProcessedColor / MidGray, secondaryContrast) * MidGray;
+		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
 #endif
 
         //TODO: put BT.709->BT.2020 gamut expansion here if necessary (e.g. after the midGrayScale division)
@@ -1180,6 +1172,5 @@ PSOutput PS(PSInput psInput)
 	PSOutput psOutput;
 	psOutput.SV_Target.rgb = outputColor;
 	psOutput.SV_Target.a = 1.f;
-
 	return psOutput;
 }
