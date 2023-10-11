@@ -5,8 +5,18 @@
 
 #define FILM_GRAIN_TEXTURE_SIZE 1024u
 
-// 1 New Random (no flicker/repeating), 2 New random, no raised blacks 3 Kodak Filmic
-#define IMPROVED_FILM_GRAIN_TYPE 3
+#if SDR_LINEAR_INTERMEDIARY
+	#define GAMMA_TO_LINEAR(x) x
+	#define LINEAR_TO_GAMMA(x) x
+#elif SDR_USE_GAMMA_2_2
+	#define GAMMA_TO_LINEAR(x) pow(x, 2.2f)
+	#define LINEAR_TO_GAMMA(x) pow(x, 1.f / 2.2f)
+#else
+	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
+	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
+#endif
+
+#define IMPROVED_FILM_GRAIN true
 
 cbuffer _13_15 : register(b0, space0)
 {
@@ -74,35 +84,20 @@ void frag_main()
 //   .z = Film Grading Intensity (0 - 0.03)
 
 	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
-	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
-	// sRGBColor gets the luminance shift
-	float3 srgbColor = inputColor;
-	// linearColor is used to compute Y
-	float3 linearColor = inputColor;
-	
-	bool isInOutColorLinear = HdrDllPluginConstants.DisplayMode > 0;
+	bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
+	bool isInOutColorLinear = isHDR;
 #if SDR_LINEAR_INTERMEDIARY
 	isInOutColorLinear |= HdrDllPluginConstants.DisplayMode <= 0;
 #endif // SDR_LINEAR_INTERMEDIARY
-	if (isInOutColorLinear)
-	{
-		srgbColor = gamma_linear_to_sRGB(inputColor / paperWhite);
-	}
-	else
-	{
-		linearColor = gamma_sRGB_to_linear(inputColor);
-	}
 
-#if 0 // Debug Gradient
-	float pixelNumber = 1.f - (TEXCOORD.y);
-	linearColor = float3(pixelNumber, pixelNumber, pixelNumber);
-	srgbColor = gamma_linear_to_sRGB(linearColor);
-#endif
-
-	float randomNumber, customMultiplier;
+	float3 outputColor;
 
 	if (HdrDllPluginConstants.FilmGrainType == 0)
 	{
+		float3 gammaColor = (isInOutColorLinear)
+			? LINEAR_TO_GAMMA(inputColor)
+			: inputColor;
+		
 		const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
 		const float filmGrainHalfSize = 521.f; //TODO: rename in case we keep this as 521
 		// Applying modulus against 1023 will give value between 0 and 1023
@@ -122,10 +117,29 @@ void frag_main()
 		float seed = (uniqueX + uniqueY);
 
 		// Generate a random number between 0 and 1;
-		randomNumber = bethesdaRandom(seed);
+		float randomNumber = bethesdaRandom(seed);
 
-		float colorLuma = Luminance(srgbColor);
-		customMultiplier = saturate(1.f - colorLuma); // inverseLuma
+		float colorLuma = Luminance(gammaColor);
+		float inverseLuma = saturate(1.f - colorLuma); // inverseLuma
+
+		float luminanceShift = (randomNumber * 2.f) - 1.f;
+
+		float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * inverseLuma);
+		float3 newColor = float3(additiveFilmGrain, additiveFilmGrain, additiveFilmGrain);
+
+		outputColor = gammaColor + newColor;
+
+#if 0 // Output Visualization
+	float oldY = Luminance(GAMMA_TO_LINEAR(gammaColor));
+	float newY = Luminance(GAMMA_TO_LINEAR(outputColor));
+	float yChange = (oldY/newY) - 1.f;
+	outputColor = abs(yChange);
+#endif 
+
+		if (isInOutColorLinear)
+		{
+			outputColor = GAMMA_TO_LINEAR(outputColor);
+		}
 	}
 	else
 	{
@@ -135,16 +149,17 @@ void frag_main()
 		// TODO: Use iteration? Use only if repeating is noticeable
 		// float iteration = fmod(frameNumber, (fps * fps));
 		float frame = fmod(frameNumber, fps); 
-		randomNumber = rand(TEXCOORD.xy + (frame / fps));
+		float randomNumber = rand(TEXCOORD.xy + (frame / fps));
 
-#if IMPROVED_FILM_GRAIN_TYPE == 1
-		float colorLuma = Luminance(srgbColor);
-		customMultiplier = saturate(1.f - colorLuma); // inverseLuma
-#elif IMPROVED_FILM_GRAIN_TYPE == 2
-		float colorLuma = Luminance(srgbColor);
-		customMultiplier = (-2.f * (0.5f - abs(saturate(colorLuma) - 0.5f))) // Bias towards center (nothing if black or white)
-			* 3.333f; // Bump to 10%
-#elif IMPROVED_FILM_GRAIN_TYPE == 3
+		float3 linearColor = (isInOutColorLinear)
+			? inputColor
+			: GAMMA_TO_LINEAR(inputColor);
+		float yAdjustment;
+		if (isHDR) {
+			yAdjustment = (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709);
+		} else {
+			yAdjustment = 0.891f; // Kodak Gray Scale A (Highlight)
+		}
 		// Film grain is based on film density
 		// Film works in negative, meaning black has no density
 		// The greater the film density (lighter), more perceived grain
@@ -152,40 +167,32 @@ void frag_main()
 
 		// Scaling is not not linear
 		// We can estimate based on film stock.
+
 		float colorY = Luminance(linearColor);
-		float density = max(0.f, computeFilmDensity(colorY));
+		float adjustedColorY = linearNormalization(colorY,0.f,yAdjustment,0.f,1.f);
+		float density = max(0.f, computeFilmDensity(adjustedColorY));
 		float graininess = computeFilmGraininess(density);
-		customMultiplier = graininess
-			* Luminance(srgbColor) // Scale by perceived luma
-			* 5.f; // Don't see a need to bump this more, 10.f for enthusiasts?
+		float randomFactor = (randomNumber * 2.f) - 1.f;
 
-#endif
+		float yChange = randomFactor
+			* filmGrainColorAndIntensity.z // 0.03% user setting
+			* graininess // Scale by Y (fixes shadows)
+			* adjustedColorY // Adjust again for perception
+			* 50.f
+		;
+
+		outputColor = linearColor * (1.f + yChange);
+
+#if 0 // Output Visualization
+	outputColor = abs(yChange);
+#endif 
+
+		if (!isInOutColorLinear) {
+			outputColor = LINEAR_TO_GAMMA(outputColor);
+		}
 	}
 
-	// luminanceShift at -1 is black, 0 unchanged, 1 negative of current texel
-	float luminanceShift = (randomNumber * 2.f) - 1.f;
-
-
-	float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * customMultiplier);
-	float3 newColor = float3(additiveFilmGrain, additiveFilmGrain,additiveFilmGrain);
-
-	// Use addition to overlay color on top
-	// Note: we let this possibly generate colors below 1 for scRGB
-	float3 tonemappedColorWithFilmGrain = srgbColor + newColor;
-
-#if 0 // WIP fixes
-	// Right side only
-	if (TEXCOORD.x < 0.5f) {
-		tonemappedColorWithFilmGrain = inputColor;
-	}
-#endif
-
-	if (isInOutColorLinear)
-	{
-		tonemappedColorWithFilmGrain = gamma_sRGB_to_linear(tonemappedColorWithFilmGrain) * paperWhite;
-	}
-
-	SV_Target.rgb = tonemappedColorWithFilmGrain;
+	SV_Target.rgb = isHDR ? outputColor : saturate(outputColor);
 
 	SV_Target.w = 1.0f;
 }
