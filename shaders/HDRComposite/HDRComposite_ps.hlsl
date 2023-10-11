@@ -7,13 +7,13 @@
 // they are generally all on by default, you can undefine them manually below if necessary.
 //#define APPLY_BLOOM
 //#define APPLY_TONEMAPPING
-//#define APPLY_CINEMATICS
+//#define APPLY_CINEMATICS // this is post processing
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
 #define FIX_WRONG_SRGB_GAMMA_FORMULA (FORCE_VANILLA_LOOK ? 0 : 1)
 
-// This disables most other features (LUTs, ...)
+// This disables most other features (post processing/cinematics, LUTs, ...)
 #define ENABLE_TONEMAP 1
 // 0 disable contrast adjustment
 // 1 original (weak, generates values beyond 0-1 which then might get clipped)
@@ -556,7 +556,8 @@ float3 PostProcess(
 
 #elif POST_PROCESS_CONTRAST_TYPE == 2
 
-	Color = pow(Color / contrastMidPoint, contrastIntensity) * contrastMidPoint;
+	// Do abs() to avoid negative power, even if it doesn't make 100% sense, these formulas are fine as long as they look good
+	Color = pow(abs(Color) / contrastMidPoint, contrastIntensity) * contrastMidPoint * sign(Color);
 
 #elif POST_PROCESS_CONTRAST_TYPE == 3
 
@@ -609,7 +610,7 @@ float3 PostProcess_Inverse(
 
 #elif POST_PROCESS_CONTRAST_TYPE == 2
 
-	Color = pow(Color / contrastMidPoint, 1.f / contrastIntensity) * contrastMidPoint;
+	Color = pow(abs(Color) / contrastMidPoint, 1.f / contrastIntensity) * contrastMidPoint * sign(Color);
 
 #elif POST_PROCESS_CONTRAST_TYPE == 3
 
