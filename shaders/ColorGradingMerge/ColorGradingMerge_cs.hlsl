@@ -184,7 +184,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// While it unclear how exactly the floor was raised, remove the tint to floor
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
 	// Sample and hold targetChroma
-#if 1
+
+#if 0
 	//TODO: expose these values or find the best defaults. For now we skip these when "HdrDllPluginConstants.GammaCorrection" is on as it's not necessary
 	
 	// An additional tweak on top of "HdrDllPluginConstants.LUTCorrectionStrength"
@@ -204,6 +205,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 #endif
 
 	float3 detintedColor = 1.f - ((1.f - color) * reduceFactor);
+
+#if 0 // TODO: Check again reexamining gamma correction
 	// Without this, the output might be overly dark
 	static const bool alwaysClampDetintedColor = true;
 	if (alwaysClampDetintedColor || SDRRange) {
@@ -212,6 +215,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	else if (Luminance(detintedColor) < 0.f) {
 		detintedColor = 0.f;
 	}
+#endif
 
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
@@ -285,8 +289,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
 	}
 
-	// Optional step to keep colors in the SDR range.
-	if (SDRRange) {
+	if (!any(neutralLUTColor)) {
+		// Always use black at (0,0,0) now matter how LCH computes
+		color = 0.f;
+	} else if (SDRRange) {
+		// Optional step to keep colors in the SDR range.
 		color = saturate(color);
 	}
 	else if (Luminance(color) < 0.f) {
