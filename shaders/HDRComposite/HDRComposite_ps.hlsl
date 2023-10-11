@@ -847,7 +847,7 @@ PSOutput PS(PSInput psInput)
 		}
 		else
 		{
-			outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+			outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 		}
 
 		PSOutput psOutput;
@@ -991,7 +991,7 @@ PSOutput PS(PSInput psInput)
 	{
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
 		const float midGrayIn = MidGray;
 		float midGrayOut = midGrayIn;
@@ -1138,7 +1138,7 @@ PSOutput PS(PSInput psInput)
         inverseTonemappedPostProcessedColor *= paperWhite;
         minHighlightsColorOut *= paperWhite;
 
-		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_BT709;
+		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
 		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness (found empircally)
 		const float highlightsShoulderStart = onlyInvertHighlights ? lerp(0.f, min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut), localSDRTonemapHDRStrength) : 0.f;
   	  	outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);

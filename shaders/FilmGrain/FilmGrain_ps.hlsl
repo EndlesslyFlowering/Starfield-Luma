@@ -97,7 +97,7 @@ void frag_main()
 		float3 gammaColor = (isInOutColorLinear)
 			? LINEAR_TO_GAMMA(inputColor)
 			: inputColor;
-		
+
 		const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
 		const float filmGrainHalfSize = 521.f; //TODO: rename in case we keep this as 521
 		// Applying modulus against 1023 will give value between 0 and 1023
@@ -134,7 +134,7 @@ void frag_main()
 	float newY = Luminance(GAMMA_TO_LINEAR(outputColor));
 	float yChange = (oldY/newY) - 1.f;
 	outputColor = abs(yChange);
-#endif 
+#endif
 
 		if (isInOutColorLinear)
 		{
@@ -148,7 +148,7 @@ void frag_main()
 		float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
 		// TODO: Use iteration? Use only if repeating is noticeable
 		// float iteration = fmod(frameNumber, (fps * fps));
-		float frame = fmod(frameNumber, fps); 
+		float frame = fmod(frameNumber, fps);
 		float randomNumber = rand(TEXCOORD.xy + (frame / fps));
 
 		float3 linearColor = (isInOutColorLinear)
@@ -156,7 +156,7 @@ void frag_main()
 			: GAMMA_TO_LINEAR(inputColor);
 		float yAdjustment;
 		if (isHDR) {
-			yAdjustment = (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709);
+			yAdjustment = (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB);
 		} else {
 			yAdjustment = 0.891f; // Kodak Gray Scale A (Highlight)
 		}
@@ -185,7 +185,7 @@ void frag_main()
 
 #if 0 // Output Visualization
 	outputColor = abs(yChange);
-#endif 
+#endif
 
 		if (!isInOutColorLinear) {
 			outputColor = LINEAR_TO_GAMMA(outputColor);

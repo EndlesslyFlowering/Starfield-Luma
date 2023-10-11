@@ -50,24 +50,16 @@ struct CSInput
 #elif SDR_USE_GAMMA_2_2
 	#define GAMMA_TO_LINEAR(x) pow(x, 2.2h)
 	#define LINEAR_TO_GAMMA(x) pow(x, 1.h / 2.2h)
-#else //TODO: make this use half instead of float
+#else // doing sRGB in half is not accurate enough
 	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
 #endif
 
 #define HDR_BT2020 1
 
-// since blue is the least contributing in terms of luminance
-// the worst case is red and green at 0 and blue high enough so that the luminance is HDR_MAX_OUTPUT_NITS
-// TODO: use more accurate value than just the K factor from the YCbCr<->RGB transform
-#if HDR_BT2020
-	static const float blueFactor = 0.0593f;
-#else
-	static const float blueFactor = 0.0722f;
-#endif
-// Always normalize around the whole HDR10 range (anything beyond might get clipped here),
-// as even if we tonemapped to e.g. 800 nits, we want 500 nits to be treated the same independently of the peak nits.
-static const float normalizationFactor = (PQMaxNits / WhiteNits_BT709) / blueFactor;
+// Normalize to the whole HDR10 range in RGB terms
+// Anything outside HDR10 will be clipped
+static const float normalizationFactor = PQMaxNits / WhiteNits_sRGB; // = 125
 
 
 half3 PrepareForProcessing(half3 Color)
@@ -75,7 +67,7 @@ half3 PrepareForProcessing(half3 Color)
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
 #if HDR_BT2020
-		Color = BT709_To_BT2020(Color);
+		Color = BT709_To_BT2020_half(Color);
 #endif
 		return saturate(Color / normalizationFactor);
 	}
@@ -91,7 +83,7 @@ half3 PrepareForOutput(half3 Color)
 	{
 		Color *= normalizationFactor;
 #if HDR_BT2020
-		return BT2020_To_BT709(Color);
+		return BT2020_To_BT709_half(Color);
 #else
 		return Color;
 #endif

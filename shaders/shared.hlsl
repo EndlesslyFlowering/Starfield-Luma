@@ -27,7 +27,7 @@
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
-#define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_BT709)
+#define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_sRGB)
 
 // Custom push constants uploaded by the HDR DLL plugin code. Do note that register space comes at a premium when adding members. Bit/byte packing is advised.
 // Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.

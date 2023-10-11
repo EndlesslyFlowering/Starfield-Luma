@@ -44,7 +44,7 @@ float4 PS(PSInputs inputs) : SV_Target
 #if SDR_USE_GAMMA_2_2
 		UIColor.xyz = pow(gamma_linear_to_sRGB(UIColor.xyz), 2.2f);
 #endif // SDR_USE_GAMMA_2_2
-		UIColor.xyz *= HdrDllPluginConstants.DisplayMode > 0 ? (HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_BT709) : 1.f;
+		UIColor.xyz *= HdrDllPluginConstants.DisplayMode > 0 ? (HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_sRGB) : 1.f;
 		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
 		// this won't ever be perfect but it's close enough for most cases.
 		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
