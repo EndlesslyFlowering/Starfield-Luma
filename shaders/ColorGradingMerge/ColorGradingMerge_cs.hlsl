@@ -15,7 +15,7 @@
 //TODO: do we want to link this to "HdrDllPluginConstants.GammaCorrection"? Probably not
 // Make sure LUTs are normalized by linearizing them with gamma 2.2, so they work with values closer to the expected ones. Their mixed output is still kept in sRGB.
 // There's a chance that LUTs had correctly been made on sRGB gamma monitors, so in that case this would be wrong (LUTs were likely made with external tools).
-#if SDR_USE_GAMMA_2_2 && 1 // If it's disabled is because this makes LUTs look too bright, and crushes detail in HDR shadow colors.
+#if SDR_USE_GAMMA_2_2 && 1 // If it's disabled is because this makes LUTs look too bright, and crushes detail in HDR shadow colors (or does it?).
 	#define LINEARIZE(x) pow(x, 2.2f)
 #if GAMMA_CORRECT_SDR_RANGE_ONLY
 	#define CORRECT_GAMMA(x) gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x))
