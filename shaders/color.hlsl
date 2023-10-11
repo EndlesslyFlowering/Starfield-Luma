@@ -125,9 +125,11 @@ float3 linear_srgb_to_oklab(float3 rgb) {
 	float m = (0.2119034982f * rgb.r) + (0.6806995451f * rgb.g) + (0.1073969566f * rgb.b);
 	float s = (0.0883024619f * rgb.r) + (0.2817188376f * rgb.g) + (0.6299787005f * rgb.b);
 
-	float l_ = pow(l, 1.f/3.f);
-	float m_ = pow(m, 1.f/3.f);
-	float s_ = pow(s, 1.f/3.f);
+	//TODO: review... maye we could convert to BT.2020 first to avoid negative values?
+	// Not sure whether the pow(abs()) * sign() is technically correct, but if we pass in scRGB negative colors, this breaks
+	float l_ = pow(abs(l), 1.f/3.f) * sign(l);
+	float m_ = pow(abs(m), 1.f/3.f) * sign(m);
+	float s_ = pow(abs(s), 1.f/3.f) * sign(s);
 
 	return float3(
 		(0.2104542553f * l_) + (0.7936177850f * m_) - (0.0040720468f * s_),

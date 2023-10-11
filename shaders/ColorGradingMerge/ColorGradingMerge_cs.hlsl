@@ -184,28 +184,44 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// While it unclear how exactly the floor was raised, remove the tint to floor
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
 	// Sample and hold targetChroma
-	const float3 reduceFactor = linearNormalization<float3>(
-		neutralLUTColor,
-		0.f,
-		1.f,
-		1.f / (1.f - analysis.black),
-		1.f);
+#if 1
+	//TODO: expose these values or find the best defaults. For now we skip these when "HdrDllPluginConstants.GammaCorrection" is on as it's not necessary
+	
+	// An additional tweak on top of "HdrDllPluginConstants.LUTCorrectionStrength"
+	float fixRaisedBlacksStrength = 1.f /*- HdrDllPluginConstants.DevSetting01*/; // Values between 0 and 1
+	//TODO: improve the way "fixRaisedBlacksInputSmoothing" is applied, the curve isn't great now
+	// Modulates how much we fix the raised blacks based on how raised they were.
+	float fixRaisedBlacksInputSmoothing = lerp(1.f, 1.333f, HdrDllPluginConstants.GammaCorrection); // Values from 1 up, greater is smoother
+	float fixRaisedBlacksOutputSmoothing = lerp(1.f, 0.666f, HdrDllPluginConstants.GammaCorrection); // Values from 0 up, smaller than 1 is smoother
+	const float3 invertedBlack = 1.f - (pow(analysis.black, lerp(1.f, fixRaisedBlacksInputSmoothing, analysis.black)) * fixRaisedBlacksStrength);
+	const float3 reduceFactor = lerp(1.f / invertedBlack, 1.f, pow(neutralLUTColor, fixRaisedBlacksOutputSmoothing));
+#elif 1 // Original implementation
+	const float3 reduceFactor = lerp(1.f / (1.f - analysis.black), 1.f, neutralLUTColor);
+#elif 0 // Alternative implementation, generates slightly smoother shadow gradients but it hasn't been tested around the game much, and still crushes blacks
+	const float3 reduceFactor = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
+#else // Disable for quick testing
+	const float3 reduceFactor = 1.f;
+#endif
 
-	const float3 detintedColor = max(0.f, 1.f-((1.f - color) * reduceFactor));
+	float3 detintedColor = 1.f - ((1.f - color) * reduceFactor);
+	// Without this, the output might be overly dark
+	static const bool alwaysClampDetintedColor = true;
+	if (alwaysClampDetintedColor || SDRRange) {
+		detintedColor = max(detintedColor, 0.f);
+	}
+	else if (Luminance(detintedColor) < 0.f) {
+		detintedColor = 0.f;
+	}
 
-	// The saturation multiplier is restricted to HDR as it easily goes beyond Rec.709
+	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
 	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * (SDRRange ? 1.f : saturation);
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
 
-	const float3 increaseFactor = linearNormalization<float3>(
-			neutralLUTColor,
-			0.f,
-			1.f,
-			1.f + analysis.black,
-			1.f);
+	//TODO: review: is this still good after "fixRaisedBlacksStrength"/"fixRaisedBlacksInputSmoothing"/"fixRaisedBlacksOutputSmoothing"?
+	const float3 increaseFactor = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
 
 	const float3 retintedColor = detintedColor * increaseFactor;
 
