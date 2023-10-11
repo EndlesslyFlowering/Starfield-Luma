@@ -46,8 +46,7 @@ namespace Hooks
 
     void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
     {
-		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
-		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+		auto& s = *(new (alloca(sizeof(RE::SubSettingsList::GeneralSetting))) RE::SubSettingsList::GeneralSetting());
 
 		s.m_Text.SetStringValue(a_setting.name.c_str());
 		s.m_Description.SetStringValue(a_setting.description.c_str());
@@ -61,8 +60,7 @@ namespace Hooks
 
     void Hooks::CreateStepperSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Stepper& a_setting, bool a_bEnabled)
     {
-		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
-		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+		auto& s = *(new (alloca(sizeof(RE::SubSettingsList::GeneralSetting))) RE::SubSettingsList::GeneralSetting());
 
 		s.m_Text.SetStringValue(a_setting.name.c_str());
 		s.m_Description.SetStringValue(a_setting.description.c_str());
@@ -79,8 +77,7 @@ namespace Hooks
 
     void Hooks::CreateSliderSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Slider& a_setting, bool a_bEnabled)
     {
-		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
-		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+		auto& s = *(new (alloca(sizeof(RE::SubSettingsList::GeneralSetting))) RE::SubSettingsList::GeneralSetting());
 
 		s.m_Text.SetStringValue(a_setting.name.c_str());
 		s.m_Description.SetStringValue(a_setting.description.c_str());
@@ -95,8 +92,7 @@ namespace Hooks
 
     void Hooks::CreateSeparator(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::SettingID a_id)
     {
-		auto  hack = alloca(sizeof(RE::SubSettingsList::GeneralSetting));
-		auto& s = *(new (hack) RE::SubSettingsList::GeneralSetting());
+		auto& s = *(new (alloca(sizeof(RE::SubSettingsList::GeneralSetting))) RE::SubSettingsList::GeneralSetting());
 
 		s.m_Text.SetStringValue("");
 		s.m_Description.SetStringValue("");
@@ -285,7 +281,7 @@ namespace Hooks
 		CreateSettings(settingList);
     }
 
-    void Hooks::Hook_SettingsDataModelBoolEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
+    void Hooks::Hook_SettingsDataModelCheckboxChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		const auto settings = Settings::Main::GetSingleton();
 
@@ -310,10 +306,10 @@ namespace Hooks
 		    break;
 		}
 
-		_SettingsDataModelBoolEvent(a_arg1, a_eventData);
+		_SettingsDataModelCheckboxChanged(a_arg1, a_eventData);
     }
 
-    void Hooks::Hook_SettingsDataModelIntEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
+    void Hooks::Hook_SettingsDataModelStepperChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		const auto settings = Settings::Main::GetSingleton();
 
@@ -355,22 +351,42 @@ namespace Hooks
 			break;
 		}
 
-		_SettingsDataModelIntEvent(a_arg1, a_eventData);
+		_SettingsDataModelStepperChanged(a_arg1, a_eventData);
     }
 
-    void Hooks::Hook_SettingsDataModelFloatEvent(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
+    void Hooks::Hook_SettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		const auto settings = Settings::Main::GetSingleton();
 
 		auto HandleSetting = [&](Settings::Slider& a_setting) {
 			const auto prevValue = a_setting.value.get_data();
 			const auto newValue = a_setting.GetValueFromSlider(a_eventData.m_Value.Float);
+
 			if (prevValue != newValue) {
 				*a_setting.value = newValue;
-				if (auto setting = a_eventData.m_Model->FindSettingById(a_eventData.m_SettingID)) {
-					setting->m_SliderData.m_ShuttleMap.GetData().m_DisplayValue.SetStringValue(a_setting.GetSliderText().data());
-				}
 				settings->Save();
+			}
+
+			// Skip _SettingsDataModelSliderChanged and queue the update callback ourselves. Why, you ask? Bethesda had the
+			// brilliant idea to hardcode slider option text values.
+			struct
+			{
+				int            v1;         // 0
+				float          v2;         // 4
+				const char*    v3;         // 8
+				unsigned int   v4 = 0;     // 10
+				unsigned short v5 = 1024;  // 14
+			} const callbackData = {
+				.v1 = a_eventData.m_SettingID,
+				.v2 = a_eventData.m_Value.Float,
+				.v3 = a_setting.GetSliderText().c_str(),
+			};
+
+			const auto modelData = *reinterpret_cast<void **>(reinterpret_cast<uintptr_t>(a_eventData.m_Model) + 0x8);
+			const auto func = reinterpret_cast<void (*)(void*, const void*)>(dku::Hook::IDToAbs(135746));
+
+			if (modelData) {
+				func(modelData, &callbackData);
 			}
 		};
 
@@ -402,9 +418,10 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kSecondaryGamma):
 			HandleSetting(settings->SecondaryGamma);
 			break;
+		default:
+			_SettingsDataModelSliderChanged(a_eventData);
+			break;
 		}
-
-		_SettingsDataModelFloatEvent(a_arg1, a_eventData);
     }
 
 	bool Hooks::Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2)
