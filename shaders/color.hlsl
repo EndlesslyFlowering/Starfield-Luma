@@ -1,7 +1,7 @@
 #pragma once
 
-// Rec.709 SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
-static const float WhiteNits_BT709 = 80.f;
+// sRGB SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
+static const float WhiteNits_sRGB = 80.f;
 static const float ReferenceWhiteNits_BT2408 = 203.f;
 
 // SDR mid gray.
@@ -16,23 +16,34 @@ static const float MaxShadowsColor = pow(1.f / 3.f, 2.2f);
 // This is also the max each color channel can have in HDR10.
 static const float PQMaxNits = 10000.0f;
 // SMPTE ST 2084 is defined as using BT.2020 white point.
-static const float PQMaxWhitePoint = PQMaxNits / WhiteNits_BT709;
+static const float PQMaxWhitePoint = PQMaxNits / WhiteNits_sRGB;
 
 // These have been calculated to be as accurate as possible
 static const float3x3 BT709_2_BT2020 = float3x3(
-	0.627401924722236, 0.329291971755002, 0.0433061035227622,
-	0.0690954897392608, 0.919544281267395, 0.0113602289933443,
-	0.0163937090881632, 0.0880281623979006, 0.895578128513936);
+	0.62722527980804443359375f,       0.329476892948150634765625f, 0.04329781234264373779296875f,
+	0.0690418779850006103515625f,     0.919605672359466552734375f, 0.011352437548339366912841796875f,
+	0.01639117114245891571044921875f, 0.0880887508392333984375f,   0.89552009105682373046875f);
+
 static const float3x3 BT2020_2_BT709 = float3x3(
-	1.66049621914783, -0.587656444131135, -0.0728397750166941,
-	-0.124547095586012, 1.13289510924730, -0.00834801366128445,
-	-0.0181536813870718, -0.100597371685743, 1.11875105307281);
-	
-static const float PQ_constant_N = (2610.0 / 4096.0 / 4.0);
-static const float PQ_constant_M = (2523.0 / 4096.0 * 128.0);
-static const float PQ_constant_C1 = (3424.0 / 4096.0);
-static const float PQ_constant_C2 = (2413.0 / 4096.0 * 32.0);
-static const float PQ_constant_C3 = (2392.0 / 4096.0 * 32.0);
+	 1.6609637737274169921875f,       -0.58811271190643310546875f,    -0.072851054370403289794921875f,
+	-0.124477200210094451904296875f,   1.1328194141387939453125f,     -0.00834227167069911956787109375f,
+	-0.0181571580469608306884765625f, -0.10066641867160797119140625f,  1.118823528289794921875f);
+
+static const half3x3 BT709_2_BT2020_half = half3x3(
+	0.62744140625h,     0.32958984375h,    0.043304443359375h,
+	0.06903076171875h,  0.91943359375h,    0.0113525390625h,
+	0.016387939453125h, 0.08807373046875h, 0.8955078125h);
+
+static const half3x3 BT2020_2_BT709_half = half3x3(
+	 1.6611328125h,      -0.587890625h,      -0.0728759765625h,
+	-0.12445068359375h,   1.1328125h,        -0.00833892822265625h,
+	-0.018157958984375h, -0.10064697265625h,  1.119140625h);
+
+static const float PQ_constant_M1 =  0.1593017578125f;
+static const float PQ_constant_M2 = 78.84375f;
+static const float PQ_constant_C1 =  0.8359375f;
+static const float PQ_constant_C2 = 18.8515625f;
+static const float PQ_constant_C3 = 18.6875f;
 
 float3 BT709_To_BT2020(float3 color)
 {
@@ -44,6 +55,16 @@ float3 BT2020_To_BT709(float3 color)
 	return mul(BT2020_2_BT709, color);
 }
 
+half3 BT709_To_BT2020_half(half3 color)
+{
+	return mul(BT709_2_BT2020_half, color);
+}
+
+half3 BT2020_To_BT709_half(half3 color)
+{
+	return mul(BT2020_2_BT709_half, color);
+}
+
 float gamma_linear_to_sRGB(float channel)
 {
 	[flatten]
@@ -53,7 +74,7 @@ float gamma_linear_to_sRGB(float channel)
 	}
 	else
 	{
-		channel = 1.055f * pow(channel, 1.0f / 2.4f) - 0.055f;
+		channel = 1.055f * pow(channel, 1.f / 2.4f) - 0.055f;
 	}
 	return channel;
 }
@@ -90,19 +111,19 @@ float3 gamma_sRGB_to_linear(float3 Color)
 float3 linear_to_PQ(float3 LinearColor, const float PQMaxValue = PQMaxWhitePoint)
 {
     LinearColor /= PQMaxValue;
-    float3 colorPow = pow(LinearColor, PQ_constant_N);
+    float3 colorPow = pow(LinearColor, PQ_constant_M1);
     float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
     float3 denominator = 1.f + PQ_constant_C3 * colorPow;
-    float3 pq = pow(numerator / denominator, PQ_constant_M);
+    float3 pq = pow(numerator / denominator, PQ_constant_M2);
     return pq;
 }
 
 float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue = PQMaxWhitePoint)
 {
-    float3 colorPow = pow(ST2084Color, 1.f / PQ_constant_M );
+    float3 colorPow = pow(ST2084Color, 1.f / PQ_constant_M2 );
     float3 numerator = max(colorPow - PQ_constant_C1, 0.f);
     float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
-    float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_N);
+    float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
     linearColor *= PQMaxValue;
     return linearColor;
 }
@@ -110,7 +131,7 @@ float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue = PQMaxWhitePoint
 float Luminance(float3 color)
 {
 	// Fixed from "wrong" values: 0.2125 0.7154 0.0721f
-	return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+	return dot(color, float3(0.2125072777271270751953125f, 0.71535003185272216796875f, 0.07214272022247314453125f));
 }
 
 float3 Saturation(float3 color, float saturation)
@@ -159,7 +180,7 @@ float3 oklab_to_linear_srgb(float3 lab) {
 }
 
 float3 oklab_to_oklch(float3 lab) {
-	float L = lab[0]; 
+	float L = lab[0];
 	float a = lab[1];
 	float b = lab[2];
 	return float3 (

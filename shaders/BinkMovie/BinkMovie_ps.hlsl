@@ -28,7 +28,7 @@ float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
     const float SDRRatio = Luminance(Color);
     // Limit AutoHDR brightness, it won't look good beyond a certain level.
     // The paper white multiplier is applied later so we account for that.
-    const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, WhiteNits_BT709) / WhiteNits_BT709;
+    const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, WhiteNits_sRGB) / WhiteNits_sRGB;
     const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
     const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, BinkVideosAutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
     const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
@@ -74,7 +74,7 @@ float4 PS(PSInputs inputs) : SV_Target
 
 		if (HdrDllPluginConstants.DisplayMode > 0)
 		{
-			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_BT709;
+			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			if (BinkVideosAutoHDR)
 				color = PumboAutoHDR(color, HdrDllPluginConstants.HDRPeakBrightnessNits, paperWhite);
 
