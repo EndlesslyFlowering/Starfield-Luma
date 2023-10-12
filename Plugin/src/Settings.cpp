@@ -1,7 +1,23 @@
 #include "Settings.h"
 
+#include "Utils.h"
+
 namespace Settings
 {
+	std::string EnumStepper::GetStepperText(int32_t a_value) const
+    {
+		if (optionNames.size() > a_value) {
+			return optionNames[a_value];
+		}
+
+		return "Invalid";
+    }
+
+    std::string ValueStepper::GetStepperText(int32_t a_value) const
+    {
+		return std::to_string(GetValueFromStepper(a_value));
+    }
+
     float Slider::GetSliderPercentage() const
     {
 		return (value.get_data() - sliderMin) / (sliderMax - sliderMin);
@@ -9,7 +25,7 @@ namespace Settings
 
     std::string Slider::GetSliderText() const
     {
-		return std::format("{}", value.get_data());
+		return std::format("{}{}", value.get_data(), suffix);
     }
 
     float Slider::GetValueFromSlider(float a_percentage) const
@@ -22,7 +38,54 @@ namespace Settings
         *value = GetValueFromSlider(a_percentage);
     }
 
-    bool Main::IsHDREnabled() const
+    bool Main::InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject)
+	{
+		swapChainObject = a_swapChainObject;
+
+		// check for old NativeHDR being present
+		auto isModuleLoaded = [&](LPCWSTR a_moduleName) {
+			HMODULE hModule = nullptr;
+			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, a_moduleName, &hModule);
+			return hModule != nullptr;
+		};
+
+		constexpr std::array moduleNames = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
+
+		for (auto& moduleName : moduleNames) {
+			if (isModuleLoaded(moduleName)) {
+				ERROR("An old version of the Native(Auto)HDR plugin is loaded. Please remove it while using Luma. It is a successor to the previous mod.")
+				return false;
+			}
+		}
+
+		// check hdr support
+		//bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
+		//bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
+
+		//// enable hdr if off and display mode suggests it should be on
+		//if (bIsHDRSupported && !bIsHDREnabled && DisplayMode.value.get_data() > 0) {
+		//    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
+		//}
+
+		//// change display mode setting if it's hdr and hdr is not supported
+		//if (!bIsHDRSupported && DisplayMode.value.get_data() > 0) {
+		//    *DisplayMode.value = 0;
+		//}
+
+		//// autodetect peak brightness
+		//if (bIsHDRSupported && PeakBrightnessAutoDetected.get_data() == false) {
+		//	float detectedMaxLuminance;
+		//	if (Utils::GetHDRMaxLuminance(swapChainObject->swapChainInterface, detectedMaxLuminance)) {
+		//	    *PeakBrightnessAutoDetected = true;
+		//		*PeakBrightness.value = detectedMaxLuminance;
+		//		Save();
+		//	}
+		//}
+
+		return true;
+	}
+
+    bool Main::IsDisplayModeSetToHDR() const
     {
 		return DisplayMode.value.get_data() != 0;
     }
@@ -52,6 +115,22 @@ namespace Settings
 		}
     }
 
+    void Main::OnDisplayModeChanged()
+	{
+		// enable HDR if disabled
+		/*if (!bIsHDREnabled && bIsHDRSupported && DisplayMode.value.get_data() > 0) {
+			bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
+		}*/
+
+		const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
+		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
+
+		swapChainObject->format = newFormat;
+
+		// toggle vsync to force a swapchain recreation
+		Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
+	}
+
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
     {
 		a_outShaderConstants.DisplayMode = static_cast<uint32_t>(DisplayMode.value.get_data());
@@ -64,7 +143,7 @@ namespace Settings
 		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
 		a_outShaderConstants.GammaCorrectionStrength = static_cast<float>(GammaCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
 		// There is no reason this wouldn't work in HDR, but for now it's disabled
-		a_outShaderConstants.SDRSecondaryGamma = IsHDREnabled() ? 1.f : (((static_cast<float>((SecondaryGamma.value.get_data()) * 0.01f) - 0.5f) * 0.5f) + 1.f);    // 0-100 to 0.75-1.25
+		a_outShaderConstants.SDRSecondaryGamma = IsDisplayModeSetToHDR() ? 1.f : (((static_cast<float>((SecondaryGamma.value.get_data()) * 0.01f) - 0.5f) * 0.5f) + 1.f);    // 0-100 to 0.75-1.25
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
 		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
 		a_outShaderConstants.bIsAtEndOfFrame = static_cast<uint32_t>(bIsAtEndOfFrame.load());
@@ -127,6 +206,7 @@ namespace Settings
 				//"NativeResolutionColorBuffer01",  // issues on AMD
 				//"ColorBuffer01"
 				);
+			config.Bind(PeakBrightnessAutoDetected, false);
 		});
 
 		config.Load();
@@ -157,16 +237,27 @@ namespace Settings
 		return false;
     }
 
-    bool Main::DrawReshadeStepper(Stepper& a_stepper)
+    bool Main::DrawReshadeEnumStepper(EnumStepper& a_stepper)
     {
 		int tempValue = *a_stepper.value;
-		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, 0, a_stepper.optionNames.size() - 1, a_stepper.optionNames[tempValue].c_str(), ImGuiSliderFlags_NoInput)) {
+		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, 0, a_stepper.GetNumOptions() - 1, a_stepper.GetStepperText(tempValue).c_str(), ImGuiSliderFlags_NoInput)) {
 			*a_stepper.value = tempValue;
 			Save();
 			return true;
 		}
 		return false;
     }
+
+    bool Main::DrawReshadeValueStepper(ValueStepper& a_stepper)
+	{
+		int tempValue = *a_stepper.value;
+		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, a_stepper.minValue, a_stepper.maxValue, std::to_string(tempValue).c_str())) {
+			*a_stepper.value = tempValue;
+			Save();
+			return true;
+		}
+		return false;
+	}
 
     bool Main::DrawReshadeSlider(Slider& a_slider)
     {
@@ -181,18 +272,9 @@ namespace Settings
 
     void Main::DrawReshadeSettings()
     {
-		if (DrawReshadeStepper(DisplayMode)) {
-			const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
-
-			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
-			swapChainObject->format = newFormat;
-
-			// toggle vsync to force a swapchain recreation
-			Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
-		}
-		DrawReshadeSlider(PeakBrightness);
-		DrawReshadeSlider(GamePaperWhite);
-		DrawReshadeSlider(UIPaperWhite);
+		DrawReshadeValueStepper(PeakBrightness);
+		DrawReshadeValueStepper(GamePaperWhite);
+		DrawReshadeValueStepper(UIPaperWhite);
 		DrawReshadeSlider(Saturation);
 		DrawReshadeSlider(Contrast);
 		DrawReshadeSlider(GammaCorrectionStrength);
@@ -200,7 +282,7 @@ namespace Settings
 		DrawReshadeSlider(LUTCorrectionStrength);
 		DrawReshadeSlider(ColorGradingStrength);
 		DrawReshadeCheckbox(VanillaMenuLUTs);
-		DrawReshadeStepper(FilmGrainType);
+		DrawReshadeEnumStepper(FilmGrainType);
 		DrawReshadeCheckbox(PostSharpen);
 
 		DrawReshadeSlider(DevSetting01);
@@ -208,5 +290,10 @@ namespace Settings
 		DrawReshadeSlider(DevSetting03);
 		DrawReshadeSlider(DevSetting04);
 		DrawReshadeSlider(DevSetting05);
+
+		/*if (ImGui::Button("Init compatiblity"))
+		{
+		    InitCompatibility(swapChainObject);
+		}*/
     }
 }

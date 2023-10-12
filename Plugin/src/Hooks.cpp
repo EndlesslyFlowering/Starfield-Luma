@@ -68,10 +68,10 @@ namespace Hooks
 		s.m_Type.SetValue(RE::SubSettingsList::GeneralSetting::Type::Stepper);
 		s.m_Category.SetValue(RE::SubSettingsList::GeneralSetting::Category::Display);
 		s.m_Enabled.SetValue(a_bEnabled);
-		for (auto& optionName : a_setting.optionNames) {
-			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem(optionName.c_str());
+		for (auto i = 0; i < a_setting.GetNumOptions(); ++i) {
+			s.m_StepperData.m_ShuttleMap.GetData().m_DisplayValues.AddItem(a_setting.GetStepperText(i).c_str());
 		}
-		s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(a_setting.value.get_data());
+		s.m_StepperData.m_ShuttleMap.GetData().m_Value.SetValue(a_setting.GetCurrentStepFromValue());
 		a_settingList->AddItem(s);
     }
 
@@ -109,13 +109,13 @@ namespace Hooks
 
 		CreateSeparator(a_settingList, Settings::SettingID::kSTART);
 
-		CreateStepperSetting(a_settingList, settings->DisplayMode, true);
-		CreateSliderSetting(a_settingList, settings->PeakBrightness, settings->IsHDREnabled());
-		CreateSliderSetting(a_settingList, settings->GamePaperWhite, settings->IsHDREnabled());
-		CreateSliderSetting(a_settingList, settings->UIPaperWhite, settings->IsHDREnabled());
-		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsHDREnabled());
-		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsHDREnabled());
-		CreateSliderSetting(a_settingList, settings->SecondaryGamma, !settings->IsHDREnabled());
+		CreateStepperSetting(a_settingList, settings->DisplayMode, settings->IsHDRSupported());
+		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsDisplayModeSetToHDR());
+		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR());
+		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsDisplayModeSetToHDR());
+		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsDisplayModeSetToHDR());
+		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsDisplayModeSetToHDR());
+		CreateSliderSetting(a_settingList, settings->SecondaryGamma, !settings->IsDisplayModeSetToHDR());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
@@ -231,12 +231,8 @@ namespace Hooks
 
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
-		Utils::CheckCompatibility();
-
-		// save the pointer for later
-		Settings::swapChainObject = a_bgsSwapchainObject;
-
 		const auto settings = Settings::Main::GetSingleton();
+		settings->InitCompatibility(a_bgsSwapchainObject);
 
 		a_bgsSwapchainObject->swapChainInterface->SetColorSpace1(settings->GetDisplayModeColorSpaceType());
 
@@ -248,10 +244,10 @@ namespace Hooks
     bool Hooks::Hook_TakeSnapshot(uintptr_t a1)
     {
 		const auto settings = Settings::Main::GetSingleton();
-		//if (settings->IsHDREnabled()) {
+		//if (settings->IsDisplayModeSetToHDR()) {
 		if (true) {  // actually it's always going to be the case because we're always going to update the image space buffer format
 			auto  hack = alloca(sizeof(RE::MessageBoxData));
-			auto& message = *(new (hack) RE::MessageBoxData("Photo Mode", "Taking screenshots with Photo Mode is not supported with Native HDR. Use an external tool (e.g. Xbox Game Bar) to take a screenshot.", nullptr, 0));
+			auto& message = *(new (hack) RE::MessageBoxData("Photo Mode", "Taking screenshots with Photo Mode is not supported with Starfield Luma. Use an external tool (e.g. Xbox Game Bar) to take a screenshot.", nullptr, 0));
 			Offsets::ShowMessageBox(*Offsets::MessageMenuManagerPtr, message, false);
 
 			// hack to refresh the UI visibility after the snapshot
@@ -315,7 +311,7 @@ namespace Hooks
 
 		auto HandleSetting = [&](Settings::Stepper& a_setting) {
 			const auto prevValue = a_setting.value.get_data();
-			const auto newValue = a_eventData.m_Value.Int;
+			const auto newValue = a_setting.GetValueFromStepper(a_eventData.m_Value.Int);
 			if (prevValue != newValue) {
 				*a_setting.value = newValue;
 				settings->Save();
@@ -329,22 +325,24 @@ namespace Hooks
 			{
 				const auto prevDisplayMode = settings->DisplayMode.value.get_data();
 				if (HandleSetting(settings->DisplayMode)) {
-					const RE::BS_DXGI_FORMAT newFormat = settings->GetDisplayModeFormat();
-
-					Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
-
 					if (prevDisplayMode == 0) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, true);
 					} else if (settings->DisplayMode.value.get_data() == 0) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, false);
 					}
 
-					Settings::swapChainObject->format = newFormat;
-
-					// toggle vsync to force a swapchain recreation
-					Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
+					settings->OnDisplayModeChanged();
 				}
 			}
+			break;
+		case static_cast<int>(Settings::SettingID::kHDR_PeakBrightness):
+			HandleSetting(settings->PeakBrightness);
+			break;
+		case static_cast<int>(Settings::SettingID::kHDR_GamePaperWhite):
+			HandleSetting(settings->GamePaperWhite);
+			break;
+		case static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite):
+			HandleSetting(settings->UIPaperWhite);
 			break;
 		case static_cast<int>(Settings::SettingID::kFilmGrainType):
 			HandleSetting(settings->FilmGrainType);
@@ -354,7 +352,7 @@ namespace Hooks
 		_SettingsDataModelStepperChanged(a_arg1, a_eventData);
     }
 
-    void Hooks::Hook_SettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
+    bool Hooks::OnSettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		const auto settings = Settings::Main::GetSingleton();
 
@@ -382,7 +380,7 @@ namespace Hooks
 				.v3 = a_setting.GetSliderText().c_str(),
 			};
 
-			const auto modelData = *reinterpret_cast<void **>(reinterpret_cast<uintptr_t>(a_eventData.m_Model) + 0x8);
+			const auto modelData = *reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(a_eventData.m_Model) + 0x8);
 			const auto func = reinterpret_cast<void (*)(void*, const void*)>(dku::Hook::IDToAbs(135746));
 
 			if (modelData) {
@@ -391,40 +389,44 @@ namespace Hooks
 		};
 
 		switch (a_eventData.m_SettingID) {
-		case static_cast<int>(Settings::SettingID::kHDR_PeakBrightness):
-			HandleSetting(settings->PeakBrightness);
-			break;
-		case static_cast<int>(Settings::SettingID::kHDR_GamePaperWhite):
-			HandleSetting(settings->GamePaperWhite);
-			break;
-		case static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite):
-			HandleSetting(settings->UIPaperWhite);
-			break;
 		case static_cast<int>(Settings::SettingID::kHDR_Saturation):
 			HandleSetting(settings->Saturation);
-			break;
+			return true;
 		case static_cast<int>(Settings::SettingID::kHDR_Contrast):
 			HandleSetting(settings->Contrast);
-			break;
+			return true;
 		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
 			HandleSetting(settings->LUTCorrectionStrength);
-			break;
+			return true;
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
-			break;
+			return true;
 		case static_cast<int>(Settings::SettingID::kGammaCorrectionStrength):
 			HandleSetting(settings->GammaCorrectionStrength);
-			break;
+			return true;
 		case static_cast<int>(Settings::SettingID::kSecondaryGamma):
 			HandleSetting(settings->SecondaryGamma);
-			break;
-		default:
-			_SettingsDataModelSliderChanged(a_eventData);
-			break;
+			return true;
+		}
+
+		return false;
+    }
+
+    void Hooks::Hook_SettingsDataModelSliderChanged1(RE::SettingsDataModel::UpdateEventData& a_eventData)
+    {
+		if (!OnSettingsDataModelSliderChanged(a_eventData)) {
+			_SettingsDataModelSliderChanged1(a_eventData);
 		}
     }
 
-	bool Hooks::Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2)
+    void Hooks::Hook_SettingsDataModelSliderChanged2(RE::SettingsDataModel::UpdateEventData& a_eventData)
+    {
+		if (!OnSettingsDataModelSliderChanged(a_eventData)) {
+			_SettingsDataModelSliderChanged2(a_eventData);
+		}
+    }
+
+    bool Hooks::Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2)
 	{
 		const bool result = _ApplyRenderPassRenderState1(a_arg1, a_arg2);
 

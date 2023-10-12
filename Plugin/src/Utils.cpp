@@ -211,23 +211,117 @@ namespace Utils
 		return true;
 	}
 
-    bool CheckCompatibility()
+    bool GetHDRMaxLuminance(IDXGISwapChain3* a_swapChainInterface, float& a_outMaxLuminance)
     {
-		auto isModuleLoaded = [&](LPCWSTR a_moduleName) {
-			HMODULE hModule = nullptr;
-			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, a_moduleName, &hModule);
-			return hModule != nullptr;
-		};
+		IDXGIOutput* output = nullptr;
+		if (FAILED(a_swapChainInterface->GetContainingOutput(&output))) {
+		    return false;
+		}
 
-		constexpr std::array moduleNames = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
+		IDXGIOutput6* output6 = nullptr;
+		if (FAILED(output->QueryInterface(&output6))) {
+		    return false;
+		}
 
-		for (auto& moduleName : moduleNames) {
-			if (isModuleLoaded(moduleName)) {
-				ERROR("An old version of the Native(Auto)HDR plugin is loaded. Please remove it while using Luma. It is a successor to the previous mod.")
-				return false;
+		DXGI_OUTPUT_DESC1 desc1;
+		if (FAILED(output6->GetDesc1(&desc1))) {
+		    return false;
+		}
+
+		a_outMaxLuminance = desc1.MaxLuminance;
+		return true;
+    }
+
+    bool GetDisplayConfigPathInfo(HWND a_hwnd, DISPLAYCONFIG_PATH_INFO& a_outPathInfo)
+    {
+		uint32_t pathCount, modeCount;
+		if (ERROR_SUCCESS != GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount))
+		{
+		    return false;
+		}
+
+		std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
+		std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
+		if (ERROR_SUCCESS != QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(), &modeCount, modes.data(), nullptr)) {
+		    return false;
+		}
+
+		const HMONITOR monitorFromWindow = MonitorFromWindow(a_hwnd, MONITOR_DEFAULTTONULL);
+		for (auto& pathInfo : paths) {
+			if (pathInfo.flags & DISPLAYCONFIG_PATH_ACTIVE && pathInfo.sourceInfo.statusFlags & DISPLAYCONFIG_SOURCE_IN_USE) {
+				const bool bVirtual = pathInfo.flags & DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE;
+				const DISPLAYCONFIG_SOURCE_MODE& sourceMode = modes[bVirtual ? pathInfo.sourceInfo.sourceModeInfoIdx : pathInfo.sourceInfo.modeInfoIdx].sourceMode;
+
+				RECT rect { sourceMode.position.x, sourceMode.position.y, sourceMode.position.x + sourceMode.width, sourceMode.position.y + sourceMode.height };
+				if (!IsRectEmpty(&rect)) {
+					const HMONITOR monitorFromMode = MonitorFromRect(&rect, MONITOR_DEFAULTTONULL);
+					if (monitorFromMode != nullptr && monitorFromMode == monitorFromWindow) {
+						a_outPathInfo = pathInfo;
+						return true;
+					}
+				}
 			}
 		}
 
-		return true;
+		return false;
+    }
+
+    bool GetColorInfo(HWND a_hwnd, DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO& a_outColorInfo)
+    {
+		DISPLAYCONFIG_PATH_INFO pathInfo{};
+		if (GetDisplayConfigPathInfo(a_hwnd, pathInfo)) {
+			DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO colorInfo{};
+			colorInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+		    colorInfo.header.size = sizeof(colorInfo);
+		    colorInfo.header.adapterId = pathInfo.targetInfo.adapterId;
+		    colorInfo.header.id = pathInfo.targetInfo.id;
+			auto result = DisplayConfigGetDeviceInfo(&colorInfo.header);
+			if (result == ERROR_SUCCESS) {
+				a_outColorInfo = colorInfo;
+				return true;
+			}
+		}
+
+		return false;
+    }
+
+    bool IsHDRSupported(HWND a_hwnd)
+    {
+		DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO colorInfo{};
+		if (GetColorInfo(a_hwnd, colorInfo)) {
+		    return colorInfo.advancedColorSupported;
+		}
+
+		return false;
+    }
+
+    bool IsHDREnabled(HWND a_hwnd)
+    {
+		DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO colorInfo{};
+		if (GetColorInfo(a_hwnd, colorInfo)) {
+			return colorInfo.advancedColorEnabled;
+		}
+
+		return false;
+    }
+
+    bool SetHDREnabled(HWND a_hwnd)
+    {
+		DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO colorInfo{};
+		if (GetColorInfo(a_hwnd, colorInfo)) {
+			if (colorInfo.advancedColorSupported && !colorInfo.advancedColorEnabled) {
+				DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE setColorState{};
+			    setColorState.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE;
+			    setColorState.header.size = sizeof(setColorState);
+			    setColorState.header.adapterId = colorInfo.header.adapterId;
+			    setColorState.header.id = colorInfo.header.id;
+			    setColorState.enableAdvancedColor = true;
+				return ERROR_SUCCESS == DisplayConfigSetDeviceInfo(&setColorState.header);
+			}
+
+			return colorInfo.advancedColorEnabled;
+		}
+
+		return false;
     }
 }

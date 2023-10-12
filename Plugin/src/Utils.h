@@ -15,5 +15,11 @@ namespace Utils
 
 	bool ShouldCorrectLUTs();
 
-	bool CheckCompatibility();
+	bool GetHDRMaxLuminance(IDXGISwapChain3* a_swapChainInterface, float& a_outMaxLuminance);
+	bool GetDisplayConfigPathInfo(HWND a_hwnd, DISPLAYCONFIG_PATH_INFO& a_outPathInfo);
+	bool GetColorInfo(HWND a_hwnd, DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO& a_outColorInfo);
+	bool IsHDRSupported(HWND a_hwnd);
+	bool IsHDREnabled(HWND a_hwnd);
+	bool SetHDREnabled(HWND a_hwnd);
+	
 }

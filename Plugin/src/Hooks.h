@@ -47,8 +47,8 @@ namespace Hooks
 			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136113, 0x62F), Hook_CreateMonitorSetting);
 			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
 			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
-			_SettingsDataModelSliderChanged = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135739, 0xA3), Hook_SettingsDataModelSliderChanged);
-			_SettingsDataModelSliderChanged = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135956, 0x4), Hook_SettingsDataModelSliderChanged);
+			_SettingsDataModelSliderChanged1 = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135739, 0xA3), Hook_SettingsDataModelSliderChanged1);
+			_SettingsDataModelSliderChanged2 = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135956, 0x4), Hook_SettingsDataModelSliderChanged2);
 
 			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x89), Hook_RecreateSwapchain);
 
@@ -84,8 +84,12 @@ namespace Hooks
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelCheckboxChanged)> _SettingsDataModelCheckboxChanged;
 		static void Hook_SettingsDataModelStepperChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelStepperChanged)> _SettingsDataModelStepperChanged;
-		static void Hook_SettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
-		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelSliderChanged)> _SettingsDataModelSliderChanged;
+
+		static bool OnSettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static void Hook_SettingsDataModelSliderChanged1(RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static void Hook_SettingsDataModelSliderChanged2(RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelSliderChanged1)> _SettingsDataModelSliderChanged1;
+		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelSliderChanged2)> _SettingsDataModelSliderChanged2;
 
 		static bool Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2);
 		static bool Hook_ApplyRenderPassRenderState2(void* a_arg1, void* a_arg2);
