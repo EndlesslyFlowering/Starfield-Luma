@@ -179,7 +179,7 @@ namespace Settings
 		    "Gamma Correction Strength",
 		    "Sets the gamma correction strength. The game used the sRGB gamma formula but was calibrated on gamma 2.2 displays. Only applies if \"Color Grading\" is enabled. Leave at 100\% if unsure.",
 		    { "GammaCorrectionStrength", "Main" },
-		    100.f,
+		    50.f,
 		    0.f,
 		    100.f
 		};
