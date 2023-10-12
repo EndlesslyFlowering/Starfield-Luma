@@ -239,16 +239,17 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	float3 detintedColor = 1.f - ((1.f - color) * reduceFactor);
 
-#if 0 // TODO: Check again reexamining gamma correction
+#if 0 // TODO: Check again after reexamining gamma correction, this should be fine to do in SDR as well
 	// Without this, the output might be overly dark
 	static const bool alwaysClampDetintedColor = true;
 	if (alwaysClampDetintedColor || SDRRange) {
 		detintedColor = max(detintedColor, 0.f);
 	}
-	else if (Luminance(detintedColor) < 0.f) {
+	else
+#endif
+	if (Luminance(detintedColor) < 0.f) {
 		detintedColor = 0.f;
 	}
-#endif
 
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
@@ -322,10 +323,13 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
 	}
 
+#if 0 //TODO: branching on colors isn't good, we should be writing math that guarantees 0 maps to 0 if necessay
 	if (!any(neutralLUTColor)) {
 		// Always use black at (0,0,0) now matter how LCH computes
 		color = 0.f;
-	} else if (SDRRange) {
+	} else
+#endif
+	if (SDRRange) {
 		// Optional step to keep colors in the SDR range.
 		color = saturate(color);
 	}
