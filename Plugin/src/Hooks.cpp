@@ -149,7 +149,7 @@ namespace Hooks
 		case 0xFF1A:
 		case 0x600FF1A:
 		case 0x700FF1A:
-		//case 0x800FF1A:
+		case 0x800FF1A:
 		case 0xE00FF1A:
 		case 0xF00FF1A:
 			{
@@ -164,7 +164,7 @@ namespace Hooks
 			}
 
 		case 0x400FF59:
-			//case 0x2000FF59:
+		//case 0x2000FF59:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
