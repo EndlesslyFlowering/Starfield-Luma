@@ -177,7 +177,7 @@ namespace Settings
 		Slider   GammaCorrectionStrength{
 		    SettingID::kGammaCorrectionStrength,
 		    "Gamma Correction Strength",
-		    "Sets the gamma correction strength. The game used the sRGB gamma formula but was calibrated on gamma 2.2 displays. Only applies if \"Color Grading\" is enabled. Leave at 100\% if unsure.",
+		    "Sets the gamma correction strength. The game used the sRGB gamma formula but was calibrated on gamma 2.2 displays. Only applies if \"Color Grading\" is enabled. 100\% should be closer to the original look.",
 		    { "GammaCorrectionStrength", "Main" },
 		    50.f,
 		    0.f,
