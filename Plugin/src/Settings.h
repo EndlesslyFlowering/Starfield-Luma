@@ -1,6 +1,5 @@
 #pragma once
 #include "Offsets.h"
-#include "Utils.h"
 #include "DKUtil/Config.hpp"
 #include "RE/Buffers.h"
 #include "reshade/reshade.hpp"
@@ -55,7 +54,47 @@ namespace Settings
 	{
 		Integer value;
 		int32_t defaultValue;
+
+		Stepper(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, int32_t a_defaultValue) :
+			Setting{ a_id, a_name, a_description }, value{ a_key, a_section }, defaultValue(a_defaultValue) {}
+
+		virtual ~Stepper() = default;
+
+		virtual std::string GetStepperText(int32_t a_value) const = 0;
+		virtual int32_t GetNumOptions() const = 0;
+		virtual int32_t GetValueFromStepper(int32_t a_value) const = 0;
+		virtual int32_t GetCurrentStepFromValue() const = 0;
+		virtual void SetValueFromStepper(int32_t a_value) = 0;
+	};
+
+	struct EnumStepper : Stepper
+	{
 		std::vector<std::string> optionNames;
+
+		EnumStepper(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, int32_t a_defaultValue, const std::vector<std::string>& a_optionNames) :
+			Stepper{ a_id, a_name, a_description, a_key, a_section, a_defaultValue }, optionNames(a_optionNames) {}
+
+		std::string GetStepperText(int32_t a_value) const override;
+		int32_t GetNumOptions() const override{ return optionNames.size(); }
+		int32_t GetValueFromStepper(int32_t a_value) const override { return a_value; }
+		int32_t GetCurrentStepFromValue() const override { return value.get_data(); }
+		void SetValueFromStepper(int32_t a_value) override { *value = a_value; }
+	};
+
+	struct ValueStepper : Stepper
+	{
+	    int32_t minValue;
+		int32_t maxValue;
+		int32_t stepSize;
+
+		ValueStepper(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, int32_t a_defaultValue, int32_t a_minValue, int32_t a_maxValue, int32_t a_stepSize) :
+			Stepper{ a_id, a_name, a_description, a_key, a_section, a_defaultValue }, minValue(a_minValue), maxValue(a_maxValue), stepSize(a_stepSize) {}
+
+		std::string GetStepperText(int32_t a_value) const override;
+		int32_t GetNumOptions() const override { return (maxValue - minValue) / stepSize + 1; }
+		int32_t GetValueFromStepper(int32_t a_value) const override { return a_value * stepSize + minValue; }
+		int32_t GetCurrentStepFromValue() const override { return (value.get_data() - minValue) / stepSize; }
+		void SetValueFromStepper(int32_t a_value) override { *value = GetValueFromStepper(a_value); }
 	};
 
 	struct Slider : Setting
@@ -64,6 +103,7 @@ namespace Settings
 		float  defaultValue;
 		float sliderMin;
 		float sliderMax;
+		std::string suffix = "";
 
 		float GetSliderPercentage() const;
 		std::string GetSliderText() const;
@@ -100,52 +140,63 @@ namespace Settings
     class Main : public DKUtil::model::Singleton<Main>
     {
     public:
-		Stepper DisplayMode{ SettingID::kDisplayMode, "Display Mode", "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation.", { "DisplayMode", "Main" }, 0, { "SDR", "HDR10", "HDR scRGB" } };
-
-		Slider PeakBrightness{
+		EnumStepper DisplayMode {
+		    SettingID::kDisplayMode,
+		    "Display Mode",
+		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation.",
+		    "DisplayMode", "Main",
+		    0,
+		    { "SDR", "HDR10", "HDR scRGB" }
+		};
+		ValueStepper PeakBrightness{
 			SettingID::kHDR_PeakBrightness,
 			"Peak Brightness",
 			"Sets the peak brightness in HDR modes, this should match your display peak brightness. This will not influence the game average brightness.",
-			{ "PeakBrightness", "HDR" },
-			1000.f,
-		    80.f,
-			10000.f
+			"PeakBrightness", "HDR",
+			1000,
+			80,
+			4000,
+			10
 		};
-		Slider GamePaperWhite{
+		ValueStepper GamePaperWhite{
 			SettingID::kHDR_GamePaperWhite,
 			"Game Paper White",
-			"Sets the game paper white brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness. The reference default is 203.",
-			{ "GamePaperWhite", "HDR" },
-			203.f,
-		    80.f,
-			500.f
+			"Sets the game paper white brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness. The reference default is 200.",
+			"GamePaperWhite", "HDR",
+			200,
+		    80,
+			500,
+			10
 		};
-		Slider UIPaperWhite{
+		ValueStepper UIPaperWhite{
 			SettingID::kHDR_UIPaperWhite,
 			"UI Paper White",
-			"Sets the UI paper white brightness in HDR modes. The reference default is 203.",
-			{ "UIPaperWhite", "HDR" },
-			203.f,
-			80.f,
-			500.f
+			"Sets the UI paper white brightness in HDR modes. The reference default is 200.",
+			"UIPaperWhite", "HDR",
+			200,
+			80,
+			500,
+			10
 		};
 		Slider   Saturation{
 		    SettingID::kHDR_Saturation,
 		    "Saturation",
-		    "Sets the saturation strength in HDR modes. Neutral default at 50.",
+		    "Sets the saturation strength in HDR modes. Neutral default at 50\%.",
 		    { "Saturation", "HDR" },
 		    50.f,
 		    0.f,
-		    100.f
+		    100.f,
+			"%"
 		};
 		Slider   Contrast{
 		    SettingID::kHDR_Contrast,
 		    "Contrast",
-		    "Sets the contrast strength in HDR modes. Neutral default at 50.",
+		    "Sets the contrast strength in HDR modes. Neutral default at 50\%.",
 		    { "Contrast", "HDR" },
 		    50.f,
 		    0.f,
-		    100.f
+		    100.f,
+			"%"
 		};
 		Slider   SecondaryGamma{
 		    SettingID::kSecondaryGamma,
@@ -154,7 +205,8 @@ namespace Settings
 		    { "SecondaryGamma", "Main" },
 		    50.f,
 		    0.f,
-		    100.f
+		    100.f,
+			"%"
 		};
 		Slider   LUTCorrectionStrength{
 		    SettingID::kLUTCorrectionStrength,
@@ -163,7 +215,8 @@ namespace Settings
 		    { "LUTCorrectionStrength", "Main" },
 		    100.f,
 		    0.f,
-		    100.f
+		    100.f,
+			"%"
 		};
 		Slider   ColorGradingStrength{
 		    SettingID::kColorGradingStrength,
@@ -172,7 +225,8 @@ namespace Settings
 		    { "ColorGradingStrength", "Main" },
 		    100.f,
 		    0.f,
-		    100.f
+		    100.f,
+			"%"
 		};
 		Slider   GammaCorrectionStrength{
 		    SettingID::kGammaCorrectionStrength,
@@ -181,7 +235,8 @@ namespace Settings
 		    { "GammaCorrectionStrength", "Main" },
 		    50.f,
 		    0.f,
-		    100.f
+		    100.f,
+			"%"
 		};
 		Checkbox VanillaMenuLUTs{
 			SettingID::kVanillaMenuLUTs,
@@ -190,11 +245,11 @@ namespace Settings
 			{ "VanillaMenuLUTs", "Main" },
 			true
 		};
-		Stepper  FilmGrainType{
+		EnumStepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
 		    "Film Grain Type",
 		    "Sets the film grain type.",
-		    { "FilmGrainType", "Main" },
+		     "FilmGrainType", "Main",
 		    1,
 		    { "Vanilla", "Improved" }
 		};
@@ -214,12 +269,19 @@ namespace Settings
 #endif
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
 
-        bool IsHDREnabled() const;
+		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "Main" };
+
+		bool InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject);
+
+		bool IsHDRSupported() const { return true; } //bIsHDRSupported; }
+        bool IsDisplayModeSetToHDR() const;
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
+
+		void OnDisplayModeChanged();
 
 		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
 
@@ -233,13 +295,19 @@ namespace Settings
     private:
 		TomlConfig config = COMPILE_PROXY("Luma.toml"sv);
 		std::atomic_bool bIsAtEndOfFrame = false;
+		bool bIsHDRSupported = false;
+		bool bIsHDREnabled = false;
+
+		RE::BGSSwapChainObject* swapChainObject = nullptr;
+
 		bool bReshadeSettingsOverlayRegistered = false;
 
 		bool DrawReshadeCheckbox(Checkbox& a_checkbox);
-		bool DrawReshadeStepper(Stepper& a_stepper);
+		bool DrawReshadeEnumStepper(EnumStepper& a_stepper);
+		bool DrawReshadeValueStepper(ValueStepper& a_stepper);
 		bool DrawReshadeSlider(Slider& a_slider);
 		void DrawReshadeSettings();
     };
 
-	static inline RE::BGSSwapChainObject* swapChainObject = nullptr;
+	
 }
