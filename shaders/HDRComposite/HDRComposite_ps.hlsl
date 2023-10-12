@@ -554,9 +554,7 @@ float3 PostProcess(
 
 	// Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
 	// The higher the distance from the contrast middle point, the more contrast will change the color.
-	// This generates negative colors for contrast > 1, and LUT's can't take them.
-	//TODO: it would be nice to keep this branch and be able to map colors beyond 0-1 to the LUT,
-	//by extrapolating samples outside of its coordinates, simply by looking at the closest values on the valid range and coming up with a guessed extrapolation.
+	// This generates negative colors for contrast > 1, and LUT's can't take them, unless they have "LUTS_EXTRAPOLATION"
 	Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
 
 #elif POST_PROCESS_CONTRAST_TYPE == 2
