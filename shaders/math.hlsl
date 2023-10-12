@@ -22,7 +22,11 @@ T linearNormalization(T input, T min, T max, T newMin, T newMax)
 // Returns 1 if "dividend" is 0
 float safeDivision(float quotient, float dividend)
 {
+#if 0
+	return dividend == 0.f ? (FLT_MAX * sign(quotient)) : (quotient / dividend);
+#else
 	return dividend == 0.f ? 1.f : (quotient / dividend);
+#endif
 }
 
 // Returns 1 if "dividend" is 0
@@ -33,7 +37,11 @@ float3 safeDivision(float3 quotient, float3 dividend)
 	{
 		if (dividend[channel] == 0.f)
 		{
+#if 0
+			result = FLT_MAX * sign(quotient);
+#else
 			result = 1.f;
+#endif
 		}
 	}
 	return result;
