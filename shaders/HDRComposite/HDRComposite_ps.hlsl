@@ -12,6 +12,8 @@
 
 // Suggested if "LUT_FIX_GAMMA_MAPPING" is true
 #define FIX_WRONG_SRGB_GAMMA_FORMULA (FORCE_VANILLA_LOOK ? 0 : 1)
+//TODO: WIP
+#define LUTS_EXTRAPOLATION 0
 
 // This disables most other features (post processing/cinematics, LUTs, ...)
 #define ENABLE_TONEMAP 1
@@ -770,6 +772,25 @@ float3 GradingLUT(float3 color, float2 uv)
 #else
 	float3 LUTColor = LUTTexture.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+
+#if LUTS_EXTRAPOLATION //TODO: does it even make sense given that "LUTCoordinates" is in sRGB? Negative numbers would be fkep up
+	// Extrapolate colors beyond the 0-1 input coordinates by finding the closest color to the LUT cube edge,
+	// and calculating the "color change" acceleration in that direction.
+	const float3 LUTCenterCoordinates = 0.5f;
+	//TODO: this should probably take into account the direction of our color and only move to the center of the closest 3D LUT texel
+	const float colorCenteringOffset = hypot3((LUT_SIZE / 2.f) - 1.f) / hypot3(LUT_SIZE / 2.f);
+	const float3 LUTCenteredCoordinates = ((saturate(LUTCoordinates) - LUTCenterCoordinates) * colorCenteringOffset) + LUTCenterCoordinates;
+	
+#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+	float3 LUTCenterColor = TetrahedralInterpolation(LUTTexture, LUTCenteredCoordinates);
+#else
+	float3 LUTCenterColor = LUTTexture.Sample(Sampler0, LUTCenteredCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+	
+	// Shift the color in the opposite direction of the centered one, by the ratio between the centered and the extra/external offset
+	LUTColor = lerp(LUTColor, LUTCenterColor, -abs(LUTCoordinates - saturate(LUTCoordinates)) / abs(saturate(LUTCoordinates) - LUTCenteredCoordinates));
+	//TODO: clip negative luminance colors?
+#endif // LUTS_EXTRAPOLATION
 
 #if !LUT_FIX_GAMMA_MAPPING
 	// We always work in linear space so convert to it.
