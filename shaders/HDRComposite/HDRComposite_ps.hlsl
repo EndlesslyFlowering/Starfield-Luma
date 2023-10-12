@@ -10,7 +10,9 @@
 //#define APPLY_CINEMATICS // this is post processing
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
-// Suggested if "LUT_FIX_GAMMA_MAPPING" is true
+// Suggested if "LUT_FIX_GAMMA_MAPPING" is true.
+// Overall, we don't really care about maintaining the wrong sRGB gamma formula as it broke LUT mapping, causing clipping,
+// and just looked bad. We correct LUTs so it doesn't really matter.
 #define FIX_WRONG_SRGB_GAMMA_FORMULA (FORCE_VANILLA_LOOK ? 0 : 1)
 //TODO: WIP
 #define LUTS_EXTRAPOLATION 0
@@ -961,9 +963,11 @@ PSOutput PS(PSInput psInput)
 #endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
 // Do these even if "ENABLE_LUT" is false, for consistency
-#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0 // Disabled as this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it
+// If it's disabled is because this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it.
+// With the improved broken Bethesda sRGB function, this looks decent, it makes shadows darker.
+#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0
 	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
+	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor)), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
 #endif // FIX_WRONG_SRGB_GAMMA_FORMULA
 #if SDR_USE_GAMMA_2_2
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.

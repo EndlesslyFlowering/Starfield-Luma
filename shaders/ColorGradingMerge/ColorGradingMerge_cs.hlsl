@@ -5,6 +5,13 @@
 
 // 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good and it's kinda broken in SDR)
 #define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
+// This setting goes to influence the LUTs correction process, by determining how LUTs are linearized.
+// Theoretically this should be set to match the way LUTs were generated (designed, made):
+// -0) if they were made outside of the game on sRGB screens (this assumes in the game they didn't look as the artists intended them) (sRGB raises blacks compared to 2.2)
+// -1) if they were made outside of the game on 2.2 screens (this assumes in the game they didn't look as the artists intended them)
+// -2) if they were made inside of the game with the broken/optimized Bethesda sRGB gamma formula and outputting on 2.2 gamma or sRGB screens (based on "SDR_USE_GAMMA_2_2")
+// -3) if they were made inside of the game outputting on 2.2 gamma or sRGB screens but we don't care about correcting for the broken/optimized Bethesda sRGB gamma formula, we instead correct with the official one
+#define LUTS_GAMMA_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
 #define FORCE_SDR_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
@@ -12,21 +19,47 @@
 #define UNUSED_PARAMS 0
 #define LUT_DEBUG_VALUES false
 
+#if LUTS_GAMMA_TYPE <= 0 // sRGB->inear
+	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
+	#define CORRECT_GAMMA(x) x
+#elif LUTS_GAMMA_TYPE == 1 // 2.2->linear
+	#define LINEARIZE(x) pow(x, 2.2f)
+	#define CORRECT_GAMMA(x) x
+#elif LUTS_GAMMA_TYPE == 2 // Broken sRGB->linear->sRGB or 2.2->linear
+	#define LINEARIZE(x) gamma_sRGB_to_linear_Bethesda_Optimized(x)
+	#if SDR_USE_GAMMA_2_2
+		#if GAMMA_CORRECT_SDR_RANGE_ONLY
+			#define CORRECT_GAMMA(x) (pow(gamma_linear_to_sRGB_Bethesda_Optimized(saturate(x)), 2.2f) + (x - saturate(x)))
+		#else
+			#define CORRECT_GAMMA(x) (pow(gamma_linear_to_sRGB_Bethesda_Optimized(abs(x)), 2.2f) * (sign(x)))
+		#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+	#else
+		#if GAMMA_CORRECT_SDR_RANGE_ONLY
+			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(gamma_linear_to_sRGB_Bethesda_Optimized(saturate(x))) + (x - saturate(x)))
+			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(pow(pow(saturate(x), 1.f / 2.2f), 2.2f), 1.f / 2.2f)) + (x - saturate(x))) /*Seems like this is identical to the formula above, just slower*/
+		#else
+			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(gamma_linear_to_sRGB_Bethesda_Optimized(abs(x))) * (sign(x)))
+		#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+	#endif // SDR_USE_GAMMA_2_2
+#elif LUTS_GAMMA_TYPE >= 3 // sRGB->linear->sRGB or 2.2->linear
+	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
+	#if SDR_USE_GAMMA_2_2
+		#if GAMMA_CORRECT_SDR_RANGE_ONLY
+			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x)))
+		#else
+			// NOTE: to somehow conserve some HDR colors and not generate NaNs, we are doing inverse pow as gamma on negative numbers.
+			// Alternatively we could try to do this in BT.2020, so there's no negative colors.
+			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f) * (sign(x))))
+		#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+	#else
+		#define CORRECT_GAMMA(x) x
+	#endif // SDR_USE_GAMMA_2_2
+#endif // LUTS_GAMMA_TYPE
+
 //TODO: do we want to link this to "HdrDllPluginConstants.GammaCorrection"? Probably not
 // Make sure LUTs are normalized by linearizing them with gamma 2.2, so they work with values closer to the expected ones. Their mixed output is still kept in sRGB.
 // There's a chance that LUTs had correctly been made on sRGB gamma monitors, so in that case this would be wrong (LUTs were likely made with external tools).
-#if SDR_USE_GAMMA_2_2 && 1 // If it's disabled is because this makes LUTs look too bright, and crushes detail in HDR shadow colors (or does it?).
-	#define LINEARIZE(x) pow(x, 2.2f)
-#if GAMMA_CORRECT_SDR_RANGE_ONLY
-	#define CORRECT_GAMMA(x) gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x))
-#else
-	// NOTE: to somehow conserve some HDR colors and not generate NaNs, we are doing inverse pow as gamma on negative numbers.
-	// Alternatively we could try to do this in BT.2020, so there's no negative colors.
-	#define CORRECT_GAMMA(x) gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f) * (sign(x)))
-#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
-#else
-	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
-	#define CORRECT_GAMMA(x) x
+#if SDR_USE_GAMMA_2_2 // If it's disabled is because this makes LUTs look too bright, and crushes detail in HDR shadow colors (or does it?).
 #endif // SDR_USE_GAMMA_2_2
 
 // Behaviour when the color luminance goes beyond 1
@@ -302,6 +335,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	color = lerp(originalColor, color, HdrDllPluginConstants.LUTCorrectionStrength);
 
+	color = CORRECT_GAMMA(color);
+
 	return color;
 }
 
@@ -322,10 +357,10 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	float3 LUT2Color = LUT2.Load(inUVW);
 	float3 LUT3Color = LUT3.Load(inUVW);
 	float3 LUT4Color = LUT4.Load(inUVW);
-	LUT1Color = LINEARIZE(LUT1Color);
-	LUT2Color = LINEARIZE(LUT2Color);
-	LUT3Color = LINEARIZE(LUT3Color);
-	LUT4Color = LINEARIZE(LUT4Color);
+	LUT1Color = CORRECT_GAMMA(LINEARIZE(LUT1Color));
+	LUT2Color = CORRECT_GAMMA(LINEARIZE(LUT2Color));
+	LUT3Color = CORRECT_GAMMA(LINEARIZE(LUT3Color));
+	LUT4Color = CORRECT_GAMMA(LINEARIZE(LUT4Color));
 
 #endif // LUT_IMPROVEMENT_TYPE
 
@@ -387,9 +422,6 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	                + (adjustedLUT2Percentage * LUT2Color)
 	                + (adjustedLUT3Percentage * LUT3Color)
 	                + (adjustedLUT4Percentage * LUT4Color);
-
-	// Note: this might not work great if the LUT has colors beyond the SDR 0-1 range	
-	mixedLUT = CORRECT_GAMMA(mixedLUT);
 
 // Convert to sRGB after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
 #if !LUT_FIX_GAMMA_MAPPING
