@@ -57,9 +57,18 @@ struct CSInput
 
 #define HDR_BT2020 1
 
-// Normalize to the whole HDR10 range in RGB terms
-// Anything outside HDR10 will be clipped
-static const float normalizationFactor = PQMaxNits / WhiteNits_sRGB; // = 125
+// since blue is the least contributing in terms of luminance
+// the worst case is red and green at 0 and blue high enough
+// so that the luminance is HdrDllPluginConstants.HDRPeakBrightnessNits
+#if HDR_BT2020
+	static const float BlueFactor = 0.059265948832035064697265625f;
+#else
+	static const float BlueFactor = 0.07214272022247314453125f;
+#endif
+// normalize for the worst HDR10 case
+// clamped at 125 as that is the max HDR10 brightness (10000 / 80)
+static const half NormalizationFactor =
+	min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f);
 
 
 half3 PrepareForProcessing(half3 Color)
@@ -69,7 +78,7 @@ half3 PrepareForProcessing(half3 Color)
 #if HDR_BT2020
 		Color = BT709_To_BT2020_half(Color);
 #endif
-		return saturate(Color / normalizationFactor);
+		return saturate(Color / NormalizationFactor);
 	}
 	else
 	{
@@ -81,7 +90,7 @@ half3 PrepareForOutput(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
-		Color *= normalizationFactor;
+		Color *= NormalizationFactor;
 #if HDR_BT2020
 		return BT2020_To_BT709_half(Color);
 #else
