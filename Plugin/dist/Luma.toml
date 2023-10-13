@@ -7,19 +7,20 @@ DevSetting05 = 0.5
 
 [HDR]
 Contrast = 50.0
-GamePaperWhite = 203.0
-PeakBrightness = 1000.0
+GamePaperWhite = 200
+PeakBrightness = 1000
+PeakBrightnessAutoDetected = false
 Saturation = 50.0
-UIPaperWhite = 203.0
+UIPaperWhite = 200
 
 [Main]
 ColorGradingStrength = 100.0
 DisplayMode = 0
 FilmGrainType = 1
-LUTCorrectionStrength = 100.0
 GammaCorrectionStrength = 50.0
-SecondaryGamma = 50.0
+LUTCorrectionStrength = 100.0
 PostSharpen = true
+SecondaryGamma = 50.0
 VanillaMenuLUTs = true
 
 [RenderTargets]
