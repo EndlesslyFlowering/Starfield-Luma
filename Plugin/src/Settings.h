@@ -269,11 +269,11 @@ namespace Settings
 #endif
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
 
-		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "Main" };
+		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "HDR" };
 
 		bool InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject);
 
-		bool IsHDRSupported() const { return true; } //bIsHDRSupported; }
+		bool IsHDRSupported() const { return bIsHDRSupported; }
         bool IsDisplayModeSetToHDR() const;
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
