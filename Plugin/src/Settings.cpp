@@ -59,28 +59,28 @@ namespace Settings
 		}
 
 		// check hdr support
-		//bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
-		//bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
+		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
+		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
 
-		//// enable hdr if off and display mode suggests it should be on
-		//if (bIsHDRSupported && !bIsHDREnabled && DisplayMode.value.get_data() > 0) {
-		//    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
-		//}
+		// enable hdr if off and display mode suggests it should be on
+		if (bIsHDRSupported && !bIsHDREnabled && DisplayMode.value.get_data() > 0) {
+		    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
+		}
 
-		//// change display mode setting if it's hdr and hdr is not supported
-		//if (!bIsHDRSupported && DisplayMode.value.get_data() > 0) {
-		//    *DisplayMode.value = 0;
-		//}
+		// change display mode setting if it's hdr and hdr is not supported
+		if (!bIsHDRSupported && DisplayMode.value.get_data() > 0) {
+		    *DisplayMode.value = 0;
+		}
 
-		//// autodetect peak brightness
-		//if (bIsHDRSupported && PeakBrightnessAutoDetected.get_data() == false) {
-		//	float detectedMaxLuminance;
-		//	if (Utils::GetHDRMaxLuminance(swapChainObject->swapChainInterface, detectedMaxLuminance)) {
-		//	    *PeakBrightnessAutoDetected = true;
-		//		*PeakBrightness.value = detectedMaxLuminance;
-		//		Save();
-		//	}
-		//}
+		// autodetect peak brightness
+		if (bIsHDRSupported && PeakBrightnessAutoDetected.get_data() == false) {
+			float detectedMaxLuminance;
+			if (Utils::GetHDRMaxLuminance(swapChainObject->swapChainInterface, detectedMaxLuminance)) {
+			    *PeakBrightnessAutoDetected = true;
+				*PeakBrightness.value = detectedMaxLuminance;
+				Save();
+			}
+		}
 
 		return true;
 	}
@@ -118,9 +118,9 @@ namespace Settings
     void Main::OnDisplayModeChanged()
 	{
 		// enable HDR if disabled
-		/*if (!bIsHDREnabled && bIsHDRSupported && DisplayMode.value.get_data() > 0) {
+		if (!bIsHDREnabled && bIsHDRSupported && DisplayMode.value.get_data() > 0) {
 			bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
-		}*/
+		}
 
 		const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
 		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
@@ -290,10 +290,5 @@ namespace Settings
 		DrawReshadeSlider(DevSetting03);
 		DrawReshadeSlider(DevSetting04);
 		DrawReshadeSlider(DevSetting05);
-
-		/*if (ImGui::Button("Init compatiblity"))
-		{
-		    InitCompatibility(swapChainObject);
-		}*/
     }
 }
