@@ -11,7 +11,7 @@
 // -1) if they were made outside of the game on 2.2 screens (this assumes in the game they didn't look as the artists intended them)
 // -2) if they were made inside of the game with the broken/optimized Bethesda sRGB gamma formula and outputting on 2.2 gamma or sRGB screens (based on "SDR_USE_GAMMA_2_2")
 // -3) if they were made inside of the game outputting on 2.2 gamma or sRGB screens but we don't care about correcting for the broken/optimized Bethesda sRGB gamma formula, we instead correct with the official one
-#define LUTS_GAMMA_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
+#define LUTS_GAMMA_TYPE (FORCE_VANILLA_LOOK ? 0 : 0)
 #define FORCE_SDR_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
@@ -228,28 +228,32 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	float fixRaisedBlacksInputSmoothing = lerp(1.f, 1.333f, HdrDllPluginConstants.GammaCorrection); // Values from 1 up, greater is smoother
 	float fixRaisedBlacksOutputSmoothing = lerp(1.f, 0.666f, HdrDllPluginConstants.GammaCorrection); // Values from 0 up, smaller than 1 is smoother
 	const float3 invertedBlack = 1.f - (pow(analysis.black, lerp(1.f, fixRaisedBlacksInputSmoothing, analysis.black)) * fixRaisedBlacksStrength);
-	const float3 reduceFactor = lerp(1.f / invertedBlack, 1.f, pow(neutralLUTColor, fixRaisedBlacksOutputSmoothing));
+	const float3 blackScaling = lerp(1.f / invertedBlack, 1.f, pow(neutralLUTColor, fixRaisedBlacksOutputSmoothing));
 #elif 1 // Original implementation
-	const float3 reduceFactor = lerp(1.f / (1.f - analysis.black), 1.f, neutralLUTColor);
+	const float3 blackScaling = lerp(1.f / (1.f - analysis.black), 1.f, neutralLUTColor);
 #elif 0 // Alternative implementation, generates slightly smoother shadow gradients but it hasn't been tested around the game much, and still crushes blacks
-	const float3 reduceFactor = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
+	const float3 blackScaling = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
 #else // Disable for quick testing
-	const float3 reduceFactor = 1.f;
+	const float3 blackScaling = 1.f;
 #endif
 
-	float3 detintedColor = 1.f - ((1.f - color) * reduceFactor);
+	float3 detintedColor = 1.f - ((1.f - color) * blackScaling);
 
-#if 0 // TODO: Check again after reexamining gamma correction, this should be fine to do in SDR as well
-	// Without this, the output might be overly dark
-	static const bool alwaysClampDetintedColor = true;
-	if (alwaysClampDetintedColor || SDRRange) {
-		detintedColor = max(detintedColor, 0.f);
-	}
-	else
-#endif
+	// Must be done because if channels go negative othwerise it'll become
+	// amplified when gain is applied back, causing L to be lower than it should.
+	// Even if Y or L is positive before gain, a negative channel being multiplied
+	// will hurt visiblity.
+	// (eg: (-2,0,1) * 2 = (-4, 0, 2) instead of (0,0,2)
+	// Trade off here is, near black, more visibility vs smoother gradients
+	detintedColor = max(detintedColor, 0.f);
+	
+#if LUT_DEBUG_VALUES
+	// Should never happen
 	if (Luminance(detintedColor) < 0.f) {
-		detintedColor = 0.f;
+		return DEBUG_COLOR;
 	}
+#endif // LUT_DEBUG_VALUES
+	
 
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
@@ -258,12 +262,18 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
 
-	//TODO: review: is this still good after "fixRaisedBlacksStrength"/"fixRaisedBlacksInputSmoothing"/"fixRaisedBlacksOutputSmoothing"?
-	const float3 increaseFactor = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
+	// We fork a bit from Normalized LUTs 2.0.0 here, because the scaling will
+	// now be symmetrical to avoid an extra lerp.
+	// Max shift in any channel is +0.00015736956998746443f
+	// In RGB8 this only shifts 8653 / 794,624 (1%) of texels enough to
+	// change one channel by 1/255 (and likely from rounding).
+	// None of those RGB8 values are near black or white
+	// At worse, it's 0.01% brighter
 
-	const float3 retintedColor = detintedColor * increaseFactor;
+	const float extraLBoost = 1.f; // Replace with user option? 
+	const float3 retintedColor = detintedColor * blackScaling * extraLBoost;
 
-	float targetL = linear_srgb_to_oklch(retintedColor)[0];
+	float targetL = linear_srgb_to_oklab(retintedColor)[0];
 
 #if LUT_DEBUG_VALUES
 	if (targetL < 0) return DEBUG_COLOR;
@@ -323,19 +333,49 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
 	}
 
-#if 0 //TODO: branching on colors isn't good, we should be writing math that guarantees 0 maps to 0 if necessay
-	if (!any(neutralLUTColor)) {
-		// Always use black at (0,0,0) now matter how LCH computes
-		color = 0.f;
-	} else
-#endif
+
+#if LUT_DEBUG_VALUES // Debug black point
+	bool isBlackPoint = neutralLUTColor.r == 0.f && neutralLUTColor.g == 0.f && neutralLUTColor.b == 0.f;
+
+	bool wasBlack = !any(color);
+
+	// If neutralLutColor is 0,0,0, force 0
+	
+	color *= (!isBlackPoint);
+
+	bool nowBlack = !any(color);
+
+	if (isBlackPoint) {
+		if (wasBlack) {
+			// color = float3(0.f,1.f, 0.f); // Green (OK)
+		} else if (nowBlack) {
+			// L has recorded upto `0.000004829726509479252`
+			// If below 0.000005, ignore it
+			if (targetL >= 0.01f) {
+				color = float3(1.f,1.f, 0.f); // Yellow (Bad L)
+			}
+		}
+	} else if (nowBlack || targetL < 0.000005f) {
+		if (!wasBlack) {
+			color = float3(0.f,1.f, 1.f); // Cyan (Crush)
+		}
+	}
+#endif // LUT_DEBUG_VALUES
+
 	if (SDRRange) {
 		// Optional step to keep colors in the SDR range.
 		color = saturate(color);
 	}
-	else if (Luminance(color) < 0.f) {
-		color = 0.f;
+
+#if LUT_DEBUG_VALUES
+	// Should never happen
+	if (Luminance(color) < 0.f) {
+		return DEBUG_COLOR;
 	}
+#endif // LUT_DEBUG_VALUES
+
+	// To note, color channels may be negative, even if -0.00001f
+
 
 	color = lerp(originalColor, color, HdrDllPluginConstants.LUTCorrectionStrength);
 
