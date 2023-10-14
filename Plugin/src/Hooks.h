@@ -57,6 +57,9 @@ namespace Hooks
 
 			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(205436, 0x3F7), Hook_EndOfFrame);
 			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(205436, 0x7CB), Hook_PostEndOfFrame);
+
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x174), HookedScaleformCompositeSetRenderTarget);
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x249), HookedScaleformCompositeDraw);
 		}
 
 	private:
@@ -68,6 +71,9 @@ namespace Hooks
 		static void CreateSettings(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList);
 
 		static void UploadRootConstants(void* a1, void* a2);
+
+		static void HookedScaleformCompositeSetRenderTarget(void* a1, void* a2, void** a_rtArray, void* a4, void* a5, void* a6, void* a7, void* a8, void* a9);
+		static void HookedScaleformCompositeDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount);
 
 		static void Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;
