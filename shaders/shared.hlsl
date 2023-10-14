@@ -16,6 +16,10 @@
 // If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
 // Requires "SDR_USE_GAMMA_2_2".
 #define GAMMA_CORRECTION_IN_LUTS 1
+#define FORCE_SDR_LUTS 0
+
+#define USE_OKLAB_COLORS 0
+
 // If true, SDR will be kept in linear space until the final out.
 // This is desired for output quality as we store colors on float buffers, which are based kept in linear space,
 // it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
