@@ -23,7 +23,7 @@ namespace Settings
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
 		kGammaCorrectionStrength,
-		kSecondaryGamma,
+		kSecondaryBrightness,
         kVanillaMenuLUTs,
 		kFilmGrainType,
 		kPostSharpen,
@@ -124,7 +124,7 @@ namespace Settings
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
-		float    SDRSecondaryGamma;
+		float    SDRSecondaryBrightness;
 		uint32_t FilmGrainType;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
@@ -198,11 +198,11 @@ namespace Settings
 		    100.f,
 			"%"
 		};
-		Slider   SecondaryGamma{
-		    SettingID::kSecondaryGamma,
+		Slider   SecondaryBrightness{
+		    SettingID::kSecondaryBrightness,
 		    "Brightness",
-		    "Modulates the brightness in SDR modes. Leave at 50\% if unsure.",
-		    { "SecondaryGamma", "Main" },
+		    "Modulates the brightness in SDR modes. Neutral default at 50\%.",
+		    { "SecondaryBrightness", "Main" },
 		    50.f,
 		    0.f,
 		    100.f,
@@ -256,7 +256,7 @@ namespace Settings
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
-			"Enables the game default forced post sharpen pass.",
+			"Toggles the game default post sharpen pass. By default this was running after other sharpening or upscaling methods, and was always forced on.",
 			{ "PostSharpen", "Main" },
 			true
 		};

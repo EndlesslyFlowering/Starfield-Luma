@@ -2,8 +2,8 @@
 DevSetting01 = 0.0
 DevSetting02 = 0.0
 DevSetting03 = 0.0
-DevSetting04 = 0.5
-DevSetting05 = 0.5
+DevSetting04 = 0.0
+DevSetting05 = 0.0
 
 [HDR]
 Contrast = 50.0
@@ -20,7 +20,7 @@ FilmGrainType = 1
 GammaCorrectionStrength = 50.0
 LUTCorrectionStrength = 100.0
 PostSharpen = true
-SecondaryGamma = 50.0
+SecondaryBrightness = 50.0
 VanillaMenuLUTs = true
 
 [RenderTargets]
