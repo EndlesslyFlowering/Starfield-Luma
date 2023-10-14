@@ -6,6 +6,9 @@
 
 #include <d3d12.h>
 
+// TODO: set to false in release builds (use the build configuation to automatically define it)
+#define DEVELOPMENT 1
+
 namespace Settings
 {
     using namespace DKUtil::Alias;
@@ -15,6 +18,7 @@ namespace Settings
 		kSTART = 600,
 
         kDisplayMode,
+		kForceSDROnHDR,
         kHDR_PeakBrightness,
         kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
@@ -23,7 +27,7 @@ namespace Settings
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
 		kGammaCorrectionStrength,
-		kSecondaryGamma,
+		kSecondaryBrightness,
         kVanillaMenuLUTs,
 		kFilmGrainType,
 		kPostSharpen,
@@ -115,7 +119,7 @@ namespace Settings
 	// Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.
 	struct ShaderConstants
 	{
-		uint32_t DisplayMode;
+		int32_t  DisplayMode;
 		float    PeakBrightness;
 		float    GamePaperWhite;
 		float    UIPaperWhite;
@@ -124,7 +128,7 @@ namespace Settings
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
-		float    SDRSecondaryGamma;
+		float    SDRSecondaryBrightness;
 		uint32_t FilmGrainType;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
@@ -147,6 +151,13 @@ namespace Settings
 		    "DisplayMode", "Main",
 		    0,
 		    { "SDR", "HDR10", "HDR scRGB" }
+		};
+		Checkbox ForceSDROnHDR{
+			SettingID::kForceSDROnHDR,
+			"Force SDR on scRGB HDR",
+			"When enabled, the game will still tonemap to SDR but output on an HDR scRGB swapchain.",
+			{ "ForceSDROnHDR", "Dev" },
+			false
 		};
 		ValueStepper PeakBrightness{
 			SettingID::kHDR_PeakBrightness,
@@ -198,11 +209,11 @@ namespace Settings
 		    100.f,
 			"%"
 		};
-		Slider   SecondaryGamma{
-		    SettingID::kSecondaryGamma,
+		Slider   SecondaryBrightness{
+		    SettingID::kSecondaryBrightness,
 		    "Brightness",
-		    "Modulates the brightness in SDR modes. Leave at 50\% if unsure.",
-		    { "SecondaryGamma", "Main" },
+		    "Modulates the brightness in SDR modes. Neutral default at 50\%.",
+		    { "SecondaryBrightness", "Main" },
 		    50.f,
 		    0.f,
 		    100.f,
@@ -256,25 +267,27 @@ namespace Settings
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
-			"Enables the game default forced post sharpen pass.",
+			"Toggles the game default post sharpen pass. By default this was running after other sharpening or upscaling methods, and was always forced on.",
 			{ "PostSharpen", "Main" },
 			true
 		};
-#if 1
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", { "DevSetting01", "Dev" }, 0.f, 0.f, 100.f };
 		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", { "DevSetting02", "Dev" }, 0.f, 0.f, 100.f };
 		Slider DevSetting03{ SettingID::kDevSetting03, "DevSetting03", "Development setting", { "DevSetting03", "Dev" }, 0.f, 0.f, 100.f };
 		Slider DevSetting04{ SettingID::kDevSetting04, "DevSetting04", "Development setting", { "DevSetting04", "Dev" }, 50.f, 0.f, 100.f };
 		Slider DevSetting05{ SettingID::kDevSetting05, "DevSetting05", "Development setting", { "DevSetting05", "Dev" }, 50.f, 0.f, 100.f };
-#endif
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
 
 		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "HDR" };
 
 		bool InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject);
+		void RefreshHDRDisplaySupportState();
+		void RefreshHDRDisplayEnableState();
 
 		bool IsHDRSupported() const { return bIsHDRSupported; }
+        bool IsSDRForcedOnHDR() const;
         bool IsDisplayModeSetToHDR() const;
+        bool IsGameRenderingSetToHDR() const;
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
@@ -295,8 +308,8 @@ namespace Settings
     private:
 		TomlConfig config = COMPILE_PROXY("Luma.toml"sv);
 		std::atomic_bool bIsAtEndOfFrame = false;
-		bool bIsHDRSupported = false;
-		bool bIsHDREnabled = false;
+		std::atomic_bool bIsHDRSupported = false;
+		std::atomic_bool bIsHDREnabled = false;
 
 		RE::BGSSwapChainObject* swapChainObject = nullptr;
 

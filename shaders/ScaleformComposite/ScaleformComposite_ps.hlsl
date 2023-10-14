@@ -4,8 +4,13 @@
 
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 // We found the best value empirically and it seems to match gamma 2.2.
-// Note that this make the look more towards SDR sRGB gamma blends when the background is white and the UI is dark, but in the opposite case, it will have the inverse effect (or something like that).
+// Note that this make the look more towards SDR sRGB gamma blends when the background is white and the UI is dark,
+// but in the opposite case, it will have the inverse effect (or something like that).
 #define HDR_UI_BLEND_POW (1.f / 2.2f)
+// Let's only correct up to a percentage to avoid corrections in the other direction
+// (e.g. the game sometimes forgets some UI widgets in the view that had a very low alpha,
+// and without or alpha pow modifications, it becomes much more noticeable).
+#define HDR_UI_BLEND_POW_ALPHA 0.5f
 
 struct PushConstantWrapper_ScaleformCompositeLayout
 {
@@ -31,6 +36,9 @@ float4 PS(PSInputs psInputs) : SV_Target
 	const float4 inputColor = FinalColorTexture[psInputs.pos.xy];
 	float4 uiColor = UITexture.Sample(UISampler, psInputs.uv.xy);
 
+	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG,
+	// as it has a copy of the UI buffer 
+
 	// Theoretically all UI is in sRGB (though it might have been designed on gamma 2.2 screens, we can't know that, but it was definately targeting gamma 2.2 as output anyway).
 	uiColor.rgb = gamma_sRGB_to_linear(uiColor.rgb);
 
@@ -47,13 +55,19 @@ float4 PS(PSInputs psInputs) : SV_Target
 		uiColor.rgb *= HdrDllPluginConstants.DisplayMode > 0 ? (HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_sRGB) : 1.f;
 		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
 		// this won't ever be perfect but it's close enough for most cases.
-		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
-#if DEVELOPMENT && 0
+#if DEVELOPMENT && 0 // Quick testing
 		const float HDRUIBlendPow = 1.f - HdrDllPluginConstants.DevSetting02;
+#elif 1
+		// Base the alpha pow application percentage on the color luminance.
+		// Generally speaking dark colors (with a low alpha) are meant as darkneing (transparent) backgrounds,
+		// while brighter/whiter colors are meant to replace the background color directly (opaque),
+		// so we could take that into account to avoid cases where the alpha pow would make stuff look worse.
+		const float HDRUIBlendPow = lerp(HDR_UI_BLEND_POW, 1.f, saturate(Luminance(UIColor.xyz)));
 #else
-		const float HDRUIBlendPow = HDR_UI_BLEND_POW;
+		const float HDRUIBlendPow = lerp(1.f, HDR_UI_BLEND_POW, HDR_UI_BLEND_POW_ALPHA);
 #endif
-		uiColor.a = pow(saturate(uiColor.a), HDRUIBlendPow); //TODO: base the percentage of application of "HDR_UI_BLEND_POW" based on how black/dark the UI color is?
+		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
+		uiColor.a = pow(saturate(uiColor.a), HDRUIBlendPow);
 	}
 #if !SDR_LINEAR_INTERMEDIARY
 	else // in SDR, output the UI as it was, independently of "SDR_USE_GAMMA_2_2", there's no need to ever adjust it really

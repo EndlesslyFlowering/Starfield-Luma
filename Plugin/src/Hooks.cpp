@@ -17,30 +17,30 @@ namespace Hooks
 		return nullptr;
 	}
 
-    void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bEnable)
+    void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bDisplayModeHDREnable, bool a_bGameRenderingHDREnable)
     {
 		if (const auto peakBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_PeakBrightness))) {
-			peakBrightnessSetting->m_Enabled.SetValue(a_bEnable);
+			peakBrightnessSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
 		if (const auto gamePaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_GamePaperWhite))) {
-			gamePaperWhiteSetting->m_Enabled.SetValue(a_bEnable);
+			gamePaperWhiteSetting->m_Enabled.SetValue(a_bDisplayModeHDREnable);
 		}
 
 		if (const auto uiPaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite))) {
-			uiPaperWhiteSetting->m_Enabled.SetValue(a_bEnable);
+			uiPaperWhiteSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
 		if (const auto saturation = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Saturation))) {
-			saturation->m_Enabled.SetValue(a_bEnable);
+			saturation->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
 		if (const auto contrast = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Contrast))) {
-			contrast->m_Enabled.SetValue(a_bEnable);
+			contrast->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 		
-		if (const auto secondaryGammaSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryGamma))) {
-			secondaryGammaSetting->m_Enabled.SetValue(!a_bEnable);
+		if (const auto secondaryBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryBrightness))) {
+			secondaryBrightnessSetting->m_Enabled.SetValue(!a_bGameRenderingHDREnable);
 		}
     }
 
@@ -109,13 +109,14 @@ namespace Hooks
 
 		CreateSeparator(a_settingList, Settings::SettingID::kSTART);
 
-		CreateStepperSetting(a_settingList, settings->DisplayMode, settings->IsHDRSupported());
-		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsDisplayModeSetToHDR());
+		// We don't expose "DevSetting*" or "ForceSDROnHDR" to the game settings, they'd just confuse users
+		CreateStepperSetting(a_settingList, settings->DisplayMode, settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
+		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR());
-		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsDisplayModeSetToHDR());
-		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsDisplayModeSetToHDR());
-		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsDisplayModeSetToHDR());
-		CreateSliderSetting(a_settingList, settings->SecondaryGamma, !settings->IsDisplayModeSetToHDR());
+		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
+		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
+		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
+		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
@@ -384,16 +385,33 @@ namespace Hooks
 			if (prevValue != newValue) {
 				*a_setting.value = newValue;
 				settings->Save();
+				return true;
 			}
+			return false;
 		};
 
 		switch (a_eventData.m_SettingID) {
+		case static_cast<int>(Settings::SettingID::kForceSDROnHDR):
+			{
+				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
+				const bool wasSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+				if (HandleSetting(settings->ForceSDROnHDR)) {
+					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
+					const bool isSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR) {
+						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR);
+					}
+					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
+						displayModeSetting->m_Enabled.SetValue(settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
+					}
+					settings->OnDisplayModeChanged();
+				}
+			}
+			break;
 		case static_cast<int>(Settings::SettingID::kVanillaMenuLUTs):
 			HandleSetting(settings->VanillaMenuLUTs);
 			break;
-		}
-
-		switch (a_eventData.m_SettingID) {
 		case static_cast<int>(Settings::SettingID::kPostSharpen):
 			HandleSetting(settings->PostSharpen);
 		    break;
@@ -420,14 +438,18 @@ namespace Hooks
 		switch (a_eventData.m_SettingID) {
 		case static_cast<int>(Settings::SettingID::kDisplayMode):
 			{
-				const auto prevDisplayMode = settings->DisplayMode.value.get_data();
+				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
+				const bool wasSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
 				if (HandleSetting(settings->DisplayMode)) {
-					if (prevDisplayMode == 0) {
-						ToggleEnableHDRSubSettings(a_eventData.m_Model, true);
-					} else if (settings->DisplayMode.value.get_data() == 0) {
-						ToggleEnableHDRSubSettings(a_eventData.m_Model, false);
+					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
+					const bool isSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR) {
+						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR);
 					}
-
+					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
+						displayModeSetting->m_Enabled.SetValue(settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
+					}
 					settings->OnDisplayModeChanged();
 				}
 			}
@@ -501,8 +523,8 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kGammaCorrectionStrength):
 			HandleSetting(settings->GammaCorrectionStrength);
 			return true;
-		case static_cast<int>(Settings::SettingID::kSecondaryGamma):
-			HandleSetting(settings->SecondaryGamma);
+		case static_cast<int>(Settings::SettingID::kSecondaryBrightness):
+			HandleSetting(settings->SecondaryBrightness);
 			return true;
 		}
 
@@ -555,6 +577,11 @@ namespace Hooks
     {
 		_PostEndOfFrame(a1);
 		Settings::Main::GetSingleton()->SetAtEndOfFrame(false);
+
+		if (Utils::IsInSettingsMenu()) // TODO: is really necessary? Was the HDR support state already refreshed e.g. when the user changed windowed mode?
+		{
+			Settings::Main::GetSingleton()->RefreshHDRDisplaySupportState();
+		}
     }
 
     void Install()
