@@ -39,8 +39,8 @@ namespace Hooks
 			contrast->m_Enabled.SetValue(a_bEnable);
 		}
 		
-		if (const auto secondaryGammaSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryGamma))) {
-			secondaryGammaSetting->m_Enabled.SetValue(!a_bEnable);
+		if (const auto secondaryBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryBrightness))) {
+			secondaryBrightnessSetting->m_Enabled.SetValue(!a_bEnable);
 		}
     }
 
@@ -115,7 +115,7 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsDisplayModeSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsDisplayModeSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsDisplayModeSetToHDR());
-		CreateSliderSetting(a_settingList, settings->SecondaryGamma, !settings->IsDisplayModeSetToHDR());
+		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsDisplayModeSetToHDR());
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
@@ -501,8 +501,8 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kGammaCorrectionStrength):
 			HandleSetting(settings->GammaCorrectionStrength);
 			return true;
-		case static_cast<int>(Settings::SettingID::kSecondaryGamma):
-			HandleSetting(settings->SecondaryGamma);
+		case static_cast<int>(Settings::SettingID::kSecondaryBrightness):
+			HandleSetting(settings->SecondaryBrightness);
 			return true;
 		}
 

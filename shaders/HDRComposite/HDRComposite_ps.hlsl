@@ -976,8 +976,13 @@ PSOutput PS(PSInput psInput)
 	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
 #endif // SDR_USE_GAMMA_2_2
 
-	// The dll makes sure this is 1 when we are in HDR
-	tonemappedPostProcessedGradedColor = pow(tonemappedPostProcessedGradedColor, -(HdrDllPluginConstants.SDRSecondaryGamma - 1.f) + 1.f);
+	// The dll makes sure this is 1 when we are in HDR.
+	if (HdrDllPluginConstants.SDRSecondaryBrightness != 1.f)
+	{
+		float3 oklabColor = linear_srgb_to_oklab(tonemappedPostProcessedGradedColor);
+		oklabColor[0] = pow(oklabColor[0], linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 0.5f, 1.5f));
+		tonemappedPostProcessedGradedColor = oklab_to_linear_srgb(oklabColor);
+	}
 
 #if GAMMA_CORRECT_SDR_RANGE_ONLY
 	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
