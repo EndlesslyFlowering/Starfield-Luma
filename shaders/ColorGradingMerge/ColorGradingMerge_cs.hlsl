@@ -356,7 +356,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	// To note, color channels may be negative, even if -0.00001f
 
-#if 1 // Print all HDR colors
+#if 0 // Print all HDR colors
 	if (any(color != saturate(color))) {
 		return DEBUG_COLOR;
 	}
