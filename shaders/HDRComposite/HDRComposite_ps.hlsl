@@ -10,10 +10,6 @@
 //#define APPLY_CINEMATICS // this is post processing
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
-// Suggested if "LUT_FIX_GAMMA_MAPPING" is true.
-// Overall, we don't really care about maintaining the wrong sRGB gamma formula as it broke LUT mapping, causing clipping,
-// and just looked bad. We correct LUTs so it doesn't really matter.
-#define FIX_WRONG_SRGB_GAMMA_FORMULA (FORCE_VANILLA_LOOK ? 0 : 1)
 //TODO: WIP
 #define LUTS_EXTRAPOLATION 0
 
@@ -758,14 +754,15 @@ float3 TetrahedralInterpolation(
 // In/Out linear space
 float3 GradingLUT(float3 color, float2 uv)
 {
-#if FIX_WRONG_SRGB_GAMMA_FORMULA
+// Overall, we don't really care about maintaining the wrong sRGB gamma formula as it broke LUT mapping, causing clipping, and just looked bad.
+#if !FORCE_VANILLA_LOOK
 	const float3 LUTCoordinates = gamma_linear_to_sRGB(color);
 #else
 	// Read gamma ini value, defaulting at 2.4 (makes little sense)
 	float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
-	// Weird linear -> sRGB conversion that clips values just above 0, and raises blacks.
+	// Weird linear -> sRGB conversion that clips values just above 0.
 	const float3 LUTCoordinates = max(gamma_linear_to_sRGB_Bethesda_Optimized(color, inverseGamma), 0.f); // Does "max()" is probably unnecessary as LUT sampling is already clamped.
-#endif // FIX_WRONG_SRGB_GAMMA_FORMULA
+#endif // FORCE_VANILLA_LOOK
 
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 	float3 LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
@@ -962,14 +959,8 @@ PSOutput PS(PSInput psInput)
 	tonemappedPostProcessedGradedColor = tonemappedPostProcessedGradedSDRColors;
 #endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
-// Do these even if "ENABLE_LUT" is false, for consistency
-// If it's disabled is because this looks awful, probably because the Bethesda optimized sRGB function doesn't even stay in the 0-1 range so there's no way to recover from it.
-// With the improved broken Bethesda sRGB function, this looks decent, it makes shadows darker.
-#if FIX_WRONG_SRGB_GAMMA_FORMULA && 0
-	// We fixed the LUT input gamma mapping formula so that LUTs apply correctly, technically speaking. Now we compensate for the adjustment.
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, gamma_sRGB_to_linear_Bethesda_Optimized(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor)), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
-#endif // FIX_WRONG_SRGB_GAMMA_FORMULA
-#if SDR_USE_GAMMA_2_2
+// Do this even if "ENABLE_LUT" is false, for consistency
+#if SDR_USE_GAMMA_2_2 && (!ENABLE_LUT || !GAMMA_CORRECTION_IN_LUTS) //TODO1
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
 	// If there's no color grading, we don't do this adjustment, as we assume the error was part of the LUTs setup, including on neutral LUTs
 	// (this is not entirely true, but the world is too black with this adjustment if there's no color grading).
