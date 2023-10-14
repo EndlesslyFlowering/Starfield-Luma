@@ -394,11 +394,12 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kForceSDROnHDR):
 			{
 				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
-				const bool wasGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+				const bool wasSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
 				if (HandleSetting(settings->ForceSDROnHDR)) {
 					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
-					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
-					if (wasDisplayModeHDR != isDisplayModeHDR || wasGameRenderingHDR != isGameRenderingHDR) {
+					const bool isSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR) {
+						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR);
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
@@ -438,11 +439,12 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kDisplayMode):
 			{
 				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
-				const bool wasGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+				const bool wasSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
 				if (HandleSetting(settings->DisplayMode)) {
 					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
-					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
-					if (wasDisplayModeHDR != isDisplayModeHDR || wasGameRenderingHDR != isGameRenderingHDR) {
+					const bool isSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR) {
+						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR);
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
@@ -578,7 +580,7 @@ namespace Hooks
 
 		if (Utils::IsInSettingsMenu()) // TODO: is really necessary? Was the HDR support state already refreshed e.g. when the user changed windowed mode?
 		{
-			Settings::Main::GetSingleton()->RefreshHDRSupportState();
+			Settings::Main::GetSingleton()->RefreshHDRDisplaySupportState();
 		}
     }
 

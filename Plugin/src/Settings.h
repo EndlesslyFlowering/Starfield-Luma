@@ -281,7 +281,8 @@ namespace Settings
 		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "HDR" };
 
 		bool InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject);
-		void RefreshHDRSupportState();
+		void RefreshHDRDisplaySupportState();
+		void RefreshHDRDisplayEnableState();
 
 		bool IsHDRSupported() const { return bIsHDRSupported; }
         bool IsSDRForcedOnHDR() const;
