@@ -18,6 +18,7 @@
 // For future development
 #define UNUSED_PARAMS 0
 #define LUT_DEBUG_VALUES false
+#define DEBUG_COLOR float3(1.f, 0.f, 1.f) /*Magenta*/
 
 #if LUTS_GAMMA_TYPE <= 0 // sRGB->inear
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
@@ -210,10 +211,6 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		return color;
 	}
 
-#if LUT_DEBUG_VALUES
-	float3 DEBUG_COLOR = float3(1.f, 0.f, 1.f); // Magenta
-#endif // LUT_DEBUG_VALUES
-
 	// While it unclear how exactly the floor was raised, remove the tint to floor
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
 	// Sample and hold targetChroma
@@ -254,7 +251,6 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	}
 #endif // LUT_DEBUG_VALUES
 	
-
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
 	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * (SDRRange ? 1.f : saturation);
