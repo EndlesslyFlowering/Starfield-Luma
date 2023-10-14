@@ -183,7 +183,7 @@ float3 oklab_to_oklch(float3 lab) {
 	float L = lab[0];
 	float a = lab[1];
 	float b = lab[2];
-	return float3 (
+	return float3(
 		L,
 		sqrt((a*a) + (b*b)),
 		atan2(b, a)
@@ -194,7 +194,7 @@ float3 oklch_to_oklab(float3 lch) {
 	float L = lch[0];
 	float C = lch[1];
 	float h = lch[2];
-	return float3 (
+	return float3(
 		L,
 		C * cos(h),
 		C * sin(h)
@@ -213,22 +213,14 @@ float3 linear_srgb_to_oklch(float3 rgb) {
 	);
 }
 
+// This is almost a perfect approximation of sRGB gamma, but it clips any color below 0.055.
 float3 gamma_linear_to_sRGB_Bethesda_Optimized(float3 Color, float InverseGamma = 1.f / 2.4f)
 {
-#if FORCE_VANILLA_LOOK
 	return (pow(Color, InverseGamma) * 1.055f) - 0.055f;
-#else // Fixes up the clipped blacks caused by the subtraction (I'm not sure if this is the closest formula to the vanilla one that doesn't clip colors)
-	return (pow(Color, InverseGamma) * 1.055f) - (0.055f * Color);
-#endif
 }
 
+	// Original exact inverse formula, this is heavily broken, especially in its inverse form
 float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
 {
-#if FORCE_VANILLA_LOOK // Original exact inverse formula, this is heavily broken, especially in its inverse form
 	return (pow(Color, Gamma) / 1.055f) + 0.055f;
-#elif 1 // Fixes up the raised blacks caused by the addition
-	return (pow(Color, Gamma) / 1.055f) + (0.055f * Color);
-#else // The most simplified version, which possibly works best
-	return pow(Color, Gamma);
-#endif
 }

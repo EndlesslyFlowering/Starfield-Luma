@@ -210,7 +210,17 @@ namespace Utils
 
 		return true;
 	}
+	
+	bool IsInSettingsMenu()
+	{
+		const auto ui = *Offsets::uiPtr;
+		if (Offsets::UI_IsMenuOpen(ui, "SettingsMenu")) { // TODO: this is a made up name
+			return true;
+		}
+		return false;
+	}
 
+	// Only works if HDR is enaged on the monitor that contains the swapchain
     bool GetHDRMaxLuminance(IDXGISwapChain3* a_swapChainInterface, float& a_outMaxLuminance)
     {
 		IDXGIOutput* output = nullptr;
