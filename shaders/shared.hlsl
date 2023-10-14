@@ -10,9 +10,12 @@
 #define CLAMP_INPUT_OUTPUT 0
 // If this is true, the code makes the assumption that Bethesda developed and calibrated the game on gamma 2.2 screens, as opposed to sRGB gamma.
 // This implies there was a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
-// By turning this on, we emulate the SDR look in HDR by baking that assumption into our calculations.
+// By turning this on, we emulate the SDR look in HDR (and out SDR) by baking that assumption into our calculations.
 // This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping.
 #define SDR_USE_GAMMA_2_2 (FORCE_VANILLA_LOOK ? 0 : 1)
+// If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
+// Requires "SDR_USE_GAMMA_2_2".
+#define GAMMA_CORRECTION_IN_LUTS 1
 // If true, SDR will be kept in linear space until the final out.
 // This is desired for output quality as we store colors on float buffers, which are based kept in linear space,
 // it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
