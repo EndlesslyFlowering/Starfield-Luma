@@ -971,7 +971,7 @@ PSOutput PS(PSInput psInput)
 	if (HdrDllPluginConstants.SDRSecondaryBrightness != 1.f)
 	{
 		float3 oklabColor = linear_srgb_to_oklab(tonemappedPostProcessedGradedColor);
-		oklabColor[0] = pow(oklabColor[0], linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 0.5f, 1.5f));
+		oklabColor[0] = pow(oklabColor[0], linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 1.25f, 0.75f));
 		tonemappedPostProcessedGradedColor = oklab_to_linear_srgb(oklabColor);
 	}
 
