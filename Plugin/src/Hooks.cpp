@@ -393,10 +393,10 @@ namespace Hooks
 		switch (a_eventData.m_SettingID) {
 		case static_cast<int>(Settings::SettingID::kForceSDROnHDR):
 			{
-				const bool wasDisplayModeHDR = settings->isDisplayModeSetToHDR();
+				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 				const bool wasGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 				if (HandleSetting(settings->ForceSDROnHDR)) {
-					const bool isDisplayModeHDR = settings->isDisplayModeSetToHDR();
+					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasGameRenderingHDR != isGameRenderingHDR) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR);
@@ -437,10 +437,10 @@ namespace Hooks
 		switch (a_eventData.m_SettingID) {
 		case static_cast<int>(Settings::SettingID::kDisplayMode):
 			{
-				const bool wasDisplayModeHDR = settings->isDisplayModeSetToHDR();
+				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 				const bool wasGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 				if (HandleSetting(settings->DisplayMode)) {
-					const bool isDisplayModeHDR = settings->isDisplayModeSetToHDR();
+					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasGameRenderingHDR != isGameRenderingHDR) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR);
