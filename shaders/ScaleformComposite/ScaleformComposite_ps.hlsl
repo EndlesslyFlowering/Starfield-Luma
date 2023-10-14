@@ -49,25 +49,8 @@ float4 PS(PSInputs psInputs) : SV_Target
 	if (HdrDllPluginConstants.DisplayMode > 0)
 #endif // SDR_LINEAR_INTERMEDIARY
 	{
-#if SDR_USE_GAMMA_2_2
 		uiColor.rgb = pow(gamma_linear_to_sRGB(uiColor.rgb), 2.2f);
-#endif // SDR_USE_GAMMA_2_2
 		uiColor.rgb *= HdrDllPluginConstants.DisplayMode > 0 ? (HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_sRGB) : 1.f;
-		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
-		// this won't ever be perfect but it's close enough for most cases.
-#if DEVELOPMENT && 0 // Quick testing
-		const float HDRUIBlendPow = 1.f - HdrDllPluginConstants.DevSetting02;
-#elif 1
-		// Base the alpha pow application percentage on the color luminance.
-		// Generally speaking dark colors (with a low alpha) are meant as darkneing (transparent) backgrounds,
-		// while brighter/whiter colors are meant to replace the background color directly (opaque),
-		// so we could take that into account to avoid cases where the alpha pow would make stuff look worse.
-		const float HDRUIBlendPow = lerp(HDR_UI_BLEND_POW, 1.f, saturate(Luminance(uiColor.xyz)));
-#else
-		const float HDRUIBlendPow = lerp(1.f, HDR_UI_BLEND_POW, HDR_UI_BLEND_POW_ALPHA);
-#endif
-		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
-		uiColor.a = pow(saturate(uiColor.a), HDRUIBlendPow);
 	}
 #if !SDR_LINEAR_INTERMEDIARY
 	else // in SDR, output the UI as it was, independently of "SDR_USE_GAMMA_2_2", there's no need to ever adjust it really
@@ -76,8 +59,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	}
 #endif // SDR_LINEAR_INTERMEDIARY
 
-	// TODO: Incorrect blend formula
-	FinalColorTexture[psInputs.pos.xy] = inputColor + float4(uiColor.rgb * uiColor.a, 0.f);
+	FinalColorTexture[psInputs.pos.xy] = float4(uiColor.rgb + (inputColor.rgb * (1 - uiColor.a)), 0.f);
 
 	// The Luma plugin binds a null render target on the engine side. All writes beyond this point are discarded regardless
 	// of whether a "discard;" statement is used.
