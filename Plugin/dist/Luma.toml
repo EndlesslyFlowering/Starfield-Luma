@@ -1,4 +1,5 @@
 [Dev]
+ForceSDROnHDR = false
 DevSetting01 = 0.0
 DevSetting02 = 0.0
 DevSetting03 = 0.0

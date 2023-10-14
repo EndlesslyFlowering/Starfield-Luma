@@ -33,7 +33,7 @@
 // Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.
 struct StructHdrDllPluginConstants
 {
-	uint DisplayMode; // SDR 0 (Rec.709 with 2.2 gamma, not sRGB), 1 HDR10 PQ BT.2020, 2 scRGB HDR
+	int DisplayMode; // -1 SDR on scRGB HDR, 0 SDR (Rec.709 with 2.2 gamma, not sRGB), 1 HDR10 PQ BT.2020, 2 scRGB HDR
 	float HDRPeakBrightnessNits; // Set equal to the max nits your display can output
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
