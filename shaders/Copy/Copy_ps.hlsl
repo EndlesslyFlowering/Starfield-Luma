@@ -42,12 +42,14 @@ float4 PS(PSInputs inputs) : SV_Target
 #endif // SDR_USE_GAMMA_2_2
         }
 #endif // SDR_LINEAR_INTERMEDIARY
-#if 1
         if (HdrDllPluginConstants.DisplayMode == -1)
         {
+#if 1
 		    color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
-        }
 #endif
+	    	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
+            color.rgb *= paperWhite;
+        }
     }
 
     return color;
