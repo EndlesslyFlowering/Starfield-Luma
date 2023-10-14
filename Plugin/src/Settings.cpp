@@ -59,24 +59,22 @@ namespace Settings
 		}
 
 		// check hdr support
-		RefreshHDRSupportState();
+		RefreshHDRDisplaySupportState();
 
 		// enable hdr if off and display mode suggests it should be on
-		if (bIsHDRSupported && !bIsHDREnabled && IsGameRenderingSetToHDR()) {
-		    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
-		}
+		RefreshHDRDisplayEnableState();
 
 		// change display mode setting if it's hdr and hdr is not supported
 		if (!bIsHDRSupported && IsGameRenderingSetToHDR()) {
 		    *DisplayMode.value = 0;
 		}
 
-		// autodetect peak brightness
-		if (bIsHDRSupported && PeakBrightnessAutoDetected.get_data() == false) {
+		// autodetect peak brightness (only works reliably if HDR is enabled)
+		if (bIsHDREnabled && PeakBrightnessAutoDetected.get_data() == false) {
 			float detectedMaxLuminance;
 			if (Utils::GetHDRMaxLuminance(swapChainObject->swapChainInterface, detectedMaxLuminance)) {
 			    *PeakBrightnessAutoDetected = true;
-				*PeakBrightness.value = detectedMaxLuminance;
+				*PeakBrightness.value = std::max(detectedMaxLuminance, 80.f);
 				Save();
 			}
 		}
@@ -84,11 +82,20 @@ namespace Settings
 		return true;
 	}
 
-    void Main::RefreshHDRSupportState()
+    void Main::RefreshHDRDisplaySupportState()
     {
-		// TODO: make sure the game never recreates the window handle or this would stop working
 		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
 		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
+		// TODO: make sure the game never recreates the window handle or this would stop working
+	}
+	
+    void Main::RefreshHDRDisplayEnableState()
+    {
+		if (bIsHDRSupported && !bIsHDREnabled && IsGameRenderingSetToHDR()) {
+		    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
+		}
+		// TODO: it would be nice to also force the "DisplayMode" to 0 here, and re-detect the peak brightness if "PeakBrightnessAutoDetected" was false,
+		// but it seems like it would run into thread safety problems
 	}
 
     bool Main::IsSDRForcedOnHDR() const
@@ -139,10 +146,8 @@ namespace Settings
 
     void Main::OnDisplayModeChanged()
 	{
-		// enable HDR if disabled
-		if (!bIsHDREnabled && bIsHDRSupported && IsDisplayModeSetToHDR()) {
-			bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
-		}
+		RefreshHDRDisplaySupportState();
+		RefreshHDRDisplayEnableState();
 
 		const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
 		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
