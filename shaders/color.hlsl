@@ -183,7 +183,7 @@ float3 oklab_to_oklch(float3 lab) {
 	float L = lab[0];
 	float a = lab[1];
 	float b = lab[2];
-	return float3 (
+	return float3(
 		L,
 		sqrt((a*a) + (b*b)),
 		atan2(b, a)
@@ -194,7 +194,7 @@ float3 oklch_to_oklab(float3 lch) {
 	float L = lch[0];
 	float C = lch[1];
 	float h = lch[2];
-	return float3 (
+	return float3(
 		L,
 		C * cos(h),
 		C * sin(h)

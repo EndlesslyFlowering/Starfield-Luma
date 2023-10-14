@@ -37,12 +37,12 @@ struct StructHdrDllPluginConstants
 	float HDRPeakBrightnessNits; // Set equal to the max nits your display can output
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
-    float HDRSaturation; // 1 is neutral
-	float HDRSecondaryContrast; // 1 is neutral
+    float HDRSaturation; // 0-2. 1 is neutral
+	float HDRSecondaryContrast; // 0-2. 1 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
 	float GammaCorrection; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs. 0 to 1. 1 is "neutral"
-	float SDRSecondaryGamma; // Suggested range 0.75 to 1.25. Mostly meant for SDR.. 1 is "neutral"
+	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint FilmGrainType; // 1 is default
 	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
