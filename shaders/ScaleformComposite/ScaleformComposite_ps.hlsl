@@ -62,7 +62,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 		// Generally speaking dark colors (with a low alpha) are meant as darkneing (transparent) backgrounds,
 		// while brighter/whiter colors are meant to replace the background color directly (opaque),
 		// so we could take that into account to avoid cases where the alpha pow would make stuff look worse.
-		const float HDRUIBlendPow = lerp(HDR_UI_BLEND_POW, 1.f, saturate(Luminance(UIColor.xyz)));
+		const float HDRUIBlendPow = lerp(HDR_UI_BLEND_POW, 1.f, saturate(Luminance(uiColor.xyz)));
 #else
 		const float HDRUIBlendPow = lerp(1.f, HDR_UI_BLEND_POW, HDR_UI_BLEND_POW_ALPHA);
 #endif
