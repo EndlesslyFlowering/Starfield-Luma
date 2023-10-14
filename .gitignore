@@ -11,3 +11,4 @@ tools/dxc_analysis_tools/dndxc.settings.xml
 Plugin/dist/Data/*
 Plugin/dist/ASI/*
 Plugin/dist/SFSE/*
+Plugin/dist/*.exp
