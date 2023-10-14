@@ -14,6 +14,7 @@ namespace Utils
 	RE::BS_DXGI_FORMAT GetBufferFormat(RE::Buffers a_buffer);
 
 	bool ShouldCorrectLUTs();
+	bool IsInSettingsMenu();
 
 	bool GetHDRMaxLuminance(IDXGISwapChain3* a_swapChainInterface, float& a_outMaxLuminance);
 	bool GetDisplayConfigPathInfo(HWND a_hwnd, DISPLAYCONFIG_PATH_INFO& a_outPathInfo);

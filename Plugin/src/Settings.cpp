@@ -59,16 +59,15 @@ namespace Settings
 		}
 
 		// check hdr support
-		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
-		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
+		RefreshHDRSupportState();
 
 		// enable hdr if off and display mode suggests it should be on
-		if (bIsHDRSupported && !bIsHDREnabled && DisplayMode.value.get_data() > 0) {
+		if (bIsHDRSupported && !bIsHDREnabled && IsGameRenderingSetToHDR()) {
 		    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
 		}
 
 		// change display mode setting if it's hdr and hdr is not supported
-		if (!bIsHDRSupported && DisplayMode.value.get_data() > 0) {
+		if (!bIsHDRSupported && IsGameRenderingSetToHDR()) {
 		    *DisplayMode.value = 0;
 		}
 
@@ -85,13 +84,34 @@ namespace Settings
 		return true;
 	}
 
+    void Main::RefreshHDRSupportState()
+    {
+		// TODO: make sure the game never recreates the window handle or this would stop working
+		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
+		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
+	}
+
+    bool Main::IsSDRForcedOnHDR() const
+    {
+		// The game will tonemap to SDR if this is true
+		return ForceSDROnHDR.value.get_data();
+    }
+
     bool Main::IsDisplayModeSetToHDR() const
     {
-		return DisplayMode.value.get_data() != 0;
+		return DisplayMode.value.get_data() > 0;
+    }
+	
+    bool Main::IsGameRenderingSetToHDR() const
+    {
+		// The game will tonemap to SDR if this is false
+		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR();
     }
 
     RE::BS_DXGI_FORMAT Main::GetDisplayModeFormat() const
     {
+		if (IsSDRForcedOnHDR())
+			return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT;
 		switch (DisplayMode.value.get_data()) {
 		case 0:
 		case 1:
@@ -104,6 +124,8 @@ namespace Settings
 
     DXGI_COLOR_SPACE_TYPE Main::GetDisplayModeColorSpaceType() const
     {
+		if (IsSDRForcedOnHDR())
+			return DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
 		switch (DisplayMode.value.get_data()) {
 		case 0:
 		default:
@@ -118,7 +140,7 @@ namespace Settings
     void Main::OnDisplayModeChanged()
 	{
 		// enable HDR if disabled
-		if (!bIsHDREnabled && bIsHDRSupported && DisplayMode.value.get_data() > 0) {
+		if (!bIsHDREnabled && bIsHDRSupported && IsDisplayModeSetToHDR()) {
 			bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
 		}
 
@@ -133,7 +155,7 @@ namespace Settings
 
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
     {
-		a_outShaderConstants.DisplayMode = static_cast<uint32_t>(DisplayMode.value.get_data());
+		a_outShaderConstants.DisplayMode = IsSDRForcedOnHDR() ? -1 : static_cast<int32_t>(DisplayMode.value.get_data());
 		a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
@@ -174,6 +196,7 @@ namespace Settings
 		static std::once_flag ConfigInit;
 		std::call_once(ConfigInit, [&]() {
 			config.Bind(DisplayMode.value, DisplayMode.defaultValue);
+			config.Bind(ForceSDROnHDR.value, ForceSDROnHDR.defaultValue);
 			config.Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config.Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config.Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
@@ -272,7 +295,13 @@ namespace Settings
 
     void Main::DrawReshadeSettings()
     {
+#if DEVELOPMENT // TODO: fix, this can often crash
+		DrawReshadeEnumStepper(DisplayMode);
+#endif
 		DrawReshadeValueStepper(PeakBrightness);
+#if DEVELOPMENT
+		DrawReshadeCheckbox(ForceSDROnHDR);
+#endif
 		DrawReshadeValueStepper(GamePaperWhite);
 		DrawReshadeValueStepper(UIPaperWhite);
 		DrawReshadeSlider(Saturation);
@@ -285,10 +314,12 @@ namespace Settings
 		DrawReshadeEnumStepper(FilmGrainType);
 		DrawReshadeCheckbox(PostSharpen);
 
+#if DEVELOPMENT
 		DrawReshadeSlider(DevSetting01);
 		DrawReshadeSlider(DevSetting02);
 		DrawReshadeSlider(DevSetting03);
 		DrawReshadeSlider(DevSetting04);
 		DrawReshadeSlider(DevSetting05);
+#endif
     }
 }

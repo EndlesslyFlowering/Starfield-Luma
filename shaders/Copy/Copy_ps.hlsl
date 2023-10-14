@@ -24,7 +24,7 @@ float4 PS(PSInputs inputs) : SV_Target
             color.rgb = linear_to_PQ(BT709_To_BT2020(color.rgb));
         }
 #if SDR_LINEAR_INTERMEDIARY
-        else if (HdrDllPluginConstants.DisplayMode <= 0)
+        else if (HdrDllPluginConstants.DisplayMode == 0)
         {
 #if SDR_USE_GAMMA_2_2
 		    color.rgb = pow(color.rgb, 1.f / 2.2f);
@@ -32,7 +32,22 @@ float4 PS(PSInputs inputs) : SV_Target
 		    color.rgb = gamma_linear_to_sRGB(color.rgb);
 #endif // SDR_USE_GAMMA_2_2
         }
+#else // SDR_LINEAR_INTERMEDIARY
+        else if (HdrDllPluginConstants.DisplayMode == 0)
+        {
+#if SDR_USE_GAMMA_2_2
+		    color.rgb = pow(color.rgb, 2.2f);
+#else
+		    color.rgb = gamma_sRGB_to_linear(color.rgb);
+#endif // SDR_USE_GAMMA_2_2
+        }
 #endif // SDR_LINEAR_INTERMEDIARY
+#if 1
+        if (HdrDllPluginConstants.DisplayMode == -1)
+        {
+		    color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
+        }
+#endif
     }
 
     return color;

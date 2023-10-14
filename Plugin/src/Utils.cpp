@@ -210,6 +210,15 @@ namespace Utils
 
 		return true;
 	}
+	
+	bool IsInSettingsMenu()
+	{
+		const auto ui = *Offsets::uiPtr;
+		if (Offsets::UI_IsMenuOpen(ui, "SettingsMenu")) {
+			return true;
+		}
+		return false;
+	}
 
     bool GetHDRMaxLuminance(IDXGISwapChain3* a_swapChainInterface, float& a_outMaxLuminance)
     {
