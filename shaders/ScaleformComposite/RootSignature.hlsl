@@ -6,7 +6,8 @@
 	"RootConstants(num32BitConstants=2, b0), " \
 	\
 	"DescriptorTable( " \
-		"SRV(t0, space=8) " \
+		"SRV(t0, space=8, flags=DESCRIPTORS_VOLATILE), " \
+		"UAV(u0, space=8, flags=DESCRIPTORS_VOLATILE) " \
 	"), " \
 	\
 	"RootConstants(num32BitConstants=" HDR_PLUGIN_CONSTANTS_SIZE ", b3), " \
