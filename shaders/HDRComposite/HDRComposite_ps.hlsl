@@ -35,7 +35,8 @@
 // Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
-#define DRAW_LUT 0
+#define DRAW_LUT_TEXTURE 0
+#define DRAW_LUT_SQUARE 0
 
 
 cbuffer CSharedFrameData : register(b0, space6)
@@ -778,7 +779,9 @@ float3 GradingLUT(float3 color, float2 uv)
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 	float3 LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
 #else
-	float3 LUTColor = LUTTexture.Sample(Sampler0, LUTCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
+	float3 linearScale = (LUT_SIZE - 1.0f) / LUT_SIZE;
+	float3 linearOffset = 1.0f / (2.0f * LUT_SIZE);
+	float3 LUTColor = LUTTexture.Sample(Sampler0, linearScale * LUTCoordinates + linearOffset);
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
 #if LUTS_EXTRAPOLATION //TODO: does it even make sense given that "LUTCoordinates" is in sRGB? Negative numbers would be fkep up
@@ -799,6 +802,13 @@ float3 GradingLUT(float3 color, float2 uv)
 	LUTColor = lerp(LUTColor, LUTCenterColor, -abs(LUTCoordinates - saturate(LUTCoordinates)) / abs(saturate(LUTCoordinates) - LUTCenteredCoordinates));
 	//TODO: clip negative luminance colors?
 #endif // LUTS_EXTRAPOLATION
+
+#if USE_OKLAB_COLORS
+	LUTColor = oklab_to_linear_srgb(LUTColor);
+	if (HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS) {
+		LUTColor = saturate(LUTColor);
+	}
+#endif
 
 #if !LUT_FIX_GAMMA_MAPPING
 	// We always work in linear space so convert to it.
@@ -833,27 +843,103 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 #endif
 }
 
-[RootSignature(ShaderRootSignature)]
-PSOutput PS(PSInput psInput)
-{
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+float4 drawLUT(PSInput psInput) {
 	static const uint DrawLUTScale = 10u; // Pixel scale
 	const uint2 LUTPixelPosition2D = psInput.SV_Position.xy / DrawLUTScale;
 	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % LUT_SIZE_UINT, LUTPixelPosition2D.y, LUTPixelPosition2D.x / LUT_SIZE_UINT);
 	bool drawLUT = false;
-	float3 LUTColor;
+	float4 LUTColor = float4(0,0,0,0);
 	if (!any(LUTPixelPosition3D < 0u) && !any(LUTPixelPosition3D > LUT_SIZE_UINT - 1u))
 	{
-		drawLUT = true;
-		LUTColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
-	}
+		float3 loadedColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
+		#if USE_OKLAB_COLORS
+			loadedColor = oklab_to_linear_srgb(loadedColor);
+		#endif
 
-	if (drawLUT)
+		loadedColor = lerp(float3(LUTPixelPosition3D.rgb) / float(LUT_SIZE_UINT - 1u), loadedColor, HdrDllPluginConstants.ColorGradingStrength);
+		LUTColor = float4(loadedColor.rgb, 1.f);
+	}
+	return LUTColor;
+}
+
+float4 drawLUTSquare(PSInput psInput) {
+	static const uint DrawLUTSquareScale = 2u; // Pixel scale
+	static const uint DrawLUTSquareSize = (LUT_SIZE_UINT * LUT_SIZE_UINT * DrawLUTSquareScale);
+	float4 LUTColor = float4(0,0,0,0);
+	float width;
+	float height;
+	InputColorTexture.GetDimensions(width, height);
+	if (psInput.SV_Position.y < (height - DrawLUTSquareSize)) return LUTColor;
+	
+	const uint2 position = uint2(
+		psInput.SV_Position.x / DrawLUTSquareScale,
+		(psInput.SV_Position.y - (height - DrawLUTSquareSize)) / DrawLUTSquareScale
+	);
+	const uint lutMax = LUT_SIZE_UINT - 1u;
+	uint xPoint = position.x / LUT_SIZE_UINT;
+	uint yPoint = position.y / LUT_SIZE_UINT;
+	if ((xPoint <= lutMax && yPoint >=0 && yPoint <= lutMax)) {
+		float3 xyz;
+		uint row = 0u;
+		float coord = float(xPoint) / float(lutMax);
+		float inverse = float(lutMax - xPoint) / float(lutMax);
+		     if (yPoint == row++) xyz = float3(coord  , coord  , coord  ); // Black => White
+
+		else if (yPoint == row++) xyz = float3(coord  , 0      , 0      ); // Black => Red
+		else if (yPoint == row++) xyz = float3(0      , coord  , 0      ); // Black => Green
+		else if (yPoint == row++) xyz = float3(0      , 0      , coord  ); // Black => Blue
+
+		else if (yPoint == row++) xyz = float3(0      , coord  , coord  ); // Black => Cyan
+		else if (yPoint == row++) xyz = float3(coord  , coord  , 0      ); // Black => Yellow
+		else if (yPoint == row++) xyz = float3(coord  , 0      , coord  ); // Black => Magenta
+
+		else if (yPoint == row++) xyz = float3(1u     , coord  , coord  ); // Red to White
+		else if (yPoint == row++) xyz = float3(coord  , 1u     , coord  ); // Green to White
+		else if (yPoint == row++) xyz = float3(coord  , coord  , 1u     ); // Blue to White
+
+		else if (yPoint == row++) xyz = float3(coord  , 1u     , 1u     ); // Cyan to White
+		else if (yPoint == row++) xyz = float3(1u     , 1u     , coord  ); // Yellow to White
+		else if (yPoint == row++) xyz = float3(1u     , coord  , 1u     ); // Magenta to White
+
+		else if (yPoint == row++) xyz = float3(inverse, coord  , coord  ); // Red to Cyan
+		else if (yPoint == row++) xyz = float3(coord  , inverse, coord  ); // Green to Magenta
+		else if (yPoint == row++) xyz = float3(coord  , coord  , inverse); // Blue to Yellow
+		
+
+		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb * lutMax, 0)).rgb;
+		#if USE_OKLAB_COLORS
+			loadedColor = oklab_to_linear_srgb(loadedColor);
+		#endif
+
+		loadedColor = lerp(xyz.rgb, loadedColor, HdrDllPluginConstants.ColorGradingStrength);
+		LUTColor = float4(loadedColor.rgb, 1.f);
+	}
+	return LUTColor;
+}
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
+
+
+[RootSignature(ShaderRootSignature)]
+PSOutput PS(PSInput psInput)
+{
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && (DRAW_LUT_TEXTURE || DRAW_LUT_SQUARE)
+	float4 LUTColor = float4(0,0,0,0);
+#if DRAW_LUT_TEXTURE
+	LUTColor = drawLUT(psInput);
+#endif
+#if DRAW_LUT_SQUARE
+	if (LUTColor.a == 0.f) {
+		LUTColor = drawLUTSquare(psInput);
+	}
+#endif
+
+	if (LUTColor.a != 0.f)
 	{
 #if !LUT_FIX_GAMMA_MAPPING
 		LUTColor = gamma_sRGB_to_linear(LUTColor);
 #endif
-		float3 outputColor = LUTColor;
+		float3 outputColor = LUTColor.rgb;
 		if (HdrDllPluginConstants.DisplayMode <= 0) // SDR
 		{
 #if !SDR_LINEAR_INTERMEDIARY
