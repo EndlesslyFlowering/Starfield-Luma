@@ -126,13 +126,110 @@ namespace Hooks
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
 
+	struct DescriptorAllocation
+	{
+		enum class Type : uint8_t
+		{
+			Sampler = 0,
+			CbvSrvUav = 1,
+		};
+
+		D3D12_CPU_DESCRIPTOR_HANDLE CpuHandleBase;
+		D3D12_GPU_DESCRIPTOR_HANDLE GpuHandleBase;
+	};
+
+	struct Dx12Resource // Setup at 00000001432E692F
+	{
+		char _pad0[0x78];												// 0
+		int  m_DescriptorArrayCount;									// 78 Greater than 0 (msb bit) indicates array
+		union
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE  m_CpuDescriptor;				// 80 Possibly mip levels? No idea w.r.t. its purpose
+			D3D12_CPU_DESCRIPTOR_HANDLE* m_CpuDescriptorArray;			// 80
+		};
+		D3D12_CPU_DESCRIPTOR_HANDLE m_CBVCpuDescriptor;                 // 88 Each handle is unioned with an array like above?
+		D3D12_CPU_DESCRIPTOR_HANDLE m_SRVCpuDescriptor;                 // 90
+		D3D12_CPU_DESCRIPTOR_HANDLE m_UAVCpuDescriptor;					// 98
+		D3D12_CPU_DESCRIPTOR_HANDLE m_UnknownSecondaryUAVCpuDescriptor;	// A0 Probably raytracing related
+		ID3D12Resource*             m_Resource;							// A8
+		uint32_t                    m_TransitionState;					// B0 Flags converted to D3D12_RESOURCE_STATES enum
+	};
+	static_assert(offsetof(Dx12Resource, m_DescriptorArrayCount) == 0x78);
+	static_assert(offsetof(Dx12Resource, m_CBVCpuDescriptor) == 0x88);
+	static_assert(offsetof(Dx12Resource, m_Resource) == 0xA8);
+
+	thread_local Dx12Resource *ScaleformCompositeRenderTarget;
+
+	void Hooks::HookedScaleformCompositeSetRenderTarget(void* a1, void* a2, void** a_rtArray, void* a4, void* a5, void* a6, void* a7, void* a8, void* a9)
+	{
+		ScaleformCompositeRenderTarget = *reinterpret_cast<Dx12Resource**>(reinterpret_cast<uintptr_t>(a_rtArray[0]) + 0x48);
+
+		// Ignore render target sets. They're going to be overwritten anyway.
+		//_ScaleformCompositeSetRenderTarget(a1, a2, a_rtArray, a4, a5, a6, a7, a8, a9);
+	}
+
+	void Hooks::HookedScaleformCompositeDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount)
+	{
+		auto creationRendererInstance = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x0);
+		auto device = *reinterpret_cast<ID3D12Device2**>(creationRendererInstance + 0x3A0);
+
+		auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_arg1) + 0x10);
+
+		auto unknown1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x8);
+		auto descriptorManager = *reinterpret_cast<void**>(unknown1 + 0x18);
+
+		auto getBoundShaderResource = [&](uint32_t a_index) {
+			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg2) + 0x30);
+			const auto v2 = *reinterpret_cast<uintptr_t*>(v1 + 0x10) + 24 * *(uint32_t*)(*(uintptr_t*)v1 + (4 * a_index) + 0x20);
+			return *reinterpret_cast<Dx12Resource**>(v2 + 0x8);
+		};
+
+		using AllocateDescriptors_t = void (*)(void*, DescriptorAllocation&, uint32_t, DescriptorAllocation::Type, uint32_t&);
+		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(207691));
+
+		if (Hook_ApplyRenderPassRenderState1(a_arg1, a_arg2)) {
+			// Remove all render targets; we're treating this pixel shader as a compute shader. All RT writes end
+			// up discarded.
+			//
+			// The ScaleformComposite pass contains exactly one draw so we can safely unbind them without informing
+			// the game. Game code also happens to unbind RTs immediately after the hook.
+			commandList->OMSetRenderTargets(0, nullptr, false, nullptr);
+
+			// Instead of creating copies and worrying about resource allocations, bind the original RT and SRV as
+			// UAVs that can be modified in-place.
+			DescriptorAllocation alloc;
+			uint32_t             handleSizeIncrement;
+			allocateDescriptors(descriptorManager, alloc, 2, DescriptorAllocation::Type::CbvSrvUav, handleSizeIncrement);
+
+			alloc.CpuHandleBase.ptr += (0 * handleSizeIncrement);
+			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, getBoundShaderResource(0)->m_CpuDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+			alloc.CpuHandleBase.ptr += (1 * handleSizeIncrement);
+			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, ScaleformCompositeRenderTarget->m_UAVCpuDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+			D3D12_RESOURCE_BARRIER barrier = {};
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			barrier.Transition.pResource = ScaleformCompositeRenderTarget->m_Resource;
+			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+			commandList->ResourceBarrier(1, &barrier);
+			commandList->SetGraphicsRootDescriptorTable(1, alloc.GpuHandleBase); // Hardcoded in ScaleformComposite\RootSignature.hlsl
+			commandList->DrawInstanced(a_vertexCount, 1, 0, 0);
+			std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+			commandList->ResourceBarrier(1, &barrier);
+		}
+	}
+
     void Hooks::UploadRootConstants(void* a1, void* a2)
     {
 		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8);
 		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x78);
 
 		auto uploadRootConstants = [&](const Settings::ShaderConstants& a_shaderConstants, uint32_t a_rootParameterIndex, bool a_bCompute) {
-			auto       commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
+			auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
 
 			if (!a_bCompute)
 				commandList->SetGraphicsRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsSize, &a_shaderConstants, 0);
