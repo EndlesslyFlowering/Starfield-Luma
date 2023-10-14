@@ -634,119 +634,130 @@ float3 TetrahedralInterpolation(
 	float3            LUTCoordinates)
 {
 	// We need to clip the input coordinates as LUT texure samples below are not clamped.
-	float3 coords = saturate(LUTCoordinates.rgb) * (LUT_SIZE - 1); // Pixel coords
-	float3 color = 0;
+	const float3 coords = saturate(LUTCoordinates) * (LUT_SIZE - 1); // Pixel coords
 
 	// baseInd is on [0,LUT_SIZE-1]
-	int3 baseInd = coords;
-	int3 nextInd = baseInd + 1;
+	const int3 baseInd = coords;
+	const int3 nextInd = baseInd + 1;
+	int3 indV2;
+	int3 indV3;
 
 	// fract is on [0,1]
 	float3 fract = frac(coords);
 
-	float3 f1, f4;
+	const float3 v1 = LUTTextureIn.Load(int4(baseInd, 0));
+	const float3 v4 = LUTTextureIn.Load(int4(nextInd, 0));
 
-	float3 v1 = LUTTextureIn.Load(int4(baseInd, 0)).rgb;
-	float3 v4 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+	float3 f1, f2, f3, f4;
 
 	if (fract.r >= fract.g)
 	{
 		if (fract.g >= fract.b)  // R > G > B
 		{
-			nextInd = baseInd + int3(1, 0, 0);
-			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
-
-			nextInd = baseInd + int3(1, 1, 0);
-			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+			indV2 = int3(1, 0, 0);
+			indV3 = int3(1, 1, 0);
 
 			f1 = 1.f - fract.r;
 			f4 = fract.b;
-			float3 f2 = fract.r - fract.g;
-			float3 f3 = fract.g - fract.b;
 
-			color = (f2 * v2) + (f3 * v3);
+			f2 = fract.r - fract.g;
+			f3 = fract.g - fract.b;
 		}
 		else if (fract.r >= fract.b)  // R > B > G
 		{
-			nextInd = baseInd + int3(1, 0, 0);
-			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
-
-			nextInd = baseInd + int3(1, 0, 1);
-			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+			indV2 = int3(1, 0, 0);
+			indV3 = int3(1, 0, 1);
 
 			f1 = 1.f - fract.r;
 			f4 = fract.g;
-			float3 f2 = fract.r - fract.b;
-			float3 f3 = fract.b - fract.g;
 
-			color = (f2 * v2) + (f3 * v3);
+			f2 = fract.r - fract.b;
+			f3 = fract.b - fract.g;
 		}
 		else  // B > R > G
 		{
-			nextInd = baseInd + int3(0, 0, 1);
-			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
-
-			nextInd = baseInd + int3(1, 0, 1);
-			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+			indV2 = int3(0, 0, 1);
+			indV3 = int3(1, 0, 1);
 
 			f1 = 1.f - fract.b;
 			f4 = fract.g;
-			float3 f2 = fract.b - fract.r;
-			float3 f3 = fract.r - fract.g;
 
-			color = (f2 * v2) + (f3 * v3);
+			f2 = fract.b - fract.r;
+			f3 = fract.r - fract.g;
 		}
 	}
 	else
 	{
 		if (fract.g <= fract.b)  // B > G > R
 		{
-			nextInd = baseInd + int3(0, 0, 1);
-			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
-
-			nextInd = baseInd + int3(0, 1, 1);
-			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+			indV2 = int3(0, 0, 1);
+			indV3 = int3(0, 1, 1);
 
 			f1 = 1.f - fract.b;
 			f4 = fract.r;
-			float3 f2 = fract.b - fract.g;
-			float3 f3 = fract.g - fract.r;
 
-			color = (f2 * v2) + (f3 * v3);
+			f2 = fract.b - fract.g;
+			f3 = fract.g - fract.r;
 		}
 		else if (fract.r >= fract.b)  // G > R > B
 		{
-			nextInd = baseInd + int3(0, 1, 0);
-			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
-
-			nextInd = baseInd + int3(1, 1, 0);
-			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+			indV2 = int3(0, 1, 0);
+			indV3 = int3(1, 1, 0);
 
 			f1 = 1.f - fract.g;
 			f4 = fract.b;
-			float3 f2 = fract.g - fract.r;
-			float3 f3 = fract.r - fract.b;
 
-			color = (f2 * v2) + (f3 * v3);
+			f2 = fract.g - fract.r;
+			f3 = fract.r - fract.b;
 		}
 		else  // G > B > R
 		{
-			nextInd = baseInd + int3(0, 1, 0);
-			float3 v2 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
-
-			nextInd = baseInd + int3(0, 1, 1);
-			float3 v3 = LUTTextureIn.Load(int4(nextInd, 0)).rgb;
+			indV2 = int3(0, 1, 0);
+			indV3 = int3(0, 1, 1);
 
 			f1 = 1.f - fract.g;
 			f4 = fract.r;
-			float3 f2 = fract.g - fract.b;
-			float3 f3 = fract.b - fract.r;
 
-			color = (f2 * v2) + (f3 * v3);
+			f2 = fract.g - fract.b;
+			f3 = fract.b - fract.r;
 		}
 	}
 
-	return color + (f1 * v1) + (f4 * v4);
+	//
+	// Refactored:
+	//
+	// dxc.exe ends up generating a pseudo-LUT of the above if statements using phi nodes. Mainly indV2 and indV3. Not much more can be done.
+	//
+	//
+	// This both minimizes the instruction count in divergent branches and guarantees all lanes (threads) will converge on
+	// the following .Load()s. Since lanes run in lock step within a wave (warp), if two or more pixels take different branches,
+	// they have to wait on individual loads. e.g.
+	//
+	// Lane 1, 3, 6:
+	//   LUTTextureIn.Load(int4(nextInd, 0)); 					// branch taken when if(fract.g >= fract.b)
+	//   LUTTextureIn.Load(int4(nextInd, 0));
+	//   ...
+	// Lane 2, 4, 9:
+	//   LUTTextureIn.Load(int4(nextInd, 0)); 					// branch taken when if(fract.g <= fract.b) -- BUT we have to wait for the
+	//   LUTTextureIn.Load(int4(nextInd, 0)); 					// previous Load() instructions to complete
+	//   ...
+	// Lane 1, 2, 3, 4, 6, 9:
+	//   return (f2 * v2) + (f3 * v3) + (f1 * v1) + (f4 * v4);	// reconverge
+	//
+	//
+	// When moving .Load() outside the if statements:
+	//
+	//
+	// Lane 1, 2, 3, 4, 6, 9:
+	//   LUTTextureIn.Load(int4(baseInd + indV2, 0));			// all lanes take the same path in the end. branches are still required to prepare indV2
+	//   LUTTextureIn.Load(int4(baseInd + indV3, 0));			// and indV3, but arthmetic ops are negligible.
+	//   ...
+	//   return (f2 * v2) + (f3 * v3) + (f1 * v1) + (f4 * v4);
+	//
+	const float3 v2 = LUTTextureIn.Load(int4(baseInd + indV2, 0));
+	const float3 v3 = LUTTextureIn.Load(int4(baseInd + indV3, 0));
+
+	return (f1 * v1) + (f2 * v2) + (f3 * v3) + (f4 * v4);
 }
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
@@ -777,13 +788,13 @@ float3 GradingLUT(float3 color, float2 uv)
 	//TODO: this should probably take into account the direction of our color and only move to the center of the closest 3D LUT texel
 	const float colorCenteringOffset = hypot3((LUT_SIZE / 2.f) - 1.f) / hypot3(LUT_SIZE / 2.f);
 	const float3 LUTCenteredCoordinates = ((saturate(LUTCoordinates) - LUTCenterCoordinates) * colorCenteringOffset) + LUTCenterCoordinates;
-	
+
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 	float3 LUTCenterColor = TetrahedralInterpolation(LUTTexture, LUTCenteredCoordinates);
 #else
 	float3 LUTCenterColor = LUTTexture.Sample(Sampler0, LUTCenteredCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-	
+
 	// Shift the color in the opposite direction of the centered one, by the ratio between the centered and the extra/external offset
 	LUTColor = lerp(LUTColor, LUTCenterColor, -abs(LUTCoordinates - saturate(LUTCoordinates)) / abs(saturate(LUTCoordinates) - LUTCenteredCoordinates));
 	//TODO: clip negative luminance colors?
