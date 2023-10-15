@@ -124,26 +124,13 @@ float4 PS(PSInputs psInputs) : SV_Target
         const float3 DarkenedSDRBackgroundColorGammaSpace = SDRBackgroundColorGammaSpace * (1.f - UIColor.a);
 		outputColor = GAMMA_TO_LINEAR(UIColorGammaSpace + DarkenedSDRBackgroundColorGammaSpace);
 
-		// 2) Restore the paper white multipliers (we basically apply a percentage of each based on how much the UI influenced the game background):
+		// 2) Restore the paper white multipliers:
 
-#if 1 // Newer simpler and better version
-		// We can't really base this on how much the "outputColor" changed from "SDRBackgroundColor", as if the UI blends in the same color as the background
-		// the change ratio detection would be off. For this reason, we just sum up the amount of background darkening and additive color,
-		// if it's above 1, we consider the UI to have had 100% influence.
-		// NOTE: there's probably a way to do this better, by using a smarter type of UI influence ratio, but for now this is good enough.
-		const float3 UIInfluence = saturate(UIColor.a * (1.f - SDRBackgroundColor) + UIColor.rgb);
+		// Find out how much the UI has changed the non darkened background color (in gamma space to keep ratios the same).
+		float3 UIInfluence = select(SDRBackgroundColorGammaSpace == 0.f, 1.f, 1.f - (SDRBackgroundColorGammaSpace / (UIColorGammaSpace + SDRBackgroundColorGammaSpace)));
+		// Lerp the UI influence to 1 if the UI alpha is higher, as that means the background had been darkened by that amount, and thus had reduced influence in the final color.
+		UIInfluence = lerp(UIInfluence, 1.f, UIColor.a);
 		outputColor *= lerp(GamePaperWhite, LinearUIPaperWhite, UIInfluence);
-#else
-		//TODO: this doesn't work well yet, because the operations are being done in linear space, which makes the blend ratios differ from gamma space.
-		//The only way to get this working properly would be to find the gamma space image change ratio from the UI and background (while in gamma space),
-		//and do the separate paper white multiplications based on these, e.g. "((linearOutputColor / UIColorChangeRatio) * UIPaperWhiter) * UIColorChangeRatio".
-		
-		// Multiply the non UI (game) colors by the game paper white multiplier
-		const float3 GamePaperWhiteAdditiveColor = max(((outputColor - UIColor.rgb) * lerp(GamePaperWhite, 1.f, UIColor.a)) + UIColor.rgb, 0.f) - outputColor;
-		// Multiply the non game (UI) colors by the UI paper white multiplier
-		const float3 UIPaperWhiteAdditiveColor = max(((outputColor - SDRBackgroundColor) * LinearUIPaperWhite) + SDRBackgroundColor, 0.f) - outputColor;
-		outputColor += GamePaperWhiteAdditiveColor + UIPaperWhiteAdditiveColor;
-#endif
 
 		// 3) Then add any color in excess in linear space, as there's no other way really:
 
