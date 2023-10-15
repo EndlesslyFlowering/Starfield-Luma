@@ -108,24 +108,35 @@ float3 gamma_sRGB_to_linear(float3 Color)
 }
 
 // PQ (Perceptual Quantizer - ST.2084) encode/decode used for HDR10 BT.2100
-float3 linear_to_PQ(float3 LinearColor, const float PQMaxValue = PQMaxWhitePoint)
+float3 Linear_to_PQ(float3 LinearColor)
 {
-    LinearColor /= PQMaxValue;
-    float3 colorPow = pow(LinearColor, PQ_constant_M1);
-    float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
-    float3 denominator = 1.f + PQ_constant_C3 * colorPow;
-    float3 pq = pow(numerator / denominator, PQ_constant_M2);
-    return pq;
+	float3 colorPow = pow(LinearColor, PQ_constant_M1);
+	float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
+	float3 denominator = 1.f + PQ_constant_C3 * colorPow;
+	float3 pq = pow(numerator / denominator, PQ_constant_M2);
+	return pq;
 }
 
-float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue = PQMaxWhitePoint)
+float3 Linear_to_PQ(float3 LinearColor, const float PQMaxValue)
 {
-    float3 colorPow = pow(ST2084Color, 1.f / PQ_constant_M2 );
-    float3 numerator = max(colorPow - PQ_constant_C1, 0.f);
-    float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
-    float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
-    linearColor *= PQMaxValue;
-    return linearColor;
+	LinearColor /= PQMaxValue;
+	return Linear_to_PQ(LinearColor);
+}
+
+float3 PQ_to_Linear(float3 ST2084Color)
+{
+	float3 colorPow = pow(ST2084Color, 1.f / PQ_constant_M2 );
+	float3 numerator = max(colorPow - PQ_constant_C1, 0.f);
+	float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
+	float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
+	return linearColor;
+}
+
+float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue)
+{
+	float3 linearColor = PQ_to_Linear(ST2084Color);
+	linearColor *= PQMaxValue;
+	return linearColor;
 }
 
 float Luminance(float3 color)
@@ -136,47 +147,56 @@ float Luminance(float3 color)
 
 float3 Saturation(float3 color, float saturation)
 {
-    float luminance = Luminance(color);
-    return lerp(luminance, color, saturation);
+	float luminance = Luminance(color);
+	return lerp(luminance, color, saturation);
 }
 
-// sRGB/Rec.709
+
+//RGB linear BT.709/sRGB -> OKLab's LMS
+static const float3x3 srgb_to_oklms = {
+	0.4122214708f, 0.5363325363f, 0.0514459929f,
+	0.2119034982f, 0.6806995451f, 0.1073969566f,
+	0.0883024619f, 0.2817188376f, 0.6299787005f};
+
+//OKLab's L'M'S' -> OKLab
+static const float3x3 oklms__to_oklab = {
+	0.2104542553f,  0.7936177850f, -0.0040720468f,
+	1.9779984951f, -2.4285922050f,  0.4505937099f,
+	0.0259040371f,  0.7827717662f, -0.8086757660f};
+
+//OKLab -> OKLab's L'M'S'
+//the 1s get optimized away by the compiler
+static const float3x3 oklab_to_oklms_ = {
+	1.f,  0.3963377774f,  0.2158037573f,
+	1.f, -0.1055613458f, -0.0638541728f,
+	1.f, -0.0894841775f, -1.2914855480f};
+
+//OKLab's LMS -> RGB linear BT.709/sRGB
+static const float3x3 oklms_to_srgb = {
+	 4.0767416621f, -3.3077115913f,  0.2309699292f,
+	-1.2684380046f,  2.6097574011f, -0.3413193965f,
+	-0.0041960863f, -0.7034186147f,  1.7076147010f};
+
+// sRGB/BT.709
 float3 linear_srgb_to_oklab(float3 rgb) {
-	float l = (0.4122214708f * rgb.r) + (0.5363325363f * rgb.g) + (0.0514459929f * rgb.b);
-	float m = (0.2119034982f * rgb.r) + (0.6806995451f * rgb.g) + (0.1073969566f * rgb.b);
-	float s = (0.0883024619f * rgb.r) + (0.2817188376f * rgb.g) + (0.6299787005f * rgb.b);
+	float3 lms = mul(srgb_to_oklms, rgb);
 
 	// Not sure whether the pow(abs())*sign() is technically correct, but if we pass in scRGB negative colors, this breaks,
 	// and we think this might work fine (we could convert to BT.2020 first otherwise)
-	float l_ = pow(abs(l), 1.f/3.f) * sign(l);
-	float m_ = pow(abs(m), 1.f/3.f) * sign(m);
-	float s_ = pow(abs(s), 1.f/3.f) * sign(s);
+	//L'M'S'
+	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
 
-	return float3(
-		(0.2104542553f * l_) + (0.7936177850f * m_) - (0.0040720468f * s_),
-		(1.9779984951f * l_) - (2.4285922050f * m_) + (0.4505937099f * s_),
-		(0.0259040371f * l_) + (0.7827717662f * m_) - (0.8086757660f * s_)
-	);
+	return mul(oklms__to_oklab, lms_);
 }
 
-// sRGB/Rec.709
+// sRGB/BT.709
 float3 oklab_to_linear_srgb(float3 lab) {
-	float L = lab[0];
-	float a = lab[1];
-	float b = lab[2];
-	float l_ = L + (0.3963377774f * a) + (0.2158037573f * b);
-	float m_ = L - (0.1055613458f * a) - (0.0638541728f * b);
-	float s_ = L - (0.0894841775f * a) - (1.2914855480f * b);
+	//L'M'S'
+	float3 lms_ = mul(oklab_to_oklms_, lab);
 
-	float l = l_ * l_ * l_;
-	float m = m_ * m_ * m_;
-	float s = s_ * s_ * s_;
+	float3 lms = lms_ * lms_ * lms_;
 
-	return float3(
-		(+4.0767416621f * l) - (3.3077115913f * m) + (0.2309699292f * s),
-		(-1.2684380046f * l) + (2.6097574011f * m) - (0.3413193965f * s),
-		(-0.0041960863f * l) - (0.7034186147f * m) + (1.7076147010f * s)
-	);
+	return mul(oklms_to_srgb, lms);
 }
 
 float3 oklab_to_oklch(float3 lab) {
@@ -226,101 +246,91 @@ float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
 }
 
 //L'M'S'->ICtCp
-#define PqLmsToIctcp float3x3( \
-	asfloat(0x3f000000), asfloat(0x3f000000), asfloat(0x00000000), \
-	asfloat(0x3fce9000), asfloat(0xc054b400), asfloat(0x3fdad800), \
-	asfloat(0x408c1a00), asfloat(0xc087dc00), asfloat(0xbe07c000))
+static const float3x3 PQ_LMS_2_ICtCp = {
+	0.5f,             0.5f,             0.f,
+	1.61376953125f,  -3.323486328125f,  1.709716796875f,
+	4.378173828125f, -4.24560546875f,  -0.132568359375f};
 
 //ICtCp->L'M'S'
-#define IctcpToPqLms float3x3( \
-	asfloat(0x3f800000), asfloat(0x3c0d0ceb), asfloat(0x3de36380), \
-	asfloat(0x3f800000), asfloat(0xbc0d0ceb), asfloat(0xbde36380), \
-	asfloat(0x3f800000), asfloat(0x3f0f5e37), asfloat(0xbea4293f))
+//the 1s get optimized away by the compiler
+static const float3x3 ICtCp_2_PQ_LMS = {
+	1.f,  0.008609036915004253387451171875f,  0.11102962493896484375f,
+	1.f, -0.008609036915004253387451171875f, -0.11102962493896484375f,
+	1.f,  0.560031354427337646484375f,       -0.3206271827220916748046875f};
 
 //RGB BT.709->LMS
-#define Bt709ToLms float3x3( \
-	asfloat(0x3e976000), asfloat(0x3f1f9000), asfloat(0x3da60000), \
-	asfloat(0x3e1fc000), asfloat(0x3f3a4000), asfloat(0x3dee8000), \
-	asfloat(0x3d100000), asfloat(0x3e208000), asfloat(0x3f4ed000))
+static const float3x3 BT709_2_LMS = {
+	0.295654296875f, 0.623291015625f, 0.0810546875f,
+	0.156005859375f, 0.7275390625f,   0.116455078125f,
+	0.03515625f,     0.15673828125f,  0.807861328125f};
 
 //LMS->RGB BT.709
-#define LmsToBt709 float3x3( \
-	asfloat(0x40c57ba5), asfloat(0xc0aa33fb), asfloat(0x3e171433), \
-	asfloat(0xbfa92286), asfloat(0x4023ac35), asfloat(0xbe71be38), \
-	asfloat(0xbc47d18b), asfloat(0xbe87882b), asfloat(0x3fa37be5))
+static const float3x3 LMS_2_BT709 = {
+	 6.171343326568603515625f,          -5.318845272064208984375f,      0.14753799140453338623046875f,
+	-1.3213660717010498046875f,          2.5573856830596923828125f,    -0.23607718944549560546875f,
+	-0.012195955030620098114013671875f, -0.2647107541561126708984375f,  1.27721846103668212890625f};
 
 //ICtCp->L'M'S'
-float3 ICtCp_to_LMS(float3 Colour)
+float3 ICtCp_to_PQ_LMS(float3 Colour)
 {
-	return mul(IctcpToPqLms, Colour);
+	return mul(ICtCp_2_PQ_LMS, Colour);
 }
 
 //L'M'S'->ICtCp
-float3 LMS_to_ICtCp(float3 Colour)
+float3 PQ_LMS_to_ICtCp(float3 Colour)
 {
-	return mul(PqLmsToIctcp, Colour);
+	return mul(PQ_LMS_2_ICtCp, Colour);
 }
 
 //RGB BT.709->LMS
 float3 BT709_to_LMS(float3 Colour)
 {
-	return mul(Bt709ToLms, Colour);
+	return mul(BT709_2_LMS, Colour);
 }
 
 //LMS->RGB BT.709
 float3 LMS_to_BT709(float3 Colour)
 {
-	return mul(LmsToBt709, Colour);
+	return mul(LMS_2_BT709, Colour);
 }
 
 float3 BT709_to_ICtCp(float3 Colour)
 {
-	// Keep division by "PQMaxWhitePoint" here (BT709_to_LMS()) instead of in "linear_to_PQ()" for floating point accuracy
-    float3 LMS = mul(Bt709ToLms, Colour / PQMaxWhitePoint);
-    float3 PQ_LMS = linear_to_PQ(LMS, 1.f);
-    return LMS_to_ICtCp(PQ_LMS);
+	// Keep division by "PQMaxWhitePoint" here (BT709_to_LMS()) instead of in "Linear_to_PQ()" for floating point accuracy
+	float3 LMS = BT709_to_LMS(Colour / PQMaxWhitePoint);
+	float3 PQ_LMS = Linear_to_PQ(LMS);
+	return PQ_LMS_to_ICtCp(PQ_LMS);
 }
 
 float3 ICtCp_to_BT709(float3 Colour)
 {
-    float3 PQ_LMS = ICtCp_to_LMS(Colour);
-	// Max should be save as LMS should be only positive
-    float3 LMS = max(PQ_to_Linear(PQ_LMS, 1.f), 0.f);
-    return LMS_to_BT709(LMS * PQMaxWhitePoint);
+	float3 PQ_LMS = ICtCp_to_PQ_LMS(Colour);
+	// max should be save as LMS should be only positive
+	float3 LMS = max(PQ_to_Linear(PQ_LMS), 0.f);
+	float3 RGB = LMS_to_BT709(LMS);
+	return RGB * PQMaxWhitePoint;
 }
 
-static const float3x3 XYZ_2_sRGB = float3x3(
-	3.2409699419, -1.5373831776, -0.4986107603,
-	-0.9692436363, 1.8759675015, 0.0415550574,
-	0.0556300797, -0.2039769589, 1.0569715142);
-static const float3x3 sRGB_2_XYZ = float3x3(
-	0.4124564, 0.3575761, 0.1804375,
-	0.2126729, 0.7151522, 0.0721750,
-	0.0193339, 0.1191920, 0.9503041);
-static const float3x3 XYZ_2_AP1 = float3x3(
-	1.6410233797, -0.3248032942, -0.2364246952,
-	-0.6636628587, 1.6153315917, 0.0167563477,
-	0.0117218943, -0.0082844420, 0.9883948585);
-static const float3x3 D65_2_D60 = float3x3(
-	1.01303, 0.00610531, -0.014971,
-	0.00769823, 0.998165, -0.00503203,
-	-0.00284131, 0.00468516, 0.924507);
-static const float3x3 D60_2_D65 = float3x3(
-	0.987224, -0.00611327, 0.0159533,
-	-0.00759836, 1.00186, 0.00533002,
-	0.00307257, -0.00509595, 1.08168);
-static const float3x3 AP1_2_XYZ = float3x3(
-	0.6624541811, 0.1340042065, 0.1561876870,
-	0.2722287168, 0.6740817658, 0.0536895174,
-	-0.0055746495, 0.0040607335, 1.0103391003);
-static const float3 AP1_RGB2Y = float3(
-	0.2722287168, /*AP1_2_XYZ[0][1]*/
-	0.6740817658, /*AP1_2_XYZ[1][1]*/
-	0.0536895174 /*AP1_2_XYZ[2][1]*/);
-static const float3x3 SRGB_2_CUSTOM_XYZ = float3x3(
-    0.5441691, 0.2395926, 0.1666943,
-    0.2394656, 0.7021530, 0.0583814,
-    -0.0023439, 0.0361834, 1.0552183); //TODO1
+
+static const float3x3 BT709_2_AP1D65 = {
+	0.61685097217559814453125,     0.33406293392181396484375,     0.049086071550846099853515625,
+	0.069866396486759185791015625, 0.91741669178009033203125,     0.012716926634311676025390625,
+	0.020549066364765167236328125, 0.107642211019992828369140625, 0.871808707714080810546875};
+
+static const float3x3 AP1D65_2_BT709 = {
+	 1.69267940521240234375,          -0.606218039989471435546875,   -0.086461342871189117431640625,
+	-0.1285739839076995849609375,      1.13793361186981201171875,    -0.009359653107821941375732421875,
+	-0.02402246557176113128662109375, -0.12621171772480010986328125,  1.150234222412109375};
+
+static const float3x3 AP1D65_2_XYZ = {
+	 0.647292673587799072265625,        0.13440339267253875732421875, 0.1684710681438446044921875,
+	 0.26599824428558349609375,         0.676089823246002197265625,   0.0579119287431240081787109375,
+	-0.0054470631293952465057373046875, 0.00407283008098602294921875, 1.0897972583770751953125};
+
+static const float3x3 WIDE_2_AP1D65 = {
+	0.83451688289642333984375,        0.16025958955287933349609375,    0.005223505198955535888671875,
+	0.02554519288241863250732421875,  0.973101556301116943359375,      0.0013532745651900768280029296875,
+	0.001925828866660594940185546875, 0.03037279658019542694091796875, 0.967701375484466552734375};
 
 // Expand bright saturated BT.709 colors onto BT.2020 to achieve a fake HDR look.
 // Input (and output) needs to be in sRGB linear space.
@@ -328,22 +338,18 @@ static const float3x3 SRGB_2_CUSTOM_XYZ = float3x3(
 // Calling this with values above 1 yields diminishing returns.
 float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
 {
-    const float3x3 sRGB_2_AP1 = mul(XYZ_2_AP1, mul(D65_2_D60, sRGB_2_XYZ));
-    const float3x3 AP1_2_sRGB = mul(XYZ_2_sRGB, mul(D60_2_D65, AP1_2_XYZ));
-    const float3x3 CUSTOM_XYZ_2_AP1 = mul(XYZ_2_AP1, SRGB_2_CUSTOM_XYZ);
-    const float3x3 ExtendGamutMatrix = mul(CUSTOM_XYZ_2_AP1, AP1_2_sRGB);
+  float3 ColorAP1    = mul(BT709_2_AP1D65, Color);
+  float3 ColorExpand = mul(WIDE_2_AP1D65,  Color);
 
-    float3 ColorAP1 = mul(sRGB_2_AP1, Color);
+  float  LumaAP1   = dot(ColorAP1, AP1D65_2_XYZ[1]);
+  float3 ChromaAP1 = ColorAP1 / LumaAP1;
 
-    float LumaAP1 = dot(ColorAP1, AP1_RGB2Y);
-    float3 ChromaAP1 = ColorAP1 / LumaAP1;
+	float ChromaAP1Minus1  = ChromaAP1 - 1.f;
+  float ChromaDistSqr    = dot(ChromaAP1Minus1, ChromaAP1Minus1);
+  float ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
 
-    float ChromaDistSqr = dot(ChromaAP1 - 1.f, ChromaAP1 - 1.f);
-    float ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
+  ColorAP1 = lerp(ColorAP1, ColorExpand, ExtendGamutAlpha);
 
-    float3 ColorExpand = mul(ExtendGamutMatrix, ColorAP1);
-    ColorAP1 = lerp(ColorAP1, ColorExpand, ExtendGamutAlpha);
-
-    Color = mul(AP1_2_sRGB, ColorAP1);
-    return Color;
+  Color = mul(AP1D65_2_BT709, ColorAP1);
+  return Color;
 }
