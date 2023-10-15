@@ -582,9 +582,15 @@ namespace Hooks
 		_PostEndOfFrame(a1);
 		Settings::Main::GetSingleton()->SetAtEndOfFrame(false);
 
-		if (Utils::IsInSettingsMenu()) // TODO: is really necessary? Was the HDR support state already refreshed e.g. when the user changed windowed mode?
-		{
+		// Hack to refresh the HDR official game graphics settings menu settings when the main or pause menu is first opened,
+		// otherwise if moving the game between SDR and HDR screens, it could end up staying grayed out, or not graying out.
+		// Note that toggling between windowed and borderless also automatically refreshes this as it re-creates the swapchain.
+		static bool wasInPauseMenu = false;
+		if (!wasInPauseMenu && (Utils::IsInPauseMenu() || Utils::IsInMainMenu())) {
 			Settings::Main::GetSingleton()->RefreshHDRDisplaySupportState();
+			wasInPauseMenu = true;
+		} else if (wasInPauseMenu && !(Utils::IsInPauseMenu() || Utils::IsInMainMenu())) {
+			wasInPauseMenu = false;
 		}
     }
 
