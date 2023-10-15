@@ -402,7 +402,6 @@ namespace Hooks
 					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 					// We probably don't need all these checks, but we are being extra sure
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
-						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
