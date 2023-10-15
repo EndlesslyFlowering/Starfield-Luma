@@ -288,4 +288,62 @@ float3 ICtCp_to_BT709(float3 Colour)
     float3 LMS = max(PQ_to_Linear(PQ_LMS, 1.f), 0.f);
     return LMS_to_BT709(LMS * PQMaxWhitePoint);
 }
+
+static const float3x3 XYZ_2_sRGB = float3x3(
+	3.2409699419, -1.5373831776, -0.4986107603,
+	-0.9692436363, 1.8759675015, 0.0415550574,
+	0.0556300797, -0.2039769589, 1.0569715142);
+static const float3x3 sRGB_2_XYZ = float3x3(
+	0.4124564, 0.3575761, 0.1804375,
+	0.2126729, 0.7151522, 0.0721750,
+	0.0193339, 0.1191920, 0.9503041);
+static const float3x3 XYZ_2_AP1 = float3x3(
+	1.6410233797, -0.3248032942, -0.2364246952,
+	-0.6636628587, 1.6153315917, 0.0167563477,
+	0.0117218943, -0.0082844420, 0.9883948585);
+static const float3x3 D65_2_D60 = float3x3(
+	1.01303, 0.00610531, -0.014971,
+	0.00769823, 0.998165, -0.00503203,
+	-0.00284131, 0.00468516, 0.924507);
+static const float3x3 D60_2_D65 = float3x3(
+	0.987224, -0.00611327, 0.0159533,
+	-0.00759836, 1.00186, 0.00533002,
+	0.00307257, -0.00509595, 1.08168);
+static const float3x3 AP1_2_XYZ = float3x3(
+	0.6624541811, 0.1340042065, 0.1561876870,
+	0.2722287168, 0.6740817658, 0.0536895174,
+	-0.0055746495, 0.0040607335, 1.0103391003);
+static const float3 AP1_RGB2Y = float3(
+	0.2722287168, /*AP1_2_XYZ[0][1]*/
+	0.6740817658, /*AP1_2_XYZ[1][1]*/
+	0.0536895174 /*AP1_2_XYZ[2][1]*/);
+static const float3x3 SRGB_2_CUSTOM_XYZ = float3x3(
+    0.5441691, 0.2395926, 0.1666943,
+    0.2394656, 0.7021530, 0.0583814,
+    -0.0023439, 0.0361834, 1.0552183); //TODO1
+
+// Expand bright saturated BT.709 colors onto BT.2020 to achieve a fake HDR look.
+// Input (and output) needs to be in sRGB linear space.
+// Calling this with a value of 0 still results in changes (avoid doing so, it might produce invalid colors).
+// Calling this with values above 1 yields diminishing returns.
+float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
+{
+    const float3x3 sRGB_2_AP1 = mul(XYZ_2_AP1, mul(D65_2_D60, sRGB_2_XYZ));
+    const float3x3 AP1_2_sRGB = mul(XYZ_2_sRGB, mul(D60_2_D65, AP1_2_XYZ));
+    const float3x3 CUSTOM_XYZ_2_AP1 = mul(XYZ_2_AP1, SRGB_2_CUSTOM_XYZ);
+    const float3x3 ExtendGamutMatrix = mul(CUSTOM_XYZ_2_AP1, AP1_2_sRGB);
+
+    float3 ColorAP1 = mul(sRGB_2_AP1, Color);
+
+    float LumaAP1 = dot(ColorAP1, AP1_RGB2Y);
+    float3 ChromaAP1 = ColorAP1 / LumaAP1;
+
+    float ChromaDistSqr = dot(ChromaAP1 - 1.f, ChromaAP1 - 1.f);
+    float ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
+
+    float3 ColorExpand = mul(ExtendGamutMatrix, ColorAP1);
+    ColorAP1 = lerp(ColorAP1, ColorExpand, ExtendGamutAlpha);
+
+    Color = mul(AP1_2_sRGB, ColorAP1);
+    return Color;
 }
