@@ -32,7 +32,6 @@ Issues and limitations:
 -The UI blends in slightly differently in HDR, usually it's not noticeable
 -scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)
 -You can not take screenshots directly from Starfield in photo mode
--FSR2 clips all non Rec.709 (SDR) colors
 
 Comparison with other "HDR" methods:
 -Starfield Xbox HDR: Starfield on Xbox uses an integrated for of AutoHDR, the output image in HDR is extracted from an SDR one, thus its visual quality is still bottlenecked by that.
