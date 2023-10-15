@@ -210,11 +210,20 @@ namespace Utils
 
 		return true;
 	}
-	
-	bool IsInSettingsMenu()
+
+	bool IsInPauseMenu()
 	{
 		const auto ui = *Offsets::uiPtr;
-		if (Offsets::UI_IsMenuOpen(ui, "SettingsMenu")) { // TODO: this is a made up name
+		if (Offsets::UI_IsMenuOpen(ui, "PauseMenu")) {
+			return true;
+		}
+		return false;
+	}
+
+	bool IsInMainMenu()
+	{
+		const auto ui = *Offsets::uiPtr;
+		if (Offsets::UI_IsMenuOpen(ui, "MainMenu")) {
 			return true;
 		}
 		return false;

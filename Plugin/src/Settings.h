@@ -172,7 +172,7 @@ namespace Settings
 		ValueStepper GamePaperWhite{
 			SettingID::kHDR_GamePaperWhite,
 			"Game Paper White",
-			"Sets the game paper white brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness.\nDefault is 200.",
+			"Sets the game paper white brightness in HDR modes.\nThis influences the average brightness of the image without affecting the peak brightness.\nDefault is 200.",
 			"GamePaperWhite", "HDR",
 			200, /*ITU reference default is 203 but we don't want to confuse users*/
 		    80,
