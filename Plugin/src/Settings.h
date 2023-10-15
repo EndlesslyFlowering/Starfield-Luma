@@ -162,19 +162,19 @@ namespace Settings
 		ValueStepper PeakBrightness{
 			SettingID::kHDR_PeakBrightness,
 			"Peak Brightness",
-			"Sets the peak brightness in HDR modes, this should match your display peak brightness. This will not influence the game average brightness.",
+			"Sets the peak brightness in HDR modes, this should match your display peak brightness.\nThis will not influence the game average brightness.",
 			"PeakBrightness", "HDR",
 			1000,
 			80,
-			4000,
+			10000,
 			10
 		};
 		ValueStepper GamePaperWhite{
 			SettingID::kHDR_GamePaperWhite,
 			"Game Paper White",
-			"Sets the game paper white brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness. The reference default is 200.",
+			"Sets the game paper white brightness in HDR modes. This influences the average brightness of the image without affecting the peak brightness.\nDefault is 200.",
 			"GamePaperWhite", "HDR",
-			200,
+			200, /*ITU reference default is 203 but we don't want to confuse users*/
 		    80,
 			500,
 			10
@@ -182,9 +182,9 @@ namespace Settings
 		ValueStepper UIPaperWhite{
 			SettingID::kHDR_UIPaperWhite,
 			"UI Paper White",
-			"Sets the UI paper white brightness in HDR modes. The reference default is 200.",
+			"Sets the UI paper white brightness in HDR modes.\nDefault is 200.",
 			"UIPaperWhite", "HDR",
-			200,
+			200, /*ITU reference default is 203 but we don't want to confuse users*/
 			80,
 			500,
 			10
