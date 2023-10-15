@@ -21,6 +21,7 @@
  // Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
 #define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
+//TODO1: link to "GAMMA_CORRECTION_IN_LUTS" case
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
 // 0) sRGB gamma mapping (Vanilla): it makes any intermediary sampled value (that doesn't exactly fall in the center of LUT texel) affected by gamma, and that's not good.
 // 1) Linear mapping: Makes LUTs sampling work in linear space, which is mathematically correct. This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.

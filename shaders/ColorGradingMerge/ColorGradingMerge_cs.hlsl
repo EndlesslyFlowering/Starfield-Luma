@@ -356,6 +356,8 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	                + (adjustedLUT3Percentage * LUT3Color)
 	                + (adjustedLUT4Percentage * LUT4Color);
 
+// If necessary (!GAMMA_CORRECTION_IN_LUTS), shift from gamma 2.2 to sRGB interpretation, so the LUT input and output colors
+// are in the same gamma space, which should be more mathematically correct, and we can then instead do the gamma correction later.
 #if LUT_MAPPING_TYPE != 2
 	mixedLUT = CORRECT_GAMMA(mixedLUT);
 #endif // LUT_MAPPING_TYPE
