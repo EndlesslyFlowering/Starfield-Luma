@@ -143,7 +143,7 @@ void frag_main()
 	}
 	else
 	{
-		float fps = 24.f; // TODO: Make external option
+		float fps = 24.f; // TODO: Make external option and also verify that "RuntimeMS" is stable and accurate enough over time
 		// Mod by FPS to ensure consistent range
 		float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
 		// TODO: Use iteration? Use only if repeating is noticeable
@@ -184,7 +184,7 @@ void frag_main()
 		outputColor = linearColor * (1.f + yChange);
 
 #if 0 // Output Visualization
-	outputColor = abs(yChange);
+		outputColor = abs(yChange);
 #endif
 
 		if (!isInOutColorLinear) {

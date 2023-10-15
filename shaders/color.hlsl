@@ -146,8 +146,8 @@ float3 linear_srgb_to_oklab(float3 rgb) {
 	float m = (0.2119034982f * rgb.r) + (0.6806995451f * rgb.g) + (0.1073969566f * rgb.b);
 	float s = (0.0883024619f * rgb.r) + (0.2817188376f * rgb.g) + (0.6299787005f * rgb.b);
 
-	//TODO: review... maye we could convert to BT.2020 first to avoid negative values?
-	// Not sure whether the pow(abs()) * sign() is technically correct, but if we pass in scRGB negative colors, this breaks
+	// Not sure whether the pow(abs())*sign() is technically correct, but if we pass in scRGB negative colors, this breaks,
+	// and we think this might work fine (we could convert to BT.2020 first otherwise)
 	float l_ = pow(abs(l), 1.f/3.f) * sign(l);
 	float m_ = pow(abs(m), 1.f/3.f) * sign(m);
 	float s_ = pow(abs(s), 1.f/3.f) * sign(s);
@@ -223,4 +223,69 @@ float3 gamma_linear_to_sRGB_Bethesda_Optimized(float3 Color, float InverseGamma 
 float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
 {
 	return (pow(Color, Gamma) / 1.055f) + 0.055f;
+}
+
+//L'M'S'->ICtCp
+#define PqLmsToIctcp float3x3( \
+	asfloat(0x3f000000), asfloat(0x3f000000), asfloat(0x00000000), \
+	asfloat(0x3fce9000), asfloat(0xc054b400), asfloat(0x3fdad800), \
+	asfloat(0x408c1a00), asfloat(0xc087dc00), asfloat(0xbe07c000))
+
+//ICtCp->L'M'S'
+#define IctcpToPqLms float3x3( \
+	asfloat(0x3f800000), asfloat(0x3c0d0ceb), asfloat(0x3de36380), \
+	asfloat(0x3f800000), asfloat(0xbc0d0ceb), asfloat(0xbde36380), \
+	asfloat(0x3f800000), asfloat(0x3f0f5e37), asfloat(0xbea4293f))
+
+//RGB BT.709->LMS
+#define Bt709ToLms float3x3( \
+	asfloat(0x3e976000), asfloat(0x3f1f9000), asfloat(0x3da60000), \
+	asfloat(0x3e1fc000), asfloat(0x3f3a4000), asfloat(0x3dee8000), \
+	asfloat(0x3d100000), asfloat(0x3e208000), asfloat(0x3f4ed000))
+
+//LMS->RGB BT.709
+#define LmsToBt709 float3x3( \
+	asfloat(0x40c57ba5), asfloat(0xc0aa33fb), asfloat(0x3e171433), \
+	asfloat(0xbfa92286), asfloat(0x4023ac35), asfloat(0xbe71be38), \
+	asfloat(0xbc47d18b), asfloat(0xbe87882b), asfloat(0x3fa37be5))
+
+//ICtCp->L'M'S'
+float3 ICtCp_to_LMS(float3 Colour)
+{
+	return mul(IctcpToPqLms, Colour);
+}
+
+//L'M'S'->ICtCp
+float3 LMS_to_ICtCp(float3 Colour)
+{
+	return mul(PqLmsToIctcp, Colour);
+}
+
+//RGB BT.709->LMS
+float3 BT709_to_LMS(float3 Colour)
+{
+	return mul(Bt709ToLms, Colour);
+}
+
+//LMS->RGB BT.709
+float3 LMS_to_BT709(float3 Colour)
+{
+	return mul(LmsToBt709, Colour);
+}
+
+float3 BT709_to_ICtCp(float3 Colour)
+{
+	// Keep division by "PQMaxWhitePoint" here (BT709_to_LMS()) instead of in "linear_to_PQ()" for floating point accuracy
+    float3 LMS = mul(Bt709ToLms, Colour / PQMaxWhitePoint);
+    float3 PQ_LMS = linear_to_PQ(LMS, 1.f);
+    return LMS_to_ICtCp(PQ_LMS);
+}
+
+float3 ICtCp_to_BT709(float3 Colour)
+{
+    float3 PQ_LMS = ICtCp_to_LMS(Colour);
+	// Max should be save as LMS should be only positive
+    float3 LMS = max(PQ_to_Linear(PQ_LMS, 1.f), 0.f);
+    return LMS_to_BT709(LMS * PQMaxWhitePoint);
+}
 }
