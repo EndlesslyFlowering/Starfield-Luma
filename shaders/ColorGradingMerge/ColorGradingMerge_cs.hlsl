@@ -46,8 +46,6 @@
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
 
-//TODO: try to make the LUTs return OKLCH values so there's chroma and hue even if the luminance is 0
-
 // Behaviour when the color luminance goes beyond 1
 // -0: As is, keep the normalized value that could be beyond the 0-1
 // -1: Keep orignal (non normalized) color

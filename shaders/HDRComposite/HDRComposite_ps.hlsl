@@ -19,8 +19,8 @@
 // 1 original (weak, generates values beyond 0-1 which then might get clipped)
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
 // 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
-//   (optimisation left if contrastIntensity doesn't go below 1)
-#define POST_PROCESS_CONTRAST_TYPE (FORCE_VANILLA_LOOK ? 1 : 2)
+//   (optimisation left if "contrastIntensity" doesn't go below 1)
+#define POST_PROCESS_CONTRAST_TYPE (FORCE_VANILLA_LOOK ? 1 : 3)
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
@@ -1155,7 +1155,7 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
 #endif
 
-        //TODO: put BT.709->BT.2020 gamut expansion here if necessary (e.g. after the midGrayScale division)
+        //TODO: put BT.709->BT.2020 gamut expansion here if necessary (e.g. after the midGrayScale division). It seems like the saturation slider is already good enough?
 
         inverseTonemappedPostProcessedColor *= paperWhite;
         minHighlightsColorOut *= paperWhite;
