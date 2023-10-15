@@ -262,7 +262,7 @@ namespace Hooks
 			}
 
 		case 0x400FF59:
-		//case 0x2000FF59:
+		case 0x2000FF59:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
