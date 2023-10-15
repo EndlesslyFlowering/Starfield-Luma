@@ -395,10 +395,13 @@ namespace Hooks
 			{
 				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 				const bool wasSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+				const bool wasGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 				if (HandleSetting(settings->ForceSDROnHDR)) {
 					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 					const bool isSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
-					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR) {
+					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+					// We probably don't need all these checks, but we are being extra sure
+					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
 						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
 					}
@@ -440,11 +443,13 @@ namespace Hooks
 			{
 				const bool wasDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 				const bool wasSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
+				const bool wasGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 				if (HandleSetting(settings->DisplayMode)) {
 					const bool isDisplayModeHDR = settings->IsDisplayModeSetToHDR();
 					const bool isSDRForcedOnHDR = settings->IsSDRForcedOnHDR();
-					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR) {
-						const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
+					// We probably don't need all these checks, but we are being extra sure
+					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
