@@ -61,7 +61,7 @@ float4 PS(PSInputs inputs) : SV_Target
 	// Clamp for safety as YCbCr<->RGB is not 100% accurate in float and can produce negative/invalid colors,
 	// this breaks the UI pass if we are using R16G16B16A16F textures,
 	// as UI blending produces invalid pixels if it's blended with an invalid color.
-	//TODO: this should be OK now?
+	// Also this is need for the gamma pow.
 	color = max(color, 0.f);
 
 #if !SDR_LINEAR_INTERMEDIARY

@@ -451,7 +451,7 @@ float3 DICETonemap(
 	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
 	return Color;
 #else
-	const float sourceLuminance = Luminance(Color);
+	const float sourceLuminance = Luminance(Color); //TODO: Do it in ICpCt for more accurate luminance values?
 	if (sourceLuminance > 0.0f)
 	{
 		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
@@ -777,10 +777,9 @@ float3 GradingLUT(float3 color, float2 uv)
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 	float3 LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
 #else
-	//TODO1: verify this is the same
-	float3 linearScale = (LUT_SIZE - 1.0f) / LUT_SIZE;
-	float3 linearOffset = 1.0f / (2.0f * LUT_SIZE);
-	float3 LUTColor = LUTTexture.Sample(Sampler0, linearScale * LUTCoordinates + linearOffset);
+	float3 LUTCoordinatesScale = (LUT_SIZE - 1.0f) / LUT_SIZE; // Also "1-(1/LUT_SIZE)"
+	float3 LUTCoordinatesOffset = 1.0f / (2.0f * LUT_SIZE); // Also "(1/LUT_SIZE)/2"
+	float3 LUTColor = LUTTexture.Sample(Sampler0, (LUTCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
 #if LUT_MAPPING_TYPE == 2
