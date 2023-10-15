@@ -65,7 +65,7 @@ struct CSInput
 #else
 	static const float BlueFactor = 0.07214272022247314453125f;
 #endif
-// normalize for the worst HDR10 case. It's still better than always normalizing it based on 10k nits.abort
+// normalize for the worst HDR10 case. It's still better than always normalizing it based on 10k nits.
 // clamped at 125 as that is the max HDR10 brightness (10000 / 80).
 static const half NormalizationFactor = min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f);
 
