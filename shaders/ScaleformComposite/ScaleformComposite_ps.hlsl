@@ -104,6 +104,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	if (all(UIColor == 0.f)) // UI will have no influence at all in this case, skip all the conversions and writes
 	{
 		discard;
+		return 0;
 	}
 	const float3 backgroundColor = FinalColorTexture[psInputs.pos.xy].rgb; // This is always in linear unless "SDR_LINEAR_INTERMEDIARY" was false and we were in SDR
 	float3 outputColor;
@@ -158,7 +159,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// The Luma plugin binds a null render target on the engine side. All writes beyond this point are discarded regardless
 	// of whether a "discard" statement is used.
 	discard;
-	return 0.f; // Not really needed
+	return 0.f;
 #else
 	return UIColor;
 #endif // USE_REPLACED_COMPOSITION
