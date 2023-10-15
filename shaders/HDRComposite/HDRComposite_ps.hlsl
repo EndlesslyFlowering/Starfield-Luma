@@ -10,9 +10,6 @@
 //#define APPLY_CINEMATICS // this is post processing
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
-//TODO: WIP
-#define LUTS_EXTRAPOLATION 0
-
 // This disables most other features (post processing/cinematics, LUTs, ...)
 #define ENABLE_TONEMAP 1
 // 0 disable contrast adjustment
@@ -24,6 +21,8 @@
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
+//TODO: WIP
+#define ENABLE_LUT_EXTRAPOLATION (FORCE_VANILLA_LOOK ? 0 : 0)
 #define ENABLE_REPLACED_TONEMAP 1
 // Only invert highlights, which helps conserve the SDR filmic look (shadow crush) and altered colors.
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
@@ -552,7 +551,7 @@ float3 PostProcess(
 
 	// Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
 	// The higher the distance from the contrast middle point, the more contrast will change the color.
-	// This generates negative colors for contrast > 1, and LUT's can't take them, unless they have "LUTS_EXTRAPOLATION"
+	// This generates negative colors for contrast > 1, and LUT's can't take them, unless they have "ENABLE_LUT_EXTRAPOLATION"
 	Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
 
 #elif POST_PROCESS_CONTRAST_TYPE == 2
@@ -796,7 +795,7 @@ float3 GradingLUT(float3 color, float2 uv)
 	LUTColor = gamma_sRGB_to_linear(LUTColor);
 #endif // LUT_MAPPING_TYPE
 
-#if LUTS_EXTRAPOLATION //TODO: does it even make sense given that "LUTCoordinates" is in sRGB? Negative numbers would be fkep up
+#if ENABLE_LUT_EXTRAPOLATION //TODO: does it even make sense given that "LUTCoordinates" is in sRGB? Negative numbers would be fkep up
 	// Extrapolate colors beyond the 0-1 input coordinates by finding the closest color to the LUT cube edge,
 	// and calculating the "color change" acceleration in that direction.
 	const float3 LUTCenterCoordinates = 0.5f;
@@ -813,7 +812,7 @@ float3 GradingLUT(float3 color, float2 uv)
 	// Shift the color in the opposite direction of the centered one, by the ratio between the centered and the extra/external offset
 	LUTColor = lerp(LUTColor, LUTCenterColor, -abs(LUTCoordinates - saturate(LUTCoordinates)) / abs(saturate(LUTCoordinates) - LUTCenteredCoordinates));
 	//TODO: clip negative luminance colors?
-#endif // LUTS_EXTRAPOLATION
+#endif // ENABLE_LUT_EXTRAPOLATION
 
 	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 	const float LUTMaskAlpha = (1.f - LUTMaskTexture.Sample(Sampler0, uv).x) * HdrDllPluginConstants.ColorGradingStrength;
