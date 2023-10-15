@@ -118,11 +118,16 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		// 2) Restore the paper white multipliers (we basically apply a percentage of each based on how much the UI influenced the game background):
 
+#if 1 //TODO: finish this or the other
+		const float UIInfluence = saturate(UIColor.a);
+		outputColor *= lerp(GamePaperWhite, LinearUIPaperWhite, UIInfluence);
+#else
 		// Multiply the non UI (game) colors by the game paper white multiplier (in linear space)
-		const float3 GamePaperWhiteAdditiveColor = (((outputColor - UIColor.rgb) * GamePaperWhite) + UIColor.rgb) - outputColor;
+		const float3 GamePaperWhiteAdditiveColor = max(((outputColor - UIColor.rgb) * lerp(GamePaperWhite, 1.f, UIColor.a)) + UIColor.rgb, 0.f) - outputColor;
 		// Multiply the non game (UI) colors by the UI paper white multiplier (in linear space)
-		const float3 UIPaperWhiteAdditiveColor = (((outputColor - SDRBackgroundColor) * LinearUIPaperWhite) + SDRBackgroundColor) - outputColor;
+		const float3 UIPaperWhiteAdditiveColor = max(((outputColor - SDRBackgroundColor) * LinearUIPaperWhite) + SDRBackgroundColor, 0.f) - outputColor;
 		outputColor += GamePaperWhiteAdditiveColor + UIPaperWhiteAdditiveColor;
+#endif
 
 		// 3) Then add any color in excess in linear space, as there's no other way really:
 
