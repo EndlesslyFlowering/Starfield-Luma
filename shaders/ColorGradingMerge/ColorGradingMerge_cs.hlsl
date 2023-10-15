@@ -67,8 +67,10 @@ RWTexture3D<float4> OutMixedLUT : register(u0, space8);
 
 struct LUTAnalysis
 {
+	float3 blackSRGB;
 	float3 black;
 	float blackY;
+	float blackL;
 	float3 white;
 	float whiteY;
 	float whiteL;
@@ -105,8 +107,10 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
-	Analysis.black = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
+	Analysis.blackSRGB = LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb;
+	Analysis.black = LINEARIZE(Analysis.blackSRGB);
 	Analysis.blackY = Luminance(Analysis.black);
+	Analysis.blackL = linear_srgb_to_oklab(Analysis.black)[0];
 	Analysis.white = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_SIZE_UINT - 1u)).rgb);
 	Analysis.whiteY = Luminance(Analysis.white);
 	Analysis.whiteL = linear_srgb_to_oklab(Analysis.white)[0];
@@ -182,7 +186,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	LUTAnalysis analysis;
 	AnalyzeLUT(LUT, analysis);
 
-	const float3 originalLinear = LINEARIZE(LUT.Load(UVW));
+	const float3 originalSRGB = LUT.Load(UVW);
+	const float3 originalLinear = LINEARIZE(originalSRGB);
 
 	if (analysis.whiteY < analysis.blackY // If LUT is inversed (eg: photo negative) don't do anything
 		|| analysis.whiteY - analysis.blackY >= 1.f) // If LUT is full range already nothing to do
@@ -215,14 +220,15 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float3 invertedBlack = 1.f - (pow(analysis.black, lerp(1.f, fixRaisedBlacksInputSmoothing, analysis.black)) * fixRaisedBlacksStrength);
 	const float3 blackScaling = lerp(1.f / invertedBlack, 1.f, pow(neutralLUTColor, fixRaisedBlacksOutputSmoothing));
 #elif 1 // Original implementation
-	const float3 blackScaling = lerp(1.f / (1.f - analysis.black), 1.f, neutralLUTColor);
+	const float3 blackScaling = lerp(1.f / (1.f - analysis.blackSRGB), 1.f, neutralLUTColor);
 #elif 0 // Alternative implementation, generates slightly smoother shadow gradients but it hasn't been tested around the game much, and still crushes blacks
 	const float3 blackScaling = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
 #else // Disable for quick testing
 	const float3 blackScaling = 1.f;
 #endif
 
-	float3 detintedLinear = 1.f - ((1.f - originalLinear) * blackScaling);
+	float3 detintedSRGB = 1.f - ((1.f - originalSRGB) * blackScaling);
+	float3 detintedLinear = gamma_sRGB_to_linear(detintedSRGB);
 
 	// Must be done because if channels go negative othwerise it'll become
 	// amplified when gain is applied back, causing L to be lower than it should.
@@ -240,31 +246,15 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 #endif // LUT_DEBUG_VALUES
 	
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
-	const float detintedChroma = linear_srgb_to_oklch(detintedLinear)[1];
+	const float3 detintedLab = linear_srgb_to_oklab(detintedLinear);
+	const float3 detintedLCh = oklab_to_oklch(detintedLab);
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
-	const float targetChroma = detintedChroma * (SDRRange ? 1.f : saturation);
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
 
-	// We fork a bit from Normalized LUTs 2.0.0 here, because the scaling will
-	// now be symmetrical to avoid an extra lerp.
-	// Max shift in any channel is +0.00015736956998746443f
-	// In RGB8 this only shifts 8653 / 794,624 (1%) of texels enough to
-	// change one channel by 1/255 (and likely from rounding).
-	// None of those RGB8 values are near black or white
-	// At worse, it's 0.01% brighter
-
-	const float extraLBoost = 1.f; // Replace with user option? 
-	const float3 retintedLinear = detintedLinear * blackScaling * extraLBoost;
-
-	float targetL = linear_srgb_to_oklab(retintedLinear)[0];
-
-#if LUT_DEBUG_VALUES
-	if (targetL < 0) return DEBUG_COLOR;
-#endif // LUT_DEBUG_VALUES
-
-	// Texels exista as points in 3D cube. We are moving two heavily weighted
+	const float targetChroma = detintedLCh[1] * (SDRRange ? 1.f : saturation);
+	// Texels exist as points in 3D cube. We are moving two heavily weighted
 	// points and need to compute the net force to be applied.
 	// Black texel is 0 from itself and sqrt(3) from white
 	// White texel is 0 from itself and sqrt(3) from black
@@ -282,8 +272,17 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	if (analysis.whiteL <= 0) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
 
+	// Not in Normalized LUTs 2.0.0, user adjustable shadow brightness
+
+	// TODO: Use user setting for Shadow
+	const float shadowL = linearNormalization(
+		blackDistance,
+		0.f,
+		totalRange,
+		1.f + (analysis.blackL * (2.f * HdrDllPluginConstants.DevSetting05)),
+		1.f);
 	// Boost lightness by how much white was reduced
-	const float raiseL = linearNormalization(
+	const float highlightsL = linearNormalization(
 		whiteDistance,
 		0.f,
 		totalRange,
@@ -295,10 +294,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	if (raiseL < 1) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
 
-	targetL *= raiseL;
+	const float targetL = detintedLab[0] * shadowL * highlightsL;
 
-	// Use hue from LUT cube color
-	const float targetHue = originalLCh[2];
+	// TODO: Use user setting for Tint
+	const float targetHue = oklab_to_oklch(lerp(originalLab, detintedLab, HdrDllPluginConstants.DevSetting04))[2];
 
 	if (targetL >= 1.f) {
 		const uint clipBehavior = SDRRange ? LUT_SDR_ON_CLIP : LUT_HDR_ON_CLIP;
