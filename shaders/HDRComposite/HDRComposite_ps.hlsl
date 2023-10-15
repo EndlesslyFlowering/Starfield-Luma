@@ -1200,6 +1200,13 @@ PSOutput PS(PSInput psInput)
 			}
 		}
 
+		//TODO1
+		// We do this before applying "midGrayScale" as otherwise the input values would be too low.
+		if (HdrDllPluginConstants.DevSetting05 > 0.f)
+		{
+			inverseTonemappedPostProcessedColor = ExtendGamut(inverseTonemappedPostProcessedColor, HdrDllPluginConstants.DevSetting05);
+		}
+
 		const float midGrayScale = midGrayOut / midGrayIn;
 
 		// Bring back the color to the same range as SDR by matching the mid gray level.
@@ -1226,8 +1233,6 @@ PSOutput PS(PSInput psInput)
 #else // By channel (also increases saturation)
 		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
 #endif
-
-        //TODO: put BT.709->BT.2020 gamut expansion here if necessary (e.g. after the midGrayScale division). It seems like the saturation slider is already good enough?
 
         inverseTonemappedPostProcessedColor *= paperWhite;
         minHighlightsColorOut *= paperWhite;
