@@ -129,7 +129,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 #if !CLIP_HDR_BACKGROUND // If backgrounds were ever too bright, we can just clip them
 		// Apply the Reinhard tonemapper on any background color in excess, to avoid it burning it through the UI.
 		// If this is not enough we could already apply to the entire "backgroundColor" before blending it with the UI.
-		outputColor += (excessBackgroundColor / (1.f + excessBackgroundColor)) * (1.f - UIColor.a) * (isHDR ? 1.f : 0.f);
+		outputColor += (abs(excessBackgroundColor) / (1.f + abs(excessBackgroundColor)) * sign(excessBackgroundColor)) * (1.f - UIColor.a) * (isHDR ? 1.f : 0.f);
 #endif // CLIP_HDR_BACKGROUND
 	}
 	else
