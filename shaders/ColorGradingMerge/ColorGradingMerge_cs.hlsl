@@ -5,7 +5,6 @@
 
 // 0 None, 1 ShortFuse technique (normalization), 2 luminance preservation (doesn't look so good and it's kinda broken in SDR)
 #define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
-#define FORCE_SDR_LUTS 0
 // Make some small quality cuts for the purpose of optimization
 #define OPTIMIZE_LUT_ANALYSIS true
 // For future development
@@ -46,12 +45,10 @@
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
 
-// Behaviour when the color luminance goes beyond 1
-// -0: As is, keep the normalized value that could be beyond the 0-1
-// -1: Keep orignal (non normalized) color
-// -2: "Clip" to full white
-// -3: Max Hue
-// -4: Clamp
+// Behaviour when the color Lightness goes beyond 1
+// -0: Allow lightness above 1
+// -1: Revert to original (non-normalized) color
+// -2: Clamp lightness to 1
 #define LUT_SDR_ON_CLIP 1u
 #define LUT_HDR_ON_CLIP 0u
 
@@ -185,14 +182,22 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	LUTAnalysis analysis;
 	AnalyzeLUT(LUT, analysis);
 
-	float3 color = LINEARIZE(LUT.Load(UVW));
-	const float3 originalColor = color;
+	const float3 originalLinear = LINEARIZE(LUT.Load(UVW));
 
 	if (analysis.whiteY < analysis.blackY // If LUT is inversed (eg: photo negative) don't do anything
 		|| analysis.whiteY - analysis.blackY >= 1.f) // If LUT is full range already nothing to do
 	{
-		return color;
+#if USE_OKLAB_COLORS
+		return linear_srgb_to_oklab(originalLinear);
+#else 
+		return originalLinear;
+#endif // USE_OKLAB_COLORS
 	}
+
+	const float3 originalLab = linear_srgb_to_oklab(originalLinear);
+	const float3 originalLCh = oklab_to_oklch(originalLab);
+
+	float3 outputLCh;
 
 	// While it unclear how exactly the floor was raised, remove the tint to floor
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
@@ -217,7 +222,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float3 blackScaling = 1.f;
 #endif
 
-	float3 detintedColor = 1.f - ((1.f - color) * blackScaling);
+	float3 detintedLinear = 1.f - ((1.f - originalLinear) * blackScaling);
 
 	// Must be done because if channels go negative othwerise it'll become
 	// amplified when gain is applied back, causing L to be lower than it should.
@@ -225,18 +230,19 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// will hurt visiblity.
 	// (eg: (-2,0,1) * 2 = (-4, 0, 2) instead of (0,0,2)
 	// Trade off here is, near black, more visibility vs smoother gradients
-	detintedColor = max(detintedColor, 0.f);
+	detintedLinear = max(detintedLinear, 0.f);
 	
 #if LUT_DEBUG_VALUES
 	// Should never happen
-	if (Luminance(detintedColor) < 0.f) {
+	if (Luminance(detintedLinear) < 0.f) {
 		return DEBUG_COLOR;
 	}
 #endif // LUT_DEBUG_VALUES
 	
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
+	const float detintedChroma = linear_srgb_to_oklch(detintedLinear)[1];
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
-	const float targetChroma = linear_srgb_to_oklch(detintedColor)[1] * (SDRRange ? 1.f : saturation);
+	const float targetChroma = detintedChroma * (SDRRange ? 1.f : saturation);
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold targetL
@@ -250,9 +256,9 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// At worse, it's 0.01% brighter
 
 	const float extraLBoost = 1.f; // Replace with user option? 
-	const float3 retintedColor = detintedColor * blackScaling * extraLBoost;
+	const float3 retintedLinear = detintedLinear * blackScaling * extraLBoost;
 
-	float targetL = linear_srgb_to_oklab(retintedColor)[0];
+	float targetL = linear_srgb_to_oklab(retintedLinear)[0];
 
 #if LUT_DEBUG_VALUES
 	if (targetL < 0) return DEBUG_COLOR;
@@ -292,36 +298,34 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	targetL *= raiseL;
 
 	// Use hue from LUT cube color
-	const float targetHue = linear_srgb_to_oklch(color)[2];
+	const float targetHue = originalLCh[2];
 
 	if (targetL >= 1.f) {
 		const uint clipBehavior = SDRRange ? LUT_SDR_ON_CLIP : LUT_HDR_ON_CLIP;
 		if (clipBehavior == 0) // As is (treat it the same as any other color)
-			color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
-		else if (clipBehavior == 1) { } // Keep original color (do nothing)
-		else if (clipBehavior == 2) // White
-			color = 1.f;
-		else if (clipBehavior == 3) // Max Hue
-		{
-			// TODO: can we even do anything about this? if the lightness is >= 1, then the color is white?
+			outputLCh = float3(targetL, targetChroma, targetHue);
+		else if (clipBehavior == 1) {
+			outputLCh = originalLCh; // Keep original color (do nothing)
+		} else if (clipBehavior == 2) {
+			outputLCh = float3(1.f, targetChroma, targetHue);
 		}
-		else if (clipBehavior == 4) // Clamp
-			color = oklch_to_linear_srgb(float3(1.f, targetChroma, targetHue)); // TODO: isn't this the same as the "White" setting?
 	}
 	else {
-		color = oklch_to_linear_srgb(float3(targetL, targetChroma, targetHue));
+		outputLCh = float3(targetL, targetChroma, targetHue);
 	}
 
 #if LUT_DEBUG_VALUES // Debug black point
+	float3 debugLinear = oklch_to_linear_srgb(outputLCh);
+
 	bool isBlackPoint = neutralLUTColor.r == 0.f && neutralLUTColor.g == 0.f && neutralLUTColor.b == 0.f;
 
-	bool wasBlack = !any(color);
+	bool wasBlack = !any(linearColor);
 
 	// If neutralLutColor is 0,0,0, force 0
 	
-	color *= (!isBlackPoint);
+	debugLinear *= (!isBlackPoint);
 
-	bool nowBlack = !any(color);
+	bool nowBlack = !any(debugLinear);
 
 	if (isBlackPoint) {
 		if (wasBlack) {
@@ -330,39 +334,46 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 			// L has recorded upto `0.000004829726509479252`
 			// If below 0.000005, ignore it
 			if (targetL >= 0.01f) {
-				color = float3(1.f,1.f, 0.f); // Yellow (Bad L)
+				debugLinear = float3(1.f,1.f, 0.f); // Yellow (Bad L)
 			}
 		}
-	} else if (nowBlack || targetL < 0.000005f) {
+	} else if (nowBlack || targetL < 0.01f) {
 		if (!wasBlack) {
-			color = float3(0.f,1.f, 1.f); // Cyan (Crush)
+			debugLinear = float3(0.f,1.f, 1.f); // Cyan (Crush)
 		}
 	}
+	outputLCh = linear_srgb_to_oklch(debugLinear);
 #endif // LUT_DEBUG_VALUES
 
-	if (SDRRange) {
-		// Optional step to keep colors in the SDR range.
-		color = saturate(color);
-	}
 
 #if LUT_DEBUG_VALUES
 	// Should never happen
-	if (Luminance(color) < 0.f) {
+	if (Luminance(debugLinear) < 0.f) {
 		return DEBUG_COLOR;
 	}
 #endif // LUT_DEBUG_VALUES
 
 	// To note, color channels may be negative, even if -0.00001f
 
-#if 0 // Print all HDR colors
-	if (any(color != saturate(color))) {
+#if LUT_DEBUG_VALUES // Print all HDR colors
+	if (any(debugLinear != saturate(debugLinear))) {
 		return DEBUG_COLOR;
 	}
 #endif
 
-	color = lerp(originalColor, color, HdrDllPluginConstants.LUTCorrectionStrength);
+	float3 outputLab = oklch_to_oklab(outputLCh);
+	outputLab = lerp(originalLab, outputLab, HdrDllPluginConstants.LUTCorrectionStrength);
 
-	return color;
+#if USE_OKLAB_COLORS
+	return outputLab;
+#else
+	float3 outputLinear = oklab_to_linear_srgb(outputLab);
+	if (SDRRange) {
+		// Optional step to keep colors in the SDR range.
+		outputLinear = saturate(outputLinear);
+	}
+	return outputLinear;
+#endif
 }
 
 // Dispatch size is 1 1 16 (x and y have one thread and one thread group, while z has 16 thread groups with a thread each)
@@ -426,11 +437,15 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	}
 #endif // LUT_IMPROVEMENT_TYPE
 
+#if USE_OKLAB_COLORS
+	neutralLUTColor = linear_srgb_to_oklab(neutralLUTColor);
+#else 
 	neutralLUTColor = CORRECT_GAMMA(neutralLUTColor);
 	LUT1Color = CORRECT_GAMMA(LUT1Color);
 	LUT2Color = CORRECT_GAMMA(LUT2Color);
 	LUT3Color = CORRECT_GAMMA(LUT3Color);
 	LUT4Color = CORRECT_GAMMA(LUT4Color);
+#endif
 
 	float adjustedNeutralLUTPercentage = lerp(PcwColorGradingMerge.neutralLUTPercentage, 1.f, AdditionalNeutralLUTPercentage);
 	float adjustedLUT1Percentage = lerp(PcwColorGradingMerge.LUT1Percentage, 0.f, AdditionalNeutralLUTPercentage);
@@ -445,8 +460,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	                + (adjustedLUT4Percentage * LUT4Color);
 
 // Convert to sRGB after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
-#if !LUT_FIX_GAMMA_MAPPING
-
+#if !LUT_FIX_GAMMA_MAPPING && !USE_OKLAB_COLORS
 	mixedLUT = gamma_linear_to_sRGB(mixedLUT);
 
 #endif // !LUT_FIX_GAMMA_MAPPING
