@@ -67,7 +67,7 @@ struct CSInput
 #endif
 // normalize for the worst HDR10 case. It's still better than always normalizing it based on 10k nits.abort
 // clamped at 125 as that is the max HDR10 brightness (10000 / 80).
-#define NORMALIZATION_FACTOR (half)min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f);
+#define NORMALIZATION_FACTOR (half)min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f)
 
 
 half3 PrepareForProcessing(half3 Color)
