@@ -40,6 +40,9 @@ namespace Settings
 
     bool Main::InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject)
 	{
+		// NOTE: this is called every time the game switches between windowed and borderless.
+		// It's not called again when we replace swapchain color space or format ourselves.
+
 		swapChainObject = a_swapChainObject;
 
 		// check for old NativeHDR being present
@@ -66,7 +69,8 @@ namespace Settings
 
 		// change display mode setting if it's hdr and hdr is not supported
 		if (!bIsHDRSupported && IsGameRenderingSetToHDR()) {
-		    *DisplayMode.value = 0;
+			*DisplayMode.value = 0;
+			// No need to save, the user might have moved the game to an SDR display temporarily
 		}
 
 		// autodetect peak brightness (only works reliably if HDR is enabled)
@@ -86,7 +90,6 @@ namespace Settings
     {
 		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
 		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
-		// TODO: make sure the game never recreates the window handle or this would stop working
 	}
 	
     void Main::RefreshHDRDisplayEnableState()
