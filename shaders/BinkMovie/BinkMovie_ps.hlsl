@@ -25,6 +25,7 @@ static const float BinkVideosAutoHDRShoulderPow = 2.75f; // A somewhat conservat
 // https://github.com/Filoppi/PumboAutoHDR
 float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
 {
+	//TODO: do with OKLCH luminance?
     const float SDRRatio = Luminance(Color);
     // Limit AutoHDR brightness, it won't look good beyond a certain level.
     // The paper white multiplier is applied later so we account for that.
