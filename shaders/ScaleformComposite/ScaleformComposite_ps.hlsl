@@ -102,7 +102,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	const float3 backgroundColor = FinalColorTexture[psInputs.pos.xy].rgb; // This is always in linear unless "SDR_LINEAR_INTERMEDIARY" was false and we were in SDR
 	float3 outputColor;
 #if !OPTIMIZE_BLENDS
-	if (isLinear)
+	if (isLinear && UIColor.a > 0.f)
 	{
 		float GamePaperWhite = isHDR ? (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB) : 1.f;
 
