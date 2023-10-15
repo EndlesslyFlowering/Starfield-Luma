@@ -2,8 +2,8 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-#define USE_REPLACED_COMPOSITION 1
-#define OPTIMIZE_REPLACED_COMPOSITION_BLENDS 0
+#define USE_REPLACED_COMPOSITION (FORCE_VANILLA_LOOK ? 1 : 1)
+#define OPTIMIZE_REPLACED_COMPOSITION_BLENDS (FORCE_VANILLA_LOOK ? 0 : 0)
 #define CLIP_HDR_BACKGROUND 0
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 // We found the best value empirically and it seems to match gamma 2.2.
@@ -51,8 +51,8 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG,
 	// as it has a copy of the UI buffer that it uses to determine how much to reconstruct pixels.
 
-	// We do a saturate because the original UI texture was a INT/UNORM so it couldn't have had values beyond 0-1. And this also avids negatives powers in the code below.
-	UIColor.a = saturate(UIColor.a);
+	// We do a saturate because the original UI texture was a INT/UNORM so it couldn't have had values beyond 0-1. And this also avoids negatives powers in the code below.
+	UIColor = saturate(UIColor);
 
 	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
 	UIColor.rgb = GAMMA_TO_LINEAR(UIColor.rgb);
@@ -70,7 +70,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	{
 		LinearUIPaperWhite = isHDR ? (HdrDllPluginConstants.HDRUIPaperWhiteNits / WhiteNits_sRGB) : 1.f;
 
-#if !USE_REPLACED_COMPOSITION
+#if !USE_REPLACED_COMPOSITION || OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 
 		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
 		// this won't ever be perfect but it's close enough for most cases.
@@ -90,7 +90,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 #endif
 		UIColor.a = pow(UIColor.a, HDRUIBlendPow);
 
-#endif // USE_REPLACED_COMPOSITION
+#endif // !USE_REPLACED_COMPOSITION || OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 	}
 #if !SDR_LINEAR_INTERMEDIARY
 	else
@@ -101,10 +101,15 @@ float4 PS(PSInputs psInputs) : SV_Target
 #endif // SDR_LINEAR_INTERMEDIARY
 
 #if USE_REPLACED_COMPOSITION
+	if (all(UIColor == 0.f)) // UI will have no influence at all in this case, skip all the conversions and writes
+	{
+		discard;
+	}
 	const float3 backgroundColor = FinalColorTexture[psInputs.pos.xy].rgb; // This is always in linear unless "SDR_LINEAR_INTERMEDIARY" was false and we were in SDR
 	float3 outputColor;
-#if !OPTIMIZE_BLENDS
-	if (isLinear && UIColor.a > 0.f)
+#if !OPTIMIZE_REPLACED_COMPOSITION_BLENDS
+	// Do this even if "UIColor.a" is 1, as we still need to tonemap the HDR background
+	if (isLinear)
 	{
 		float GamePaperWhite = isHDR ? (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB) : 1.f;
 
@@ -114,14 +119,19 @@ float4 PS(PSInputs psInputs) : SV_Target
 		const float3 SDRBackgroundColor = saturate(normalizedBackgroundColor);
 		const float3 excessBackgroundColor = (normalizedBackgroundColor - SDRBackgroundColor) * GamePaperWhite;
 
-		const float3 UIColorGammaSpace = LINEAR_TO_GAMMA(UIColor.rgb);
-		const float3 SDRBackgroundColorGammaSpace = LINEAR_TO_GAMMA(SDRBackgroundColor);
-		outputColor = GAMMA_TO_LINEAR(UIColorGammaSpace + (SDRBackgroundColorGammaSpace * (1.f - UIColor.a)));
+        const float3 UIColorGammaSpace = LINEAR_TO_GAMMA(UIColor.rgb);
+        const float3 SDRBackgroundColorGammaSpace = LINEAR_TO_GAMMA(SDRBackgroundColor);
+        const float3 DarkenedSDRBackgroundColorGammaSpace = SDRBackgroundColorGammaSpace * (1.f - UIColor.a);
+		outputColor = GAMMA_TO_LINEAR(UIColorGammaSpace + DarkenedSDRBackgroundColorGammaSpace);
 
 		// 2) Restore the paper white multipliers (we basically apply a percentage of each based on how much the UI influenced the game background):
 
-#if 1 //TODO: finish this or the other
-		const float UIInfluence = saturate(UIColor.a);
+#if 1 // Newer simpler and better version
+		// We can't really base this on how much the "outputColor" changed from "SDRBackgroundColor", as if the UI blends in the same color as the background
+		// the change ratio detection would be off. For this reason, we just sum up the amount of background darkening and additive color,
+		// if it's above 1, we consider the UI to have had 100% influence.
+		// NOTE: there's probably a way to do this better, by using a smarter type of UI influence ratio, but for now this is good enough.
+		const float3 UIInfluence = saturate(UIColor.a * (1.f - SDRBackgroundColor) + UIColor.rgb);
 		outputColor *= lerp(GamePaperWhite, LinearUIPaperWhite, UIInfluence);
 #else
 		//TODO: this doesn't work well yet, because the operations are being done in linear space, which makes the blend ratios differ from gamma space.
@@ -137,14 +147,20 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		// 3) Then add any color in excess in linear space, as there's no other way really:
 
-#if !CLIP_HDR_BACKGROUND // If backgrounds were ever too bright, we can just clip them
 		// Apply the Reinhard tonemapper on any background color in excess, to avoid it burning it through the UI.
-		// If this is not enough we could already apply to the entire "backgroundColor" before blending it with the UI.
-		outputColor += (abs(excessBackgroundColor) / (1.f + abs(excessBackgroundColor)) * sign(excessBackgroundColor)) * (1.f - UIColor.a) * (isHDR ? 1.f : 0.f);
-#endif // CLIP_HDR_BACKGROUND
+		// NOTE: If this is not enough we could already apply to the entire "backgroundColor" before blending it with the UI.
+		// We clip any 
+		float3 tonemappedBackgroundColor = abs(excessBackgroundColor) / (1.f + abs(excessBackgroundColor)) * sign(excessBackgroundColor);
+		// In SDR, we clip any HDR color passing through the UI, as long as the UI has ANY kind of influence on the output.
+		// The reason is that the game wouldn't have ever had any colors beyond 0-1 due to having int UNORM textures, so we want to replicate the same look.
+		tonemappedBackgroundColor *= isHDR ? 1.f : 0.f;
+#if CLIP_HDR_BACKGROUND // If backgrounds were ever too bright, we can just clip them
+		tonemappedBackgroundColor = 0.f;
+#endif // !CLIP_HDR_BACKGROUND
+		outputColor += lerp(tonemappedBackgroundColor, excessBackgroundColor, 1.f - UIColor.a) * (1.f - UIColor.a);
 	}
 	else
-#endif // OPTIMIZE_BLENDS
+#endif // !OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 	{
 		// Pre-multiplied alpha formula
 		outputColor = UIColor.rgb + (backgroundColor * (1.f - UIColor.a));
@@ -155,7 +171,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// The Luma plugin binds a null render target on the engine side. All writes beyond this point are discarded regardless
 	// of whether a "discard" statement is used.
 	discard;
-	return float4(0.f, 0.f, 0.f, 0.f);
+	return 0.f; // Not really needed
 #else
 	return UIColor;
 #endif // USE_REPLACED_COMPOSITION
