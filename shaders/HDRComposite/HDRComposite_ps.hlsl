@@ -1200,11 +1200,11 @@ PSOutput PS(PSInput psInput)
 			}
 		}
 
-		//TODO1
+		//TODO1 (add define and maybe move after "midGrayScale")
 		// We do this before applying "midGrayScale" as otherwise the input values would be too low.
 		if (HdrDllPluginConstants.DevSetting05 > 0.f)
 		{
-			inverseTonemappedPostProcessedColor = ExtendGamut(inverseTonemappedPostProcessedColor, HdrDllPluginConstants.DevSetting05);
+			inverseTonemappedColor = ExtendGamut(inverseTonemappedColor, HdrDllPluginConstants.DevSetting05);
 		}
 
 		const float midGrayScale = midGrayOut / midGrayIn;
