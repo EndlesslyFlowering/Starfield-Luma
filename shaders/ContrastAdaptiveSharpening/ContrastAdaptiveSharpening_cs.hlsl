@@ -67,7 +67,7 @@ struct CSInput
 #endif
 // normalize for the worst HDR10 case. It's still better than always normalizing it based on 10k nits.abort
 // clamped at 125 as that is the max HDR10 brightness (10000 / 80).
-#define NORMALIZATION_FACTOR (half)min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f)
+static const half NormalizationFactor = min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f);
 
 
 half3 PrepareForProcessing(half3 Color)
@@ -77,7 +77,7 @@ half3 PrepareForProcessing(half3 Color)
 #if HDR_BT2020
 		Color = BT709_To_BT2020_half(Color);
 #endif
-		return saturate(Color / NORMALIZATION_FACTOR);
+		return saturate(Color / NormalizationFactor);
 	}
 	else
 	{
@@ -89,7 +89,7 @@ half3 PrepareForOutput(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
-		Color *= NORMALIZATION_FACTOR;
+		Color *= NormalizationFactor;
 #if HDR_BT2020
 		return BT2020_To_BT709_half(Color);
 #else
