@@ -13,12 +13,6 @@
 // By turning this on, we emulate the SDR look in HDR (and out SDR) by baking that assumption into our calculations.
 // This makes sense to use given we fix up (normalize) the LUTs colors and their gamma mapping.
 #define SDR_USE_GAMMA_2_2 (FORCE_VANILLA_LOOK ? 0 : 1)
-// If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
-// Requires "SDR_USE_GAMMA_2_2".
-#define GAMMA_CORRECTION_IN_LUTS 1
-#define FORCE_SDR_LUTS 0
-
-#define USE_OKLAB_COLORS 0
 
 // If true, SDR will be kept in linear space until the final out.
 // This is desired for output quality as we store colors on float buffers, which are based kept in linear space,
@@ -27,11 +21,18 @@
  // Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
 #define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
-// Makes LUTs sampling work in linear space, which is mathematically correct. Without this, they are stored as ~sRGB in a float texture and sampled in sRGB without acknowledging it.
-// This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
-#define LUT_FIX_GAMMA_MAPPING (FORCE_VANILLA_LOOK ? 0 : 1)
+// Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
+// 0) sRGB gamma mapping (Vanilla): it makes any intermediary sampled value (that doesn't exactly fall in the center of LUT texel) affected by gamma, and that's not good.
+// 1) Linear mapping: Makes LUTs sampling work in linear space, which is mathematically correct. This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
+// 2) OKLAB mapping: this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black.
+#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
+#define LUT_MAX_UINT (uint)LUT_SIZE - 1u
+// If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
+// Requires "SDR_USE_GAMMA_2_2".
+#define GAMMA_CORRECTION_IN_LUTS 1
+#define FORCE_SDR_LUTS 0
 
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
 #define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_sRGB)

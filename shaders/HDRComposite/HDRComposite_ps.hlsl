@@ -35,8 +35,7 @@
 // Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
-#define DRAW_LUT_TEXTURE 0
-#define DRAW_LUT_SQUARE 0
+#define DRAW_LUT 0
 
 
 cbuffer CSharedFrameData : register(b0, space6)
@@ -779,10 +778,23 @@ float3 GradingLUT(float3 color, float2 uv)
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 	float3 LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
 #else
+	//TODO1: verify this is the same
 	float3 linearScale = (LUT_SIZE - 1.0f) / LUT_SIZE;
 	float3 linearOffset = 1.0f / (2.0f * LUT_SIZE);
 	float3 LUTColor = LUTTexture.Sample(Sampler0, linearScale * LUTCoordinates + linearOffset);
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+
+#if LUT_MAPPING_TYPE == 2
+	LUTColor = oklab_to_linear_srgb(LUTColor);
+	if (HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS)
+	{
+		LUTColor = saturate(LUTColor);
+	}
+#elif LUT_MAPPING_TYPE == 0
+	// We always work in linear space so convert to it.
+	// We never acknowledge the original wrong gamma function here (we don't really care).
+	LUTColor = gamma_sRGB_to_linear(LUTColor);
+#endif // LUT_MAPPING_TYPE
 
 #if LUTS_EXTRAPOLATION //TODO: does it even make sense given that "LUTCoordinates" is in sRGB? Negative numbers would be fkep up
 	// Extrapolate colors beyond the 0-1 input coordinates by finding the closest color to the LUT cube edge,
@@ -802,19 +814,6 @@ float3 GradingLUT(float3 color, float2 uv)
 	LUTColor = lerp(LUTColor, LUTCenterColor, -abs(LUTCoordinates - saturate(LUTCoordinates)) / abs(saturate(LUTCoordinates) - LUTCenteredCoordinates));
 	//TODO: clip negative luminance colors?
 #endif // LUTS_EXTRAPOLATION
-
-#if USE_OKLAB_COLORS
-	LUTColor = oklab_to_linear_srgb(LUTColor);
-	if (HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS) {
-		LUTColor = saturate(LUTColor);
-	}
-#endif
-
-#if !LUT_FIX_GAMMA_MAPPING
-	// We always work in linear space so convert to it.
-	// We never acknowledge the original wrong gamma function here (we don't really care).
-	LUTColor = gamma_sRGB_to_linear(LUTColor);
-#endif // !LUT_FIX_GAMMA_MAPPING
 
 	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 	const float LUTMaskAlpha = (1.f - LUTMaskTexture.Sample(Sampler0, uv).x) * HdrDllPluginConstants.ColorGradingStrength;
@@ -843,48 +842,46 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 #endif
 }
 
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
-float4 drawLUT(PSInput psInput) {
-	static const uint DrawLUTScale = 10u; // Pixel scale
-	const uint2 LUTPixelPosition2D = psInput.SV_Position.xy / DrawLUTScale;
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
+float3 DrawLUTSquare(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
+	const uint2 LUTPixelPosition2D = PixelPosition / PixelScale;
 	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % LUT_SIZE_UINT, LUTPixelPosition2D.y, LUTPixelPosition2D.x / LUT_SIZE_UINT);
-	bool drawLUT = false;
-	float4 LUTColor = float4(0,0,0,0);
-	if (!any(LUTPixelPosition3D < 0u) && !any(LUTPixelPosition3D > LUT_SIZE_UINT - 1u))
+	if (!any(LUTPixelPosition3D < 0u) && !any(LUTPixelPosition3D > LUT_MAX_UINT))
 	{
+		DrawnLUT = true;
 		float3 loadedColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
-		#if USE_OKLAB_COLORS
-			loadedColor = oklab_to_linear_srgb(loadedColor);
-		#endif
-
-		loadedColor = lerp(float3(LUTPixelPosition3D.rgb) / float(LUT_SIZE_UINT - 1u), loadedColor, HdrDllPluginConstants.ColorGradingStrength);
-		LUTColor = float4(loadedColor.rgb, 1.f);
+#if LUT_MAPPING_TYPE == 2
+		loadedColor = oklab_to_linear_srgb(loadedColor);
+#elif LUT_MAPPING_TYPE == 0
+		loadedColor = gamma_sRGB_to_linear(loadedColor);
+#endif // LUT_MAPPING_TYPE
+		//TODO1: this (LUTPixelPosition3D) and the one underneath are probably broken as we need to linearize the neutral LUT color?
+		loadedColor = lerp(float3(LUTPixelPosition3D) / float(LUT_MAX_UINT), loadedColor, HdrDllPluginConstants.ColorGradingStrength); // Blend in neutral LUT
+		return loadedColor;
 	}
-	return LUTColor;
+	return 0;
 }
 
-float4 drawLUTSquare(PSInput psInput) {
-	static const uint DrawLUTSquareScale = 2u; // Pixel scale
-	static const uint DrawLUTSquareSize = (LUT_SIZE_UINT * LUT_SIZE_UINT * DrawLUTSquareScale);
-	float4 LUTColor = float4(0,0,0,0);
+float3 DrawLUTSimplifiedSquare(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
+	static const uint DrawLUTSquareSize = (LUT_SIZE_UINT * LUT_SIZE_UINT * PixelScale);
 	float width;
 	float height;
 	InputColorTexture.GetDimensions(width, height);
-	if (psInput.SV_Position.y < (height - DrawLUTSquareSize)) return LUTColor;
+	if (PixelPosition.y < (height - DrawLUTSquareSize))
+		return 0;
 	
-	const uint2 position = uint2(
-		psInput.SV_Position.x / DrawLUTSquareScale,
-		(psInput.SV_Position.y - (height - DrawLUTSquareSize)) / DrawLUTSquareScale
-	);
-	const uint lutMax = LUT_SIZE_UINT - 1u;
+	const uint2 position = uint2(PixelPosition.x / PixelScale, (PixelPosition.y - (height - DrawLUTSquareSize)) / PixelScale);
 	uint xPoint = position.x / LUT_SIZE_UINT;
 	uint yPoint = position.y / LUT_SIZE_UINT;
-	if ((xPoint <= lutMax && yPoint >=0 && yPoint <= lutMax)) {
+	// NOTE: this is extremely slow.
+	if ((xPoint <= LUT_MAX_UINT && yPoint >=0 && yPoint <= LUT_MAX_UINT))
+	{
+		DrawnLUT = true;
 		float3 xyz;
 		uint row = 0u;
-		float coord = float(xPoint) / float(lutMax);
-		float inverse = float(lutMax - xPoint) / float(lutMax);
-		     if (yPoint == row++) xyz = float3(coord  , coord  , coord  ); // Black => White
+		float coord = float(xPoint) / float(LUT_MAX_UINT);
+		float inverse = float(LUT_MAX_UINT - xPoint) / float(LUT_MAX_UINT);
+		if (yPoint == row++) xyz = float3(coord  , coord  , coord  ); // Black => White
 
 		else if (yPoint == row++) xyz = float3(coord  , 0      , 0      ); // Black => Red
 		else if (yPoint == row++) xyz = float3(0      , coord  , 0      ); // Black => Green
@@ -906,42 +903,33 @@ float4 drawLUTSquare(PSInput psInput) {
 		else if (yPoint == row++) xyz = float3(coord  , inverse, coord  ); // Green to Magenta
 		else if (yPoint == row++) xyz = float3(coord  , coord  , inverse); // Blue to Yellow
 		
-
-		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb * lutMax, 0)).rgb;
-		#if USE_OKLAB_COLORS
-			loadedColor = oklab_to_linear_srgb(loadedColor);
-		#endif
-
-		loadedColor = lerp(xyz.rgb, loadedColor, HdrDllPluginConstants.ColorGradingStrength);
-		LUTColor = float4(loadedColor.rgb, 1.f);
+		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb * LUT_MAX_UINT, 0)).rgb;
+#if LUT_MAPPING_TYPE == 2
+		loadedColor = oklab_to_linear_srgb(loadedColor);
+#elif LUT_MAPPING_TYPE == 0
+		loadedColor = gamma_sRGB_to_linear(loadedColor);
+#endif // LUT_MAPPING_TYPE
+		loadedColor = lerp(xyz.rgb, loadedColor, HdrDllPluginConstants.ColorGradingStrength); // Blend in neutral LUT
+		return loadedColor;
 	}
-	return LUTColor;
+	return 0;
 }
-#endif // APPLY_MERGED_COLOR_GRADING_LUT
-
+#endif // APPLY_MERGED_COLOR_GRADING_LUT && DRAW_LUT
 
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
 {
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && (DRAW_LUT_TEXTURE || DRAW_LUT_SQUARE)
-	float4 LUTColor = float4(0,0,0,0);
-#if DRAW_LUT_TEXTURE
-	LUTColor = drawLUT(psInput);
-#endif
-#if DRAW_LUT_SQUARE
-	if (LUTColor.a == 0.f) {
-		LUTColor = drawLUTSquare(psInput);
-	}
-#endif
-
-	if (LUTColor.a != 0.f)
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT //TODO1: not working
+	static const uint DrawLUTScale = 10u; // Pixel scale
+	bool drawnLUT = false;
+	float3 LUTColor = DrawLUTSquare(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
+	LUTColor = DrawLUTSimplifiedSquare(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
+	if (drawnLUT)
 	{
-#if !LUT_FIX_GAMMA_MAPPING
-		LUTColor = gamma_sRGB_to_linear(LUTColor);
-#endif
-		float3 outputColor = LUTColor.rgb;
+		float3 outputColor = LUTColor;
 		if (HdrDllPluginConstants.DisplayMode <= 0) // SDR
 		{
+			//TODO1: apply gamma correction here?
 #if !SDR_LINEAR_INTERMEDIARY
 #if SDR_USE_GAMMA_2_2
 			outputColor = pow(outputColor, 1.f / 2.2f);
