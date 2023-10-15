@@ -51,6 +51,9 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG,
 	// as it has a copy of the UI buffer that it uses to determine how much to reconstruct pixels.
 
+	// We do a saturate because the original UI texture was a INT/UNORM so it couldn't have had values beyond 0-1. And this also avids negatives powers in the code below.
+	UIColor.a = saturate(UIColor.a);
+
 	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
 	UIColor.rgb = GAMMA_TO_LINEAR(UIColor.rgb);
 
@@ -85,8 +88,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 #else
 		HDRUIBlendPow = lerp(1.f, HDRUIBlendPow, HDR_UI_BLEND_POW_ALPHA);
 #endif
-		// We do a saturate to avoid pow of -0, which might lead to unexpected results.
-		UIColor.a = pow(saturate(UIColor.a), HDRUIBlendPow);
+		UIColor.a = pow(UIColor.a, HDRUIBlendPow);
 
 #endif // USE_REPLACED_COMPOSITION
 	}
@@ -122,9 +124,13 @@ float4 PS(PSInputs psInputs) : SV_Target
 		const float UIInfluence = saturate(UIColor.a);
 		outputColor *= lerp(GamePaperWhite, LinearUIPaperWhite, UIInfluence);
 #else
-		// Multiply the non UI (game) colors by the game paper white multiplier (in linear space)
+		//TODO: this doesn't work well yet, because the operations are being done in linear space, which makes the blend ratios differ from gamma space.
+		//The only way to get this working properly would be to find the gamma space image change ratio from the UI and background (while in gamma space),
+		//and do the separate paper white multiplications based on these, e.g. "((linearOutputColor / UIColorChangeRatio) * UIPaperWhiter) * UIColorChangeRatio".
+		
+		// Multiply the non UI (game) colors by the game paper white multiplier
 		const float3 GamePaperWhiteAdditiveColor = max(((outputColor - UIColor.rgb) * lerp(GamePaperWhite, 1.f, UIColor.a)) + UIColor.rgb, 0.f) - outputColor;
-		// Multiply the non game (UI) colors by the UI paper white multiplier (in linear space)
+		// Multiply the non game (UI) colors by the UI paper white multiplier
 		const float3 UIPaperWhiteAdditiveColor = max(((outputColor - SDRBackgroundColor) * LinearUIPaperWhite) + SDRBackgroundColor, 0.f) - outputColor;
 		outputColor += GamePaperWhiteAdditiveColor + UIPaperWhiteAdditiveColor;
 #endif

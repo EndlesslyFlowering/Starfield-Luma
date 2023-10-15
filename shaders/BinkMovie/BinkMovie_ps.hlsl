@@ -14,7 +14,7 @@ struct PSInputs
 	float2 TEXCOORD : TEXCOORD0;
 };
 
-//TODO: exposure to user? At least the on/off bool, and maybe the shoulder pow and max nits, but it's probably better to simply pick a default that looks nice on most movies.
+//TODO: expose to user? At least the on/off bool, and maybe the shoulder pow and max nits, but it's probably better to simply pick a default that looks nice on most movies.
 static const bool BinkVideosAutoHDR = true;
 static const float BinkVideosAutoHDRMaxOutputNits = 750.f;
 // The higher it is, the "later" highlights start
