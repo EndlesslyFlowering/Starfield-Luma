@@ -33,7 +33,7 @@
 // 0 per channel (also fallback)
 // 1 on the luminance
 // 2 in ICtCp
-#define HDR_TONEMAP_TYPE 1
+#define HDR_TONEMAP_TYPE 2
 // Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
