@@ -196,7 +196,6 @@ struct HableEvalParams
 	float midSegment_lnA_optimised;
 	float shoulderSegment_lnA;
 	float shoulderSegment_B_optimised;
-	float invScale;
 };
 
 struct SDRTonemapByLuminancePP
