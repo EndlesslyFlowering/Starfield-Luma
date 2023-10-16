@@ -38,37 +38,37 @@ float3 safeDivision(float3 quotient, float3 dividend)
 	              safeDivision(quotient.z, dividend.z));
 }
 
-// Aplies exponential ("Photographic") luma compression.
+// Aplies exponential ("Photographic") luminance/luma compression.
 // The pow can modulate the curve without changing the values around the edges.
-float rangeCompressPow(float x, float fMax = FLT_MAX, float fPow = 1.f)
+float rangeCompress(float X, float Max = FLT_MAX, float Pow = 1.f)
 {
 	// Branches are for static parameters optimizations
-	if (fPow == 1.f && fMax == FLT_MAX)
+	if (Pow == 1.f && Max == FLT_MAX)
 	{
-		// This does e^x. We expect x to be between 0 and 1.
-		return 1.f - exp(-x);
+		// This does e^X. We expect X to be between 0 and 1.
+		return 1.f - exp(-X);
 	}
-	if (fPow == 1.f && fMax != FLT_MAX)
+	if (Pow == 1.f && Max != FLT_MAX)
 	{
-		const float fLostRange = exp(-fMax);
+		const float fLostRange = exp(-Max);
 		const float fRestoreRangeScale = 1.f / (1.f - fLostRange);
-		return (1.f - exp(-x)) * fRestoreRangeScale;
+		return (1.f - exp(-X)) * fRestoreRangeScale;
 	}
-	if (fPow != 1.f && fMax == FLT_MAX)
+	if (Pow != 1.f && Max == FLT_MAX)
 	{
-		return (1.f - pow(exp(-x), fPow));
+		return (1.f - pow(exp(-X), Pow));
 	}
-	const float fLostRange = pow(exp(-fMax), fPow);
-	const float fRestoreRangeScale = 1.f / (1.f - fLostRange);
-	return (1.f - pow(exp(-x), fPow)) * fRestoreRangeScale;
+	const float lostRange = pow(exp(-Max), Pow);
+	const float restoreRangeScale = 1.f / (1.f - lostRange);
+	return (1.f - pow(exp(-X), Pow)) * restoreRangeScale;
 }
 
 // Refurbished DICE HDR tonemapper (per channel or luminance)
-float luminanceCompress(float fInValue, float fOutMaxValue, float fShoulderStart = 0.f, float fInMaxValue = FLT_MAX, float fModulationPow = 1.f)
+float luminanceCompress(float InValue, float OutMaxValue, float ShoulderStart = 0.f, bool considerMaxValue = false, float InMaxValue = FLT_MAX, float ModulationPow = 1.f)
 {
-	float fCompressableValue = fInValue - fShoulderStart;
-	float fCompressableRange = fInMaxValue - fShoulderStart;
-	float fCompressedRange = fOutMaxValue - fShoulderStart;
-	float fPossibleOutValue = fShoulderStart + fCompressedRange * rangeCompressPow(fCompressableValue / fCompressedRange, fCompressableRange / fCompressedRange, fModulationPow);
-	return fInValue <= fShoulderStart ? fInValue : fPossibleOutValue;
+	const float compressableValue = InValue - ShoulderStart;
+	const float compressableRange = InMaxValue - ShoulderStart;
+	const float compressedRange = OutMaxValue - ShoulderStart;
+	const float possibleOutValue = ShoulderStart + compressedRange * rangeCompress(compressableValue / compressedRange, considerMaxValue ? (compressableRange / compressedRange) : FLT_MAX, ModulationPow);
+	return InValue <= ShoulderStart ? InValue : possibleOutValue;
 }

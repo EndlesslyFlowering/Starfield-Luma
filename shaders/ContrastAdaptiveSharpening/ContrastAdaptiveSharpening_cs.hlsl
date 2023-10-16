@@ -67,6 +67,7 @@ struct CSInput
 #endif
 // normalize for the worst HDR10 case. It's still better than always normalizing it based on 10k nits.
 // clamped at PQMaxWhitePoint (125) as that is the max HDR10 brightness (10000 / 80).
+// Setting it as static const here is actually an optimization.
 static const half NormalizationFactor =
 	min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, PQMaxWhitePoint);
 

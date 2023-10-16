@@ -28,11 +28,11 @@
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
 // or to replicate the SDR tonemapper by luminance, though both would alter the look too much and break some scenes.
 #define INVERT_TONEMAP_HIGHLIGHTS_ONLY true
-// If we are running in HDR, and we are keeping the SDR tonemapped shadow and midtones ("INVERT_TONEMAP_HIGHLIGHTS_ONLY" true),
-// then if this is true, we replace the SDR tonemapped image with one tonemapped by channel instead than by luminance, to maintain more saturation.
 // 0 per channel (also fallback)
 // 1 on the luminance
 // 2 in ICtCp
+// If we are running in HDR, and we are keeping the SDR tonemapped shadow and midtones ("INVERT_TONEMAP_HIGHLIGHTS_ONLY" true),
+// then if this is 1+, we replace the SDR tonemapped image with one tonemapped by channel instead than by luminance, to maintain more saturation.
 #define HDR_TONEMAP_TYPE 2
 // Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
 // It also dampens colors, making them darker and less saturation, especially bright colors.
@@ -112,7 +112,8 @@ static const float PostProcessStrength = 1.f;
 // 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
 // 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
-static const float HDRHighlightsModulation = 1.f;
+// Exposure to the user for more customization.
+static const float HDRHighlightsModulation = (HDR_TONEMAP_TYPE == 2) ? 1.375f : 1.f;
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
@@ -456,23 +457,6 @@ float3 Hable_Inverse(
 	return InputColor;
 }
 
-// Applies exponential "Photographic" luminance compression
-float RangeCompress(float x)
-{
-	return 1.f - exp(-x);
-}
-
-float LuminanceCompress(
-	float Channel,
-	float TargetCllInPq,
-	float ShoulderStartInPq)
-{
-	return (TargetCllInPq - ShoulderStartInPq)
-	     * RangeCompress((Channel       - ShoulderStartInPq) /
-	                     (TargetCllInPq - ShoulderStartInPq))
-	     + ShoulderStartInPq;
-}
-
 // Tonemapper inspired from DICE. Can work by luminance to maintain hue.
 // "HighlightsShoulderStart" should be between 0 and 1. Determines where the highlights curve (shoulder) starts. Leaving at zero for now as it's a simple and good looking default.
 float3 DICETonemap(
@@ -481,22 +465,23 @@ float3 DICETonemap(
 	float  HighlightsShoulderStart = 0.f,
 	float  HighlightsModulationPow = 1.f)
 {
-#if HDR_TONEMAP_TYPE == 1
+#if HDR_TONEMAP_TYPE == 1 // By luminance
 
 	const float sourceLuminance = Luminance(Color);
 	if (sourceLuminance > 0.0f)
 	{
-		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
+		const float compressedLuminance = luminanceCompress(sourceLuminance, MaxOutputLuminance, HighlightsShoulderStart, false, FLT_MAX, HighlightsModulationPow);
 		Color *= compressedLuminance / sourceLuminance;
 	}
 	return Color;
 
-#elif HDR_TONEMAP_TYPE == 2
+#elif HDR_TONEMAP_TYPE == 2 // By ICtCp "luma"
 
 	//optimisation needed to not execute this for every pixel...
 	static const float TargetCllInPq     = Linear_to_PQ(MaxOutputLuminance, PQMaxWhitePoint);
-	//hardcode to 0.5 for now as that gets better results
-	static const float ShoulderStartInPq = Linear_to_PQ(MaxOutputLuminance * 0.5, PQMaxWhitePoint);
+	//replacing "HighlightsShoulderStart" with "MaxOutputLuminance * 0.5" might look a bit better but we'd risk retonemapping mid tones,
+	//we can try using "HighlightsModulationPow" (e.g. 1.375) to achieve similar results.
+	static const float ShoulderStartInPq = Linear_to_PQ(HighlightsShoulderStart, PQMaxWhitePoint);
 
 	//to L'M'S' and normalize to 1 = 10000 nits
 	float3 PQ_LMS = Linear_to_PQ(BT709_to_LMS(Color / PQMaxWhitePoint));
@@ -507,11 +492,11 @@ float3 DICETonemap(
 	// return untouched Color if no tone mapping is needed
 	if (i1 < ShoulderStartInPq)
 	{
-	  return Color;
+		return Color;
 	}
 	else
 	{
-		float i2 = LuminanceCompress(i1, TargetCllInPq, ShoulderStartInPq);
+		float i2 = luminanceCompress(i1, TargetCllInPq, ShoulderStartInPq, false, FLT_MAX, HighlightsModulationPow);
 
 		//saturation adjustment to blow out highlights
 		float minI = min((i1 / i2), (i2 / i1));
@@ -527,11 +512,11 @@ float3 DICETonemap(
 		return LMS_to_BT709(LMS) * PQMaxWhitePoint;
 	}
 
-#else
+#else // By channel
 
-	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
-	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
-	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart, FLT_MAX, HighlightsModulationPow);
+	Color.r = luminanceCompress(Color.r, MaxOutputLuminance, HighlightsShoulderStart, false, FLT_MAX, HighlightsModulationPow);
+	Color.g = luminanceCompress(Color.g, MaxOutputLuminance, HighlightsShoulderStart, false, FLT_MAX, HighlightsModulationPow);
+	Color.b = luminanceCompress(Color.b, MaxOutputLuminance, HighlightsShoulderStart, false, FLT_MAX, HighlightsModulationPow);
 	return Color;
 
 #endif
@@ -911,7 +896,7 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 // For the "INVERT_TONEMAP_HIGHLIGHTS_ONLY" true case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
 #if 1
 	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
-#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE == 1" (tonemap by luminance)
+#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE" > 1 (tonemap by luminance)
 	return select(tonemappedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
 #endif
 }
@@ -1172,7 +1157,7 @@ PSOutput PS(PSInput psInput)
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-	const bool SDRTonemapByLuminance = (bool)HDR_TONEMAP_TYPE && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
+	const bool SDRTonemapByLuminance = (HDR_TONEMAP_TYPE > 0) && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
 #if 1 // This is delicate and could make things worse, especially within "RestorePostProcess()", but without it, highlights have uncontiguos gradients that shift color (due to strong LUTs)
 	if (SDRTonemapByLuminance)
 	{
