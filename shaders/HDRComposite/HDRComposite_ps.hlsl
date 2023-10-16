@@ -197,6 +197,46 @@ T ACESParametric_Inverse(T Color, float modE, float modA)
 	return ACES_Inverse(Color, modE, modA);
 }
 
+float HableEval(
+	float           normX,
+	HableEvalParams eParams)
+{
+	float channelOut = 0.f;
+
+	// Toe
+	if (normX < eParams.params_x0)
+	{
+		if (normX > 0.f)
+		{
+			channelOut = exp2(((((log2(normX) * eParams.toeSegment_B) + eParams.toeSegment_optimised) * RCP_LOG2_E) + eParams.toeSegment_lnA_optimised) * LOG2_E);
+		}
+	}
+	// Mid
+	else if (normX < eParams.params_x1)
+	{
+		float evalMidSegment_y0 = normX + eParams.midSegment_offsetX; // was -(-hableParams.midSegment.offsetX)
+		if (evalMidSegment_y0 > 0.f)
+		{
+			channelOut = exp2(log2(evalMidSegment_y0) + eParams.midSegment_lnA_optimised);
+		}
+	}
+	// Shoulder (highlight)
+	else
+	{
+		// Note that this will "clip" to 1 way before +INF
+
+		//float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX; // small optimisation from the original decompilation
+		float evalShoulderSegment_y0 = (1.f + eParams.params_overshootX) - normX;
+		float evalShoulderReturn = 0.f;
+		if (evalShoulderSegment_y0 > 0.f)
+		{
+			evalShoulderReturn = exp2(((eParams.shoulderSegment_B_optimised * log2(evalShoulderSegment_y0)) + eParams.shoulderSegment_lnA) * LOG2_E);
+		}
+		channelOut = eParams.params_overshootY - evalShoulderReturn;
+	}
+	return channelOut * eParams.invScale;
+}
+
 // https://github.com/johnhable/fw-public
 // http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/
 // This is NOT the Uncharted 2 tonemapper, which was also by Hable.
@@ -229,9 +269,10 @@ float3 Hable(
 	float initialW = dstParams_x0 + remainingY;
 	hableParams.dstParams.W = initialW + extraW;
 
+	const float shoulderAngleXshoulderStrength = shoulderAngle * shoulderStrength;
 	// "W * " was optimised away by DXIL->SPIRV->HLSL conversion as down the line there was a "/ W"
-	float dstParams_overshootX = 2.f * shoulderAngle * shoulderStrength;
-	float dstParams_overshootY = 0.5f * shoulderAngle * shoulderStrength;
+	float dstParams_overshootX = 2.f  * shoulderAngleXshoulderStrength;
+	float dstParams_overshootY = 0.5f * shoulderAngleXshoulderStrength;
 
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L87
 
@@ -277,9 +318,9 @@ float3 Hable(
 	// toe section
 	// SolveAB https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L60
 	hableParams.toeSegment.B = (toeM * params_x0) / (hableParams.params.y0 + EPSILON);
-	float _410 = log2(hableParams.params.y0); //belongs to SolveAB but was optimised; don't know how to name it
+	float toeSegment_optimised = log2(hableParams.params.y0);
 	float toeSegment_lnA_optimised = -hableParams.toeSegment.B * log(params_x0);
-	hableParams.toeSegment.lnA = _410 * RCP_LOG2_E + toeSegment_lnA_optimised;
+	hableParams.toeSegment.lnA = toeSegment_optimised * RCP_LOG2_E + toeSegment_lnA_optimised;
 	// toe section end
 
 	// shoulder section
@@ -305,46 +346,29 @@ float3 Hable(
 
 	hableParams.shoulderStart = (max(params_x0, params_x1) / dstCurve_invW) / hableParams.invScale;
 
+	HableEvalParams evalParams;
+
+	evalParams.params_x0                   = params_x0;
+	evalParams.params_x1                   = params_x1;
+	evalParams.params_overshootX           = params_overshootX;
+	evalParams.params_overshootY           = params_overshootY;
+	evalParams.toeSegment_lnA_optimised    = toeSegment_lnA_optimised;
+	evalParams.toeSegment_optimised        = toeSegment_optimised;
+	evalParams.toeSegment_B                = hableParams.toeSegment.B;
+	evalParams.midSegment_offsetX          = hableParams.midSegment.offsetX;
+	evalParams.midSegment_lnA_optimised    = midSegment_lnA_optimised;
+	evalParams.shoulderSegment_lnA         = hableParams.shoulderSegment.lnA;
+	evalParams.shoulderSegment_B_optimised = shoulderSegment_B_optimised;
+	evalParams.invScale                    = hableParams.invScale;
+
 	float3 toneMapped;
 
-	for (uint channel = 0; channel < 3; channel++)
-	{
-		float normX = InputColor[channel] * dstCurve_invW;
-		float returnChannel = 0.f;
+	toneMapped = InputColor * dstCurve_invW; // = normX
 
-		// Toe
-		if (normX < params_x0)
-		{
-			if (normX > 0.f)
-			{
-				returnChannel = exp2(((((log2(normX) * hableParams.toeSegment.B) + _410) * RCP_LOG2_E) + toeSegment_lnA_optimised) * LOG2_E);
-			}
-		}
-		// Mid
-		else if (normX < params_x1)
-		{
-			float evalMidSegment_y0 = normX + hableParams.midSegment.offsetX; // was -(-hableParams.midSegment.offsetX)
-			if (evalMidSegment_y0 > 0.f)
-			{
-				returnChannel = exp2(log2(evalMidSegment_y0) + midSegment_lnA_optimised);
-			}
-		}
-		// Shoulder (highlight)
-		else
-		{
-			// Note that this will "clip" to 1 way before +INF
+	toneMapped.r = HableEval(toneMapped.r, evalParams);
+	toneMapped.g = HableEval(toneMapped.g, evalParams);
+	toneMapped.b = HableEval(toneMapped.b, evalParams);
 
-			//float evalShoulderSegment_y0 = ((-1.f) - params_overshootX) + normX; // small optimisation from the original decompilation
-			float evalShoulderSegment_y0 = (1.f + params_overshootX) - normX;
-			float evalShoulderReturn = 0.f;
-			if (evalShoulderSegment_y0 > 0.f)
-			{
-				evalShoulderReturn = exp2(((shoulderSegment_B_optimised * log2(evalShoulderSegment_y0)) + hableParams.shoulderSegment.lnA) * LOG2_E);
-			}
-			returnChannel = params_overshootY - evalShoulderReturn;
-		}
-		toneMapped[channel] = returnChannel * hableParams.invScale;
-	}
 	return toneMapped; // Note: this color needs no clamping, it's already implied to be between 0-1
 }
 
