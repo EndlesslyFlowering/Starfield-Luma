@@ -345,18 +345,18 @@ static const float3x3 WIDE_2_AP1D65 = {
 // Calling this with values above 1 yields diminishing returns.
 float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
 {
-  float3 ColorAP1    = mul(BT709_2_AP1D65, Color);
-  float3 ColorExpand = mul(WIDE_2_AP1D65,  Color);
+	float3 ColorAP1    = mul(BT709_2_AP1D65, Color);
+	float3 ColorExpand = mul(WIDE_2_AP1D65,  Color);
 
-  float  LumaAP1   = dot(ColorAP1, AP1D65_2_XYZ[1]);
-  float3 ChromaAP1 = ColorAP1 / LumaAP1;
+	float  LumaAP1   = dot(ColorAP1, AP1D65_2_XYZ[1]);
+	float3 ChromaAP1 = ColorAP1 / LumaAP1;
 
 	float3 ChromaAP1Minus1  = ChromaAP1 - 1.f;
-  float  ChromaDistSqr    = dot(ChromaAP1Minus1, ChromaAP1Minus1);
-  float  ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
+	float  ChromaDistSqr    = dot(ChromaAP1Minus1, ChromaAP1Minus1);
+	float  ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
 
-  ColorAP1 = lerp(ColorAP1, ColorExpand, ExtendGamutAlpha);
+	ColorAP1 = lerp(ColorAP1, ColorExpand, ExtendGamutAlpha);
 
-  Color = mul(AP1D65_2_BT709, ColorAP1);
-  return Color;
+	Color = mul(AP1D65_2_BT709, ColorAP1);
+	return Color;
 }

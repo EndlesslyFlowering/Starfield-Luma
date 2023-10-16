@@ -18,7 +18,7 @@
 // This is desired for output quality as we store colors on float buffers, which are based kept in linear space,
 // it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
 #define SDR_LINEAR_INTERMEDIARY (FORCE_VANILLA_LOOK ? 0 : 1)
- // Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
+// Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
 #define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
 //TODO1: link to "GAMMA_CORRECTION_IN_LUTS" case
@@ -46,7 +46,7 @@ struct StructHdrDllPluginConstants
 	float HDRPeakBrightnessNits; // Set equal to the max nits your display can output
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
-    float HDRSaturation; // 0-2. 1 is neutral
+	float HDRSaturation; // 0-2. 1 is neutral
 	float HDRSecondaryContrast; // 0-2. 1 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
