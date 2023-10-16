@@ -54,13 +54,13 @@ float bethesdaRandom(float seed) {
 // Should be channel independent (R/G/B), but just using R curve for now
 // Reference target is actually just luminance * 2.046f;
 // (0, 0)
-// (0.5, 0.2)
-// (1, 0.65)
-// (2, 1.6)
-// (3, 2.38)
+// (0.5, 0.22)
+// (1.5, 1.08)
+// (2.5, 2.01)
+// (3.0, 2.3)
 float computeFilmDensity(float luminance) {
 	float scaledX = luminance * 3.0f;
-	float result = 4.118015f + (-0.00282387f - 4.118015f)/pow(1.f + pow(scaledX/3.024177f,1.75339f),1.262519f);
+	float result = 3.386477f + (0.08886645f - 3.386477f)/pow(1.f + (scaledX/2.172591f),2.240936f);
 	return result;
 }
 
@@ -69,7 +69,7 @@ float computeFilmDensity(float luminance) {
 float computeFilmGraininess(float density) {
 	float preComputedMin = 7.5857757502918375f;
 	float bofDOverC = 0.880f - (0.736f * density) - (0.003f * pow(density, 7.6f));
-	return linearNormalization(pow(10.f, bofDOverC), preComputedMin, 0.f, 1.f, 0.f);
+	return pow(10.f, bofDOverC);
 }
 
 
@@ -154,30 +154,29 @@ void frag_main()
 		float3 linearColor = (isInOutColorLinear)
 			? inputColor
 			: GAMMA_TO_LINEAR(inputColor);
-		float yAdjustment;
-		if (isHDR) {
-			yAdjustment = (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB);
-		} else {
-			yAdjustment = 0.891f; // Kodak Gray Scale A (Highlight)
-		}
 		// Film grain is based on film density
 		// Film works in negative, meaning black has no density
 		// The greater the film density (lighter), more perceived grain
 		// Simplified, grain scales with Y
 
 		// Scaling is not not linear
-		// We can estimate based on film stock.
 
 		float colorY = Luminance(linearColor);
-		float adjustedColorY = linearNormalization(colorY,0.f,yAdjustment,0.f,1.f);
-		float density = max(0.f, computeFilmDensity(adjustedColorY));
+
+		// Emulate density from a chosen film stock (Removed)
+		// float density = computeFilmDensity(adjustedColorY);
+
+		// Ideal film density matches 0-3. Skip emulating film stock
+		// https://www.mr-alvandi.com/technique/measuring-film-speed.html
+		float density = colorY * 3.f;
+		
 		float graininess = computeFilmGraininess(density);
 		float randomFactor = (randomNumber * 2.f) - 1.f;
 
 		float yChange = randomFactor
-			* filmGrainColorAndIntensity.z // 0.03% user setting
+				* filmGrainColorAndIntensity.z // fFilmGrainAmountMax (0.03)
 			* graininess
-			* 10.f // Boost
+			* 5.f
 		;
 
 		outputColor = linearColor * (1.f + yChange);
