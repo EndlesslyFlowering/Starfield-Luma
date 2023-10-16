@@ -6,12 +6,6 @@
 #define FLT11_MAX 65024.f
 #define FLT16_MAX 65504.f
 
-float hypot3(float3 input)
-{
-	float3 inputSquared = input * input;
-	return sqrt(inputSquared.x + inputSquared.y + inputSquared.z);
-}
-
 // From old to new range (just a remap function)
 template<class T>
 T linearNormalization(T input, T min, T max, T newMin, T newMax)
