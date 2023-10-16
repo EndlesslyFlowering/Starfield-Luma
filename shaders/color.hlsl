@@ -123,13 +123,20 @@ float3 Linear_to_PQ(float3 LinearColor, const float PQMaxValue)
 	return Linear_to_PQ(LinearColor);
 }
 
+float PQ_to_Linear(float ST2084Color)
+{
+	float colorPow = pow(ST2084Color, 1.f / PQ_constant_M2 );
+	float numerator = max(colorPow - PQ_constant_C1, 0.f);
+	float denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
+	float linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
+	return linearColor;
+}
+
 float3 PQ_to_Linear(float3 ST2084Color)
 {
-	float3 colorPow = pow(ST2084Color, 1.f / PQ_constant_M2 );
-	float3 numerator = max(colorPow - PQ_constant_C1, 0.f);
-	float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
-	float3 linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
-	return linearColor;
+	return float3(PQ_to_Linear(ST2084Color.r),
+	              PQ_to_Linear(ST2084Color.g),
+	              PQ_to_Linear(ST2084Color.b));
 }
 
 float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue)
@@ -344,9 +351,9 @@ float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
   float  LumaAP1   = dot(ColorAP1, AP1D65_2_XYZ[1]);
   float3 ChromaAP1 = ColorAP1 / LumaAP1;
 
-	float ChromaAP1Minus1  = ChromaAP1 - 1.f;
-  float ChromaDistSqr    = dot(ChromaAP1Minus1, ChromaAP1Minus1);
-  float ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
+	float3 ChromaAP1Minus1  = ChromaAP1 - 1.f;
+  float  ChromaDistSqr    = dot(ChromaAP1Minus1, ChromaAP1Minus1);
+  float  ExtendGamutAlpha = (1.f - exp2(-4.f * ChromaDistSqr)) * (1.f - exp2(-4.f * ExtendGamutAmount * LumaAP1 * LumaAP1));
 
   ColorAP1 = lerp(ColorAP1, ColorExpand, ExtendGamutAlpha);
 
