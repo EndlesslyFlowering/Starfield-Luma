@@ -901,7 +901,7 @@ float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColor
 }
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
-float3 DrawLUTSquare(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
+float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
 	const uint2 LUTPixelPosition2D = PixelPosition / PixelScale;
 	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % LUT_SIZE_UINT, LUTPixelPosition2D.y, LUTPixelPosition2D.x / LUT_SIZE_UINT);
 	if (!any(LUTPixelPosition3D < 0u) && !any(LUTPixelPosition3D > LUT_MAX_UINT))
@@ -920,7 +920,7 @@ float3 DrawLUTSquare(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT)
 	return 0;
 }
 
-float3 DrawLUTSimplifiedSquare(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
+float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
 	static const uint DrawLUTSquareSize = (LUT_SIZE_UINT * LUT_SIZE_UINT * PixelScale);
 	float width;
 	float height;
@@ -977,11 +977,13 @@ float3 DrawLUTSimplifiedSquare(float2 PixelPosition, uint PixelScale, inout bool
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
 {
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT //TODO1: not working
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
 	static const uint DrawLUTScale = 10u; // Pixel scale
 	bool drawnLUT = false;
-	float3 LUTColor = DrawLUTSquare(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
-	LUTColor = DrawLUTSimplifiedSquare(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
+	float3 LUTColor = DrawLUTTexture(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
+	if (!drawnLUT) {
+		LUTColor = DrawLUTGradients(psInput.SV_Position.xy, DrawLUTScale / 5u, drawnLUT);
+	}
 	if (drawnLUT)
 	{
 		float3 outputColor = LUTColor;
