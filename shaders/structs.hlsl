@@ -148,7 +148,7 @@ struct Hable_toeSegment
 	float B;
 };
 
-struct Hable_midSigment
+struct Hable_midSegment
 {
 	float offsetX;
 	float lnA;
@@ -167,7 +167,7 @@ struct HableParams
 	Hable_params          params;
 	Hable_dstParams       dstParams;
 	Hable_toeSegment      toeSegment;
-	Hable_midSigment      midSegment;
+	Hable_midSegment      midSegment;
 	Hable_shoulderSegment shoulderSegment;
 	float                 invScale;
 	float                 shoulderStart;
@@ -183,6 +183,21 @@ struct HableItmParams
 	float B;
 };
 
+struct HableEvalParams
+{
+	float params_x0;
+	float params_x1;
+	float params_overshootX;
+	float params_overshootY;
+	float toeSegment_lnA_optimised;
+	float toeSegment_optimised;
+	float toeSegment_B;
+	float midSegment_offsetX;
+	float midSegment_lnA_optimised;
+	float shoulderSegment_lnA;
+	float shoulderSegment_B_optimised;
+	float invScale;
+};
 //HDRComposite shader structs end
 //HDRComposite end
 
