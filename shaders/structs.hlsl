@@ -162,7 +162,7 @@ struct Hable_shoulderSegment
 	float B;
 };
 
-struct HableParameters
+struct HableParams
 {
 	Hable_params          params;
 	Hable_dstParams       dstParams;
@@ -172,6 +172,17 @@ struct HableParameters
 	float                 invScale;
 	float                 shoulderStart;
 };
+
+struct HableItmParams
+{
+	float offsetX;
+	float offsetY;
+	float scaleX;
+	float scaleY;
+	float lnA;
+	float B;
+};
+
 //HDRComposite shader structs end
 //HDRComposite end
 

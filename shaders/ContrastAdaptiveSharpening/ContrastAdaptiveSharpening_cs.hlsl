@@ -49,7 +49,7 @@ struct CSInput
 	#define LINEAR_TO_GAMMA(x) x
 #elif SDR_USE_GAMMA_2_2
 	#define GAMMA_TO_LINEAR(x) pow(x, 2.2h)
-	#define LINEAR_TO_GAMMA(x) pow(x, 1.h / 2.2h)
+	#define LINEAR_TO_GAMMA(x) pow(x, half(1.f / 2.2f))
 #else // doing sRGB in half is not accurate enough
 	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
@@ -66,8 +66,9 @@ struct CSInput
 	static const float BlueFactor = 0.07214272022247314453125f;
 #endif
 // normalize for the worst HDR10 case. It's still better than always normalizing it based on 10k nits.
-// clamped at 125 as that is the max HDR10 brightness (10000 / 80).
-static const half NormalizationFactor = min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, 125.f);
+// clamped at PQMaxWhitePoint (125) as that is the max HDR10 brightness (10000 / 80).
+static const half NormalizationFactor =
+	min((HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB) / BlueFactor, PQMaxWhitePoint);
 
 
 half3 PrepareForProcessing(half3 Color)
