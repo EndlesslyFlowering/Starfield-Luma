@@ -21,7 +21,7 @@ float4 PS(PSInputs inputs) : SV_Target
 		if (HdrDllPluginConstants.DisplayMode == 1) // HDR10 PQ BT.2020
 		{
 			// There is no need to clamp if "CLAMP_INPUT_OUTPUT" is true here as the output buffer is int so it will clip anything beyond 0-1.
-			color.rgb = Linear_to_PQ(BT709_To_BT2020(color.rgb), 125.f);
+			color.rgb = Linear_to_PQ(BT709_To_BT2020(color.rgb), PQMaxWhitePoint);
 		}
 #if SDR_LINEAR_INTERMEDIARY
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)

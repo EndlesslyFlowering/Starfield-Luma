@@ -201,8 +201,8 @@ T ACESParametric_Inverse(T Color, float modE, float modA)
 // http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/
 // This is NOT the Uncharted 2 tonemapper, which was also by Hable.
 float3 Hable(
-	in  float3         InputColor,
-	out HableParameters hableParams)
+	in  float3      InputColor,
+	out HableParams hableParams)
 {
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L202
 
@@ -277,7 +277,7 @@ float3 Hable(
 	// toe section
 	// SolveAB https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L60
 	hableParams.toeSegment.B = (toeM * params_x0) / (hableParams.params.y0 + EPSILON);
-	float _410 = log2(hableParams.params.y0); //doesn't belong to SolveAB (it might does)
+	float _410 = log2(hableParams.params.y0); //belongs to SolveAB but was optimised; don't know how to name it
 	float toeSegment_lnA_optimised = -hableParams.toeSegment.B * log(params_x0);
 	hableParams.toeSegment.lnA = _410 * RCP_LOG2_E + toeSegment_lnA_optimised;
 	// toe section end
@@ -350,94 +350,85 @@ float3 Hable(
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L21-L34
 float HableEval_Inverse(
-	float Channel,
-	float offsetX,
-	float offsetY,
-	float scaleX,
-	float scaleY,
-	float lnA,
-	float B)
+	float          Channel,
+	HableItmParams hableItmParams)
 {
-	float y0 = (Channel - offsetY) / scaleY;
-	float x0 = 0.f;
+	// clamp to smallest float
+	float y0 = max((Channel - hableItmParams.offsetY) / hableItmParams.scaleY, asfloat(0x00000001));
 
-	if (y0 > 0.f) // log(0) is invalid
-	{
-		x0 = exp((log(y0) - lnA) / B);
-	}
+	float x0 = exp((log(y0) - hableItmParams.lnA) / hableItmParams.B);
 
-	return x0 / scaleX + offsetX;
+	return x0 / hableItmParams.scaleX + hableItmParams.offsetX;
 }
 
-void Hable_Inverse_Channel(
-	inout float          ColorChannel,
-	in    HableParameters hableParams)
+float Hable_Inverse(
+	float       ColorChannel,
+	HableParams hableParams)
 {
+	// There's no inverse formula for colors beyond the 0-1 range
+	ColorChannel = saturate(ColorChannel);
+
 	// scaleY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L187-L197
 	// toe
 	if (ColorChannel < hableParams.params.y0)
 	{
 		// scaleXY and offsetXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L151-L154
-		ColorChannel = HableEval_Inverse(ColorChannel,
-		                                 0.f,
-		                                 0.f, // * hableParams.invScale
-		                                 1.f,
-		                                 1.f * hableParams.invScale,
-		                                 hableParams.toeSegment.lnA,
-		                                 hableParams.toeSegment.B);
+		HableItmParams hableItmParams;
+
+		hableItmParams.offsetX = 0.f;
+		hableItmParams.offsetY = 0.f; // * hableParams.invScale;
+		hableItmParams.scaleX  = 1.f;
+		hableItmParams.scaleY  = hableParams.invScale; // 1.f * hableParams.invScale
+		hableItmParams.lnA     = hableParams.toeSegment.lnA;
+		hableItmParams.B       = hableParams.toeSegment.B;
+
+		ColorChannel = HableEval_Inverse(ColorChannel, hableItmParams);
 	}
 	// mid (linear segment)
 	else if (ColorChannel < hableParams.params.y1)
 	{
 		// scaleXY and offsetY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L125-L127
-		ColorChannel = HableEval_Inverse(ColorChannel,
-		                                 -hableParams.midSegment.offsetX, // minus was optimised away
-		                                 0.f, // * hableParams.invScale
-		                                 1.f,
-		                                 1.f * hableParams.invScale,
-		                                 hableParams.midSegment.lnA,
-		                                 1.f);
+		HableItmParams hableItmParams;
+
+		hableItmParams.offsetX = -hableParams.midSegment.offsetX; // minus was optimised away
+		hableItmParams.offsetY =  0.f; // * hableParams.invScale
+		hableItmParams.scaleX  =  1.f;
+		hableItmParams.scaleY  =  hableParams.invScale; // 1.f * hableParams.invScale
+		hableItmParams.lnA     =  hableParams.midSegment.lnA;
+		hableItmParams.B       =  1.f;
+
+		ColorChannel = HableEval_Inverse(ColorChannel, hableItmParams);
 	}
 	// shoulder
 	else
 	{
 		// scaleXY setup: https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L175-L176
-		ColorChannel = HableEval_Inverse(ColorChannel,
-		                                 hableParams.shoulderSegment.offsetX,
-		                                 hableParams.shoulderSegment.offsetY * hableParams.invScale,
-		                                 -1.f,
-		                                 -1.f * hableParams.invScale,
-		                                 hableParams.shoulderSegment.lnA,
-		                                 hableParams.shoulderSegment.B);
+		HableItmParams hableItmParams;
+
+		hableItmParams.offsetX =  hableParams.shoulderSegment.offsetX;
+		hableItmParams.offsetY =  hableParams.shoulderSegment.offsetY * hableParams.invScale;
+		hableItmParams.scaleX  = -1.f;
+		hableItmParams.scaleY  = -hableParams.invScale; // -1.f * hableParams.invScale
+		hableItmParams.lnA     =  hableParams.shoulderSegment.lnA;
+		hableItmParams.B       =  hableParams.shoulderSegment.B;
+
+		ColorChannel = HableEval_Inverse(ColorChannel, hableItmParams);
 	}
+
+	return ColorChannel * hableParams.dstParams.W;
 }
 
 // https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L45-L52
 // NOTE: the precision of this inverse formula is within an offset of 0.0005 on most pixels, with highlights struggling more to being recovered.
-template<class T>
-T Hable_Inverse(
-	T              InputColor,
-	uint           Channels /*1 to 3*/, //there has to be better solution than this
-	HableParameters hableParams)
+float3 Hable_Inverse(
+	float3      InputColor,
+	HableParams hableParams)
 {
-	// There's no inverse formula for colors beyond the 0-1 range
-	InputColor = saturate(InputColor);
+	InputColor.r = Hable_Inverse(InputColor.r, hableParams);
+	InputColor.g = Hable_Inverse(InputColor.g, hableParams);
+	InputColor.b = Hable_Inverse(InputColor.b, hableParams);
 
-	float3 itmColor = InputColor; // Make this float3 to make it compile for all cases
-
-	if (Channels <= 1) // InputColor[channel] won't compile if T is float(1)
-	{
-		Hable_Inverse_Channel(itmColor.x, hableParams);
-	}
-	else
-	{
-		for (uint channel = 0; channel < Channels; channel++)
-		{
-			Hable_Inverse_Channel(itmColor[channel], hableParams);
-		}
-	}
-
-	return (T)itmColor * hableParams.dstParams.W;
+	return InputColor;
 }
 
 // Applies exponential "Photographic" luminance compression
@@ -478,12 +469,12 @@ float3 DICETonemap(
 #elif HDR_TONEMAP_TYPE == 2
 
 	//optimisation needed to not execute this for every pixel...
-	static const float TargetCllInPq     = Linear_to_PQ(MaxOutputLuminance, 125.f);
+	static const float TargetCllInPq     = Linear_to_PQ(MaxOutputLuminance, PQMaxWhitePoint);
 	//hardcode to 0.5 for now as that gets better results
-	static const float ShoulderStartInPq = Linear_to_PQ(MaxOutputLuminance * 0.5, 125.f);
+	static const float ShoulderStartInPq = Linear_to_PQ(MaxOutputLuminance * 0.5, PQMaxWhitePoint);
 
 	//to L'M'S' and normalize to 1 = 10000 nits
-	float3 PQ_LMS = Linear_to_PQ(BT709_to_LMS(Color / 125.f));
+	float3 PQ_LMS = Linear_to_PQ(BT709_to_LMS(Color / PQMaxWhitePoint));
 
 	//Intensity
 	float i1 = 0.5f * PQ_LMS.x + 0.5f * PQ_LMS.y;
@@ -508,7 +499,7 @@ float3 DICETonemap(
 		//to LMS
 		float3 LMS = max(PQ_to_Linear(PQ_LMS), 0.f);
 		//to RGB
-		return LMS_to_BT709(LMS) * 125.f;
+		return LMS_to_BT709(LMS) * PQMaxWhitePoint;
 	}
 
 #else
@@ -981,7 +972,8 @@ PSOutput PS(PSInput psInput)
 	static const uint DrawLUTScale = 10u; // Pixel scale
 	bool drawnLUT = false;
 	float3 LUTColor = DrawLUTTexture(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
-	if (!drawnLUT) {
+	if (!drawnLUT)
+	{
 		LUTColor = DrawLUTGradients(psInput.SV_Position.xy, DrawLUTScale / 5u, drawnLUT);
 	}
 	if (drawnLUT)
@@ -1043,7 +1035,7 @@ PSOutput PS(PSInput psInput)
 	float acesParam_modE;
 	float acesParam_modA;
 
-	HableParameters hableParams;
+	HableParams hableParams;
 
 	const bool clampACES = false;
 
@@ -1081,7 +1073,7 @@ PSOutput PS(PSInput psInput)
 
 	tonemappedByLuminanceColor = inputColor * safeDivision(tonemappedColorLuminance, untonemappedColorLuminance);
 
-#if APPLY_CINEMATICS
+#if defined(APPLY_CINEMATICS)
 	float prePostProcessColorLuminance;
 	float3 tonemappedPostProcessedColor = lerp(tonemappedColor, PostProcess(tonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
 #else
@@ -1170,20 +1162,20 @@ PSOutput PS(PSInput psInput)
 			{
 				if (needsInverseTonemap)
 				{
-					inverseTonemappedColor    = ACESReference_Inverse(inverseTonemappedColor);
-					midGrayOut                = ACESReference_Inverse(midGrayIn);
+					inverseTonemappedColor = ACESReference_Inverse(inverseTonemappedColor);
+					midGrayOut             = ACESReference_Inverse(midGrayIn);
 				}
-				minHighlightsColorOut         = ACESReference_Inverse(minHighlightsColorIn);
+				minHighlightsColorOut    = ACESReference_Inverse(minHighlightsColorIn);
 			} break;
 
 			case 2:
 			{
 				if (needsInverseTonemap)
 				{
-					inverseTonemappedColor    = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
-					midGrayOut                = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
+					inverseTonemappedColor = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
+					midGrayOut             = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
 				}
-				minHighlightsColorOut         = ACESParametric_Inverse(minHighlightsColorIn, acesParam_modE, acesParam_modA);
+				minHighlightsColorOut = ACESParametric_Inverse(minHighlightsColorIn, acesParam_modE, acesParam_modA);
 			} break;
 
 			case 3:
@@ -1194,13 +1186,13 @@ PSOutput PS(PSInput psInput)
 
 				if (needsInverseTonemap)
 				{
-					inverseTonemappedColor   = Hable_Inverse(inverseTonemappedColor, 3, hableParams);
-					midGrayOut               = Hable_Inverse(midGrayIn, 1, hableParams);
+					inverseTonemappedColor = Hable_Inverse(inverseTonemappedColor, hableParams);
+					midGrayOut             = Hable_Inverse(midGrayIn, hableParams);
 				}
 #if 1 // Optimized and more "accurate"
-                minHighlightsColorOut        = hableParams.shoulderStart;
+				minHighlightsColorOut = hableParams.shoulderStart;
 #else
-                minHighlightsColorOut        = Hable_Inverse(minHighlightsColorIn, 1, hableParams);
+				minHighlightsColorOut = Hable_Inverse(minHighlightsColorIn, hableParams);
 #endif
 			} break;
 
