@@ -259,7 +259,7 @@ namespace Settings
 		EnumStepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
 		    "Film Grain Type",
-		    "Sets the film grain type.",
+		    "Sets the film grain type. Luma offers an improved version, we suggest setting the strength to 50\% for it.",
 		     "FilmGrainType", "Main",
 		    1,
 		    { "Vanilla", "Improved" }
