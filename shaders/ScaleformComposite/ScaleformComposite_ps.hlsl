@@ -137,7 +137,6 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		// Apply the Reinhard tonemapper on any background color in excess, to avoid it burning it through the UI.
 		// NOTE: If this is not enough we could already apply to the entire "backgroundColor" before blending it with the UI.
-		// We clip any
 		float3 tonemappedBackgroundColor = abs(excessBackgroundColor) / (1.f + abs(excessBackgroundColor)) * sign(excessBackgroundColor);
 		// In SDR, we clip any HDR color passing through the UI, as long as the UI has ANY kind of influence on the output.
 		// The reason is that the game wouldn't have ever had any colors beyond 0-1 due to having int UNORM textures, so we want to replicate the same look.
