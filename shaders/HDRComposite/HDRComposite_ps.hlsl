@@ -234,7 +234,7 @@ float HableEval(
 		}
 		channelOut = eParams.params_overshootY - evalShoulderReturn;
 	}
-	return channelOut * eParams.invScale;
+	return channelOut;
 }
 
 // https://github.com/johnhable/fw-public
@@ -359,7 +359,6 @@ float3 Hable(
 	evalParams.midSegment_lnA_optimised    = midSegment_lnA_optimised;
 	evalParams.shoulderSegment_lnA         = hableParams.shoulderSegment.lnA;
 	evalParams.shoulderSegment_B_optimised = shoulderSegment_B_optimised;
-	evalParams.invScale                    = hableParams.invScale;
 
 	float3 toneMapped;
 
@@ -368,6 +367,8 @@ float3 Hable(
 	toneMapped.r = HableEval(toneMapped.r, evalParams);
 	toneMapped.g = HableEval(toneMapped.g, evalParams);
 	toneMapped.b = HableEval(toneMapped.b, evalParams);
+
+	toneMapped *= hableParams.invScale;
 
 	return toneMapped; // Note: this color needs no clamping, it's already implied to be between 0-1
 }
