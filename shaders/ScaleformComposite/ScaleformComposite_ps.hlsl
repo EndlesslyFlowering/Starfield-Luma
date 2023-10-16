@@ -120,9 +120,9 @@ float4 PS(PSInputs psInputs) : SV_Target
 		const float3 SDRBackgroundColor = saturate(normalizedBackgroundColor);
 		const float3 excessBackgroundColor = (normalizedBackgroundColor - SDRBackgroundColor) * GamePaperWhite;
 
-        const float3 UIColorGammaSpace = LINEAR_TO_GAMMA(UIColor.rgb);
-        const float3 SDRBackgroundColorGammaSpace = LINEAR_TO_GAMMA(SDRBackgroundColor);
-        const float3 DarkenedSDRBackgroundColorGammaSpace = SDRBackgroundColorGammaSpace * (1.f - UIColor.a);
+		const float3 UIColorGammaSpace = LINEAR_TO_GAMMA(UIColor.rgb);
+		const float3 SDRBackgroundColorGammaSpace = LINEAR_TO_GAMMA(SDRBackgroundColor);
+		const float3 DarkenedSDRBackgroundColorGammaSpace = SDRBackgroundColorGammaSpace * (1.f - UIColor.a);
 		outputColor = GAMMA_TO_LINEAR(UIColorGammaSpace + DarkenedSDRBackgroundColorGammaSpace);
 
 		// 2) Restore the paper white multipliers:
@@ -137,7 +137,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		// Apply the Reinhard tonemapper on any background color in excess, to avoid it burning it through the UI.
 		// NOTE: If this is not enough we could already apply to the entire "backgroundColor" before blending it with the UI.
-		// We clip any 
+		// We clip any
 		float3 tonemappedBackgroundColor = abs(excessBackgroundColor) / (1.f + abs(excessBackgroundColor)) * sign(excessBackgroundColor);
 		// In SDR, we clip any HDR color passing through the UI, as long as the UI has ANY kind of influence on the output.
 		// The reason is that the game wouldn't have ever had any colors beyond 0-1 due to having int UNORM textures, so we want to replicate the same look.

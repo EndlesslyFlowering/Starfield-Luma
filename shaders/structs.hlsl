@@ -198,6 +198,14 @@ struct HableEvalParams
 	float shoulderSegment_B_optimised;
 	float invScale;
 };
+
+struct SDRTonemapByLuminancePP
+{
+	float minHighlightsColorIn;
+	float minHighlightsColorOut;
+	bool  needsInverseTonemap;
+};
+
 //HDRComposite shader structs end
 //HDRComposite end
 
