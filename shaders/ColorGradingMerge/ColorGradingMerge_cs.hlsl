@@ -199,8 +199,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// For interpolation between 0 and a maximum, it become [0, ..., W, ..., W+B]
 	// Distances do not always add up to sqrt(3) (eg: 1,0,0)
 
-	const float blackDistance = hypot3(neutralLUTColor);
-	const float whiteDistance = hypot3(1.f - neutralLUTColor);
+	const float blackDistance = length(neutralLUTColor);
+	const float whiteDistance = length(1.f - neutralLUTColor);
 	const float totalRange = blackDistance + whiteDistance;
 
 #if LUT_DEBUG_VALUES

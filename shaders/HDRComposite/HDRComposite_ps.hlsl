@@ -875,7 +875,7 @@ float3 GradingLUT(float3 color, float2 uv)
 	// and calculating the "color change" acceleration in that direction.
 	const float3 LUTCenterCoordinates = 0.5f;
 	//TODO: this should probably take into account the direction of our color and only move to the center of the closest 3D LUT texel
-	const float colorCenteringOffset = hypot3((LUT_SIZE / 2.f) - 1.f) / hypot3(LUT_SIZE / 2.f);
+	const float colorCenteringOffset = length((LUT_SIZE / 2.f) - 1.f) / length(LUT_SIZE / 2.f);
 	const float3 LUTCenteredCoordinates = ((saturate(LUTCoordinates) - LUTCenterCoordinates) * colorCenteringOffset) + LUTCenterCoordinates;
 
 #if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
