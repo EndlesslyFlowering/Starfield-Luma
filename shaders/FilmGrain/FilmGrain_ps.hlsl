@@ -176,9 +176,8 @@ void frag_main()
 
 		float yChange = randomFactor
 			* filmGrainColorAndIntensity.z // 0.03% user setting
-			* graininess // Scale by Y (fixes shadows)
-			* adjustedColorY // Adjust again for perception
-			* 50.f
+			* graininess
+			* 10.f // Boost
 		;
 
 		outputColor = linearColor * (1.f + yChange);
