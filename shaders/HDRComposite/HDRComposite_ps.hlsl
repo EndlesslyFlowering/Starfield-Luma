@@ -248,11 +248,11 @@ float3 Hable(
 
 	// Note that all these variables can vary depending on the level.
 	// The 2.2 pow is so you don't have to input very small numbers, it's not related to gamma.
-	const float toeLength        = pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
-	const float toeStrength      = saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
+	const float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
+	const float toeStrength      =       saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
 	const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
-	const float shoulderStrength = max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
-	const float shoulderAngle    = saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
+	const float shoulderStrength =            max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
+	const float shoulderAngle    =       saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
 	//dstParams
 	float dstParams_x0 = toeLength * 0.5f;
@@ -282,9 +282,9 @@ float3 Hable(
 	//params
 	float params_x0 = dstParams_x0 / hableParams.dstParams.W;
 	float params_x1 = dstParams_x1 / hableParams.dstParams.W;
+	float dx        = y1_offset    / hableParams.dstParams.W;
 	//float params_overshootX = dstParams_overshootX / hableParams.dstParams.W; // this step was optimised away
 	const float params_overshootX = dstParams_overshootX;
-	float dx = y1_offset / hableParams.dstParams.W;
 
 	// mid section
 	// AsSlopeIntercept https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicToneCurve.cpp#L67

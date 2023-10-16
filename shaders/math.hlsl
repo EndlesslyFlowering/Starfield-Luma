@@ -22,29 +22,26 @@ T linearNormalization(T input, T min, T max, T newMin, T newMax)
 // Returns 1 if "dividend" is 0
 float safeDivision(float quotient, float dividend)
 {
+	float result = quotient / dividend;
+
+	if (dividend == 0.f)
+	{
 #if 0
-	return dividend == 0.f ? (FLT_MAX * sign(quotient)) : (quotient / dividend);
+		result = FLT_MAX * sign(quotient);
 #else
-	return dividend == 0.f ? 1.f : (quotient / dividend);
+		result = 1.f;
 #endif
+	}
+
+	return result;
 }
 
 // Returns 1 if "dividend" is 0
 float3 safeDivision(float3 quotient, float3 dividend)
 {
-	float3 result = quotient / dividend;
-	for (uint channel = 0; channel < 3; channel++)
-	{
-		if (dividend[channel] == 0.f)
-		{
-#if 0
-			result = FLT_MAX * sign(quotient);
-#else
-			result = 1.f;
-#endif
-		}
-	}
-	return result;
+	return float3(safeDivision(quotient.x, dividend.x),
+	              safeDivision(quotient.y, dividend.y),
+	              safeDivision(quotient.z, dividend.z));
 }
 
 // Aplies exponential ("Photographic") luma compression.
