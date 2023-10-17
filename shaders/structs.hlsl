@@ -170,6 +170,7 @@ struct HableParams
 	Hable_midSegment      midSegment;
 	Hable_shoulderSegment shoulderSegment;
 	float                 invScale;
+	float                 toeEnd;
 	float                 shoulderStart;
 };
 
