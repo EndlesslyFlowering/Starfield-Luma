@@ -1380,11 +1380,6 @@ PSOutput PS(PSInput psInput)
 #endif // CLAMP_INPUT_OUTPUT
 	}
 
-#if !CLAMP_INPUT_OUTPUT
-	if (Luminance(outputColor) < 0.f) // Remove invalid colors
-		outputColor = 0.f;
-#endif // CLAMP_INPUT_OUTPUT
-
 	PSOutput psOutput;
 	psOutput.SV_Target.rgb = outputColor;
 	psOutput.SV_Target.a = 1.f;
