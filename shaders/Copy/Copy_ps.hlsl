@@ -30,36 +30,28 @@ float4 PS(PSInputs inputs) : SV_Target
 	if (HdrDllPluginConstants.IsAtEndOfFrame)
 	{
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
-
-		if (HdrDllPluginConstants.DisplayMode == 2) // HDR10 PQ BT.2020
+		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
-			// Clamp to AP0D65 for release
 #if 0
+			// Clamp to AP0D65 to avoid invalid numbers
 			color.rgb = BT709_To_AP0D65(color.rgb);
 			color.rgb = max(color.rgb, 0.f);
 			color.rgb = AP0D65_To_BT709(color.rgb);
-
-#endif // defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
+#endif
 		}
 		else if (HdrDllPluginConstants.DisplayMode == -1) // SDR on scRGB HDR (gamma to linear space conversion)
 		{
 #if !SDR_LINEAR_INTERMEDIARY
-
 			color.rgb = GAMMA_TO_LINEAR(color.rgb);
-
 #endif // !SDR_LINEAR_INTERMEDIARY
 
 #if CLAMP_INPUT_OUTPUT || 1
-
 			color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
-
 #endif // CLAMP_INPUT_OUTPUT || 1
-
 			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			color.rgb *= paperWhite;
 		}
 #endif // defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
-
 
 #if defined(OUTPUT_TO_R10G10B10A2)
 		if (HdrDllPluginConstants.DisplayMode == 1) // HDR10 PQ BT.2020
@@ -71,7 +63,6 @@ float4 PS(PSInputs inputs) : SV_Target
 			color.rgb = Linear_to_PQ(color.rgb, PQMaxWhitePoint);
 		}
 #if SDR_LINEAR_INTERMEDIARY
-
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)
 		{
 
