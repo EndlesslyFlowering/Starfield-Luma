@@ -484,7 +484,9 @@ float3 DICETonemap(
 	static const float ShoulderStartInPq = Linear_to_PQ(HighlightsShoulderStart, PQMaxWhitePoint);
 
 	//to L'M'S' and normalize to 1 = 10000 nits
-	float3 PQ_LMS = Linear_to_PQ(BT709_to_LMS(Color / PQMaxWhitePoint));
+	float3 PQ_LMS = BT709_to_LMS(Color / PQMaxWhitePoint);
+	PQ_LMS = max(PQ_LMS, 0.f);
+	PQ_LMS = Linear_to_PQ(PQ_LMS);
 
 	//Intensity
 	float i1 = 0.5f * PQ_LMS.x + 0.5f * PQ_LMS.y;
@@ -506,8 +508,10 @@ float3 DICETonemap(
 			                              dot(PQ_LMS, PQ_LMS_2_ICtCp[1]) * minI,
 			                              dot(PQ_LMS, PQ_LMS_2_ICtCp[2]) * minI));
 
+		PQ_LMS = max(PQ_LMS, 0.f);
+
 		//to LMS
-		float3 LMS = max(PQ_to_Linear(PQ_LMS), 0.f);
+		float3 LMS = PQ_to_Linear(PQ_LMS);
 		//to RGB
 		return LMS_to_BT709(LMS) * PQMaxWhitePoint;
 	}
