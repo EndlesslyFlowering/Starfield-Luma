@@ -26,7 +26,7 @@
 	// This assumes the game used the sRGB gamma formula and was meant to be viewed on sRGB gamma displays.
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
-#else 
+#else
 	#define LINEARIZE(x) pow(x, 2.2f)
 	#if GAMMA_CORRECTION_IN_LUTS // 2.2->linear->LUT normalization
 		// If we correct gamma in LUTs, there's nothing more to do than linearize (interpret) them as gamma 2.2, while the input coordinates keep using sRGB gamma.
@@ -120,7 +120,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 #if 0 // TODO: Expose or delete
 	//TODO: expose these values or find the best defaults. For now we skip these when "HdrDllPluginConstants.GammaCorrection" is on as it's not necessary
-	
+
 	// An additional tweak on top of "HdrDllPluginConstants.LUTCorrectionStrength"
 	float fixRaisedBlacksStrength = 1.f /*- HdrDllPluginConstants.DevSetting01*/; // Values between 0 and 1
 	//TODO: improve the way "fixRaisedBlacksInputSmoothing" is applied, the curve isn't great now
@@ -153,14 +153,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	if (AlwaysClampDetintedColor || SDRRange) {
 		detintedLinear = max(detintedLinear, 0.f);
 	}
-	
+
 #if LUT_DEBUG_VALUES
 	// Should never happen, especially if "AlwaysClampDetintedColor" is true
 	if (Luminance(detintedColor) < 0.f) {
 		return DEBUG_COLOR;
 	}
 #endif // LUT_DEBUG_VALUES
-	
+
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float detintedChroma = linear_srgb_to_oklch(detintedLinear)[1];
 	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
@@ -251,7 +251,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	bool wasBlack = !any(linearColor);
 
 	// If neutralLutColor is 0,0,0, force 0
-	
+
 	debugLinear *= (!isBlackPoint);
 
 	bool nowBlack = !any(debugLinear);
@@ -272,7 +272,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		}
 	}
 	outputLCh = linear_srgb_to_oklch(debugLinear);
-	
+
 	// Should never happen
 	if (Luminance(debugLinear) < 0.f) {
 		return DEBUG_COLOR;
@@ -297,9 +297,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		outputLinear = saturate(outputLinear);
 	}
 	// To note, color channels may be negative, even if -0.00001, probably due to multiple color space conversions.
-	else if (Luminance(outputLinear) < 0.f) {
-		outputLinear = 0.f;
-	}
+//	else if (Luminance(outputLinear) < 0.f) {
+//		outputLinear = 0.f;
+//	}
+// commented out as this can cause "black dot issues"
 	return outputLinear;
 #endif
 }

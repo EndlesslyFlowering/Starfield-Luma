@@ -1056,9 +1056,6 @@ PSOutput PS(PSInput psInput)
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
 	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
 	inputColor = max(inputColor, 0.f);
-#else
-	if (Luminance(inputColor) < 0.f)
-		inputColor = 0.f;
 #endif // CLAMP_INPUT_OUTPUT
 
 #if defined(APPLY_BLOOM)
