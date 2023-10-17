@@ -951,8 +951,6 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 #elif LUT_MAPPING_TYPE == 0
 		loadedColor = gamma_sRGB_to_linear(loadedColor);
 #endif // LUT_MAPPING_TYPE
-		//TODO1: this (LUTPixelPosition3D) and the one underneath are probably broken as we need to linearize the neutral LUT color?
-		loadedColor = lerp(float3(LUTPixelPosition3D) / float(LUT_MAX_UINT), loadedColor, HdrDllPluginConstants.ColorGradingStrength); // Blend in neutral LUT
 		return loadedColor;
 	}
 	return 0;
@@ -1006,7 +1004,6 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 #elif LUT_MAPPING_TYPE == 0
 		loadedColor = gamma_sRGB_to_linear(loadedColor);
 #endif // LUT_MAPPING_TYPE
-		loadedColor = lerp(xyz.rgb, loadedColor, HdrDllPluginConstants.ColorGradingStrength); // Blend in neutral LUT
 		return loadedColor;
 	}
 	return 0;
