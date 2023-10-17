@@ -31,6 +31,10 @@ namespace Hooks
 			uiPaperWhiteSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
+		if (const auto extendGamut = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_ExtendGamut))) {
+			extendGamut->m_Enabled.SetValue(a_bGameRenderingHDREnable);
+		}
+
 		if (const auto saturation = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Saturation))) {
 			saturation->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
@@ -114,6 +118,7 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
+		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
@@ -512,6 +517,9 @@ namespace Hooks
 		};
 
 		switch (a_eventData.m_SettingID) {
+		case static_cast<int>(Settings::SettingID::kHDR_ExtendGamut):
+			HandleSetting(settings->ExtendGamut);
+			return true;
 		case static_cast<int>(Settings::SettingID::kHDR_Saturation):
 			HandleSetting(settings->Saturation);
 			return true;

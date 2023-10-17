@@ -11,6 +11,7 @@ Contrast = 50.0
 GamePaperWhite = 200
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
+ExtendGamut = 50.0
 Saturation = 50.0
 UIPaperWhite = 200
 
@@ -18,7 +19,7 @@ UIPaperWhite = 200
 ColorGradingStrength = 100.0
 DisplayMode = 0
 FilmGrainType = 1
-GammaCorrectionStrength = 50.0
+GammaCorrectionStrength = 100.0
 LUTCorrectionStrength = 100.0
 PostSharpen = true
 SecondaryBrightness = 50.0
