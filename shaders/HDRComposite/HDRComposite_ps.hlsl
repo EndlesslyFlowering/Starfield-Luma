@@ -33,7 +33,7 @@
 // 2 in ICtCp
 // If we are running in HDR, and we are keeping the SDR tonemapped shadow and midtones ("INVERT_TONEMAP_HIGHLIGHTS_ONLY" true),
 // then if this is 1+, we replace the SDR tonemapped image with one tonemapped by channel instead than by luminance, to maintain more saturation.
-#define HDR_TONEMAP_TYPE 1
+#define HDR_TONEMAP_TYPE 2
 // Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
@@ -113,7 +113,7 @@ static const float PostProcessStrength = 1.f;
 static const uint ForceTonemapper = 0;
 // 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
 // Exposure to the user for more customization.
-static const float HDRHighlightsModulation = (HDR_TONEMAP_TYPE == 2) ? 1.375f : 1.f;
+static const float HDRHighlightsModulation = 1.f;
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
