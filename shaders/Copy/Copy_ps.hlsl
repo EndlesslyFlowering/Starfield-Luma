@@ -32,8 +32,8 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
-#if 0
-			// Clamp to AP0D65 to avoid invalid numbers
+#if 1
+			// Clamp to AP0D65 to avoid invalid colors
 			color.rgb = BT709_To_AP0D65(color.rgb);
 			color.rgb = max(color.rgb, 0.f);
 			color.rgb = AP0D65_To_BT709(color.rgb);
