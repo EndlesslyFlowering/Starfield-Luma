@@ -102,13 +102,6 @@ PSOutput PS(PSInput psInput)
 			// Controls the amount of a custom blurred bilinear filtering vs HW bilinear (which is blurry if there's upscaling),
 			// by lerping beyond 1 in the opposite direction of the blurred image, we apply sharpening.
 			outColor = lerp(unsharpenedColor, inColor, sharpenIntensity);
-#if CLAMP_INPUT_OUTPUT
-			// Note: the sharpening multiplication above generates arbitrary colors and shifts the hue to be invalid
-			if (Luminance(outColor) < 0.f)
-			{
-				outColor = 0.f;
-			}
-#endif
 			if (HdrDllPluginConstants.DisplayMode <= 0)
 			{
 				outColor = LINEAR_TO_GAMMA(outColor);
