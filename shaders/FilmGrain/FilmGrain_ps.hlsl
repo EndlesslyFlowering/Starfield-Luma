@@ -163,20 +163,26 @@ void frag_main()
 
 		float colorY = Luminance(linearColor);
 
+		float yAdjustment = isHDR
+			? (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB)
+			: 1.f;
+
+		float adjustedColorY = linearNormalization(colorY,0.f,yAdjustment,0.f,1.f);
+
 		// Emulate density from a chosen film stock (Removed)
 		// float density = computeFilmDensity(adjustedColorY);
 
 		// Ideal film density matches 0-3. Skip emulating film stock
 		// https://www.mr-alvandi.com/technique/measuring-film-speed.html
-		float density = colorY * 3.f;
+		float density = adjustedColorY * 3.f;
 		
 		float graininess = computeFilmGraininess(density);
 		float randomFactor = (randomNumber * 2.f) - 1.f;
 
 		float yChange = randomFactor
-				* filmGrainColorAndIntensity.z // fFilmGrainAmountMax (0.03)
 			* graininess
-			* 5.f
+			* filmGrainColorAndIntensity.z // fFilmGrainAmountMax (0.03)
+			* 3.333f // Bump to 10%
 		;
 
 		outputColor = linearColor * (1.f + yChange);
