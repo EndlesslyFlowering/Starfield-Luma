@@ -22,6 +22,7 @@ namespace Settings
         kHDR_PeakBrightness,
         kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
+		kHDR_ExtendGamut,
 		kHDR_Contrast,
 		kHDR_Saturation,
 		kLUTCorrectionStrength,
@@ -123,6 +124,7 @@ namespace Settings
 		float    PeakBrightness;
 		float    GamePaperWhite;
 		float    UIPaperWhite;
+		float    ExtendGamut;
 		float    Saturation;
 		float    Contrast;
 		float    LUTCorrectionStrength;
@@ -189,6 +191,16 @@ namespace Settings
 			500,
 			10
 		};
+		Slider   ExtendGamut{
+		    SettingID::kHDR_ExtendGamut,
+		    "Extend Gamut",
+		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation. Neutral at 0\%.",
+		    { "Saturation", "HDR" },
+		    50.f,
+		    0.f,
+		    100.f,
+			"%"
+		};
 		Slider   Saturation{
 		    SettingID::kHDR_Saturation,
 		    "Saturation",
@@ -244,7 +256,7 @@ namespace Settings
 		    "Gamma Correction Strength",
 		    "Sets the gamma correction strength. The game used the sRGB gamma formula but was calibrated on gamma 2.2 displays. Only applies if \"Color Grading\" is enabled. 100\% should be closer to the original look.",
 		    { "GammaCorrectionStrength", "Main" },
-		    50.f,
+		    100.f,
 		    0.f,
 		    100.f,
 			"%"

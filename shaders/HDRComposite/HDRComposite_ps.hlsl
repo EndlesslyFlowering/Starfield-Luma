@@ -1301,9 +1301,10 @@ PSOutput PS(PSInput psInput)
 
 #if ALLOW_EXPAND_GAMUT
 		// We do this before applying "midGrayScale" as otherwise the input values would be too low. This way the are very close to the pre tonemapping range.
-		if (HdrDllPluginConstants.DevSetting05 > 0.f)
+		if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
 		{
-			inverseTonemappedColor = ExtendGamut(inverseTonemappedColor, HdrDllPluginConstants.DevSetting05);
+			// Pow by 2 to make the 0-1 setting slider more perceptually linear
+			inverseTonemappedColor = ExtendGamut(inverseTonemappedColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
 		}
 #endif
 
