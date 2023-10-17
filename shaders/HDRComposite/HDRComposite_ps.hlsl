@@ -959,18 +959,19 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 }
 
 float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
-	static const uint DrawLUTSquareSize = (LUT_SIZE_UINT * LUT_SIZE_UINT * PixelScale);
+	static const uint DrawLUTSquareSize = LUT_SIZE_UINT * PixelScale;
 	float width;
 	float height;
+	// We draw this on the bottom left
 	InputColorTexture.GetDimensions(width, height);
 	if (PixelPosition.y < (height - DrawLUTSquareSize))
 		return 0;
 
 	const uint2 position = uint2(PixelPosition.x / PixelScale, (PixelPosition.y - (height - DrawLUTSquareSize)) / PixelScale);
-	uint xPoint = position.x / LUT_SIZE_UINT;
-	uint yPoint = position.y / LUT_SIZE_UINT;
+	uint xPoint = position.x;
+	uint yPoint = position.y;
 	// NOTE: this is extremely slow.
-	if ((xPoint <= LUT_MAX_UINT && yPoint >=0 && yPoint <= LUT_MAX_UINT))
+	if ((xPoint <= LUT_MAX_UINT && yPoint >= 0 && yPoint <= LUT_MAX_UINT))
 	{
 		DrawnLUT = true;
 		float3 xyz;
@@ -1016,13 +1017,15 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 PSOutput PS(PSInput psInput)
 {
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
-	static const uint DrawLUTScale = 10u; // Pixel scale
+	static const uint DrawLUTTextureScale = 10u; // Pixel scale
+	static const uint DrawLUTGradientScale = 30u; // Pixel scale
 	bool drawnLUT = false;
-	float3 LUTColor = DrawLUTTexture(psInput.SV_Position.xy, DrawLUTScale, drawnLUT);
-	if (!drawnLUT)
+	float3 LUTColor = DrawLUTTexture(psInput.SV_Position.xy, DrawLUTTextureScale, drawnLUT);
+	if (!drawnLUT) // Avoids drawing on top of each other
 	{
-		LUTColor = DrawLUTGradients(psInput.SV_Position.xy, DrawLUTScale / 5u, drawnLUT);
+		LUTColor = DrawLUTGradients(psInput.SV_Position.xy, DrawLUTGradientScale, drawnLUT);
 	}
+	
 	if (drawnLUT)
 	{
 		float3 outputColor = LUTColor;
@@ -1340,7 +1343,7 @@ PSOutput PS(PSInput psInput)
 		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness (found empircally).
 		float highlightsShoulderStart = min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut);
 #else // New method (looks better but struggles more with high paper white on low peak brightness configurations)
-		// Never compress highlights in the top 2/3 of the image, even if it means we have two separate mid tones sections,
+		// Never compress highlights before the top 2/3 of the image, even if it means we have two separate mid tones sections,
 		// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
 		float highlightsShoulderStart = max(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut);
 #endif
