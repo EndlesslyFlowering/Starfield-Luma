@@ -167,6 +167,7 @@ namespace Settings
 		a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
+		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data() * 0.01f);                      // 0-100 to 0-1
 		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                        // 0-100 to 0-2
 		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                            // 0-100 to 0-2
 		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
@@ -208,6 +209,7 @@ namespace Settings
 			config.Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config.Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config.Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
+			config.Bind(ExtendGamut.value, ExtendGamut.defaultValue);
 			config.Bind(Saturation.value, Saturation.defaultValue);
 			config.Bind(Contrast.value, Contrast.defaultValue);
 			config.Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
@@ -322,6 +324,7 @@ namespace Settings
 			DrawReshadeValueStepper(PeakBrightness);
 			DrawReshadeValueStepper(GamePaperWhite);
 			DrawReshadeValueStepper(UIPaperWhite);
+			DrawReshadeSlider(ExtendGamut);
 			DrawReshadeSlider(Saturation);
 			DrawReshadeSlider(Contrast);
 		}

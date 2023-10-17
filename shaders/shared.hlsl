@@ -46,6 +46,7 @@ struct StructHdrDllPluginConstants
 	float HDRPeakBrightnessNits; // Set equal to the max nits your display can output
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
+	float HDRExtendGamut; // 0-1. 0 is neutral
 	float HDRSaturation; // 0-2. 1 is neutral
 	float HDRSecondaryContrast; // 0-2. 1 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
