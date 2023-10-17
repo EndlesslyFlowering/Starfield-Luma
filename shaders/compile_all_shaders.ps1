@@ -8,6 +8,7 @@ $ShaderOutputEmbedPDB = $false
 
 $main =
 {
+	#HDRComposite
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "FF1A"
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "600FF1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "700FF1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
@@ -15,21 +16,28 @@ $main =
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "E00FF1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "F00FF1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
 
-	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "400FF59"
-	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "2000FF59"
+	#Copy
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "400FF59"  -Defines "OUTPUT_TO_R10G10B10A2"
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "2000FF59" -Defines "OUTPUT_TO_R16G16B16A16_SFLOAT"
 
+	#FilmGrain
 	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "FF75" -Entry "main"
 
+	#ColorGradingMerge
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF81"
 
+	#ContrastAdaptiveSharpening
 	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "FF94" -Entry "main"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "100FF94" -Defines "USE_PACKED_MATH" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "300FF94" -Defines "USE_PACKED_MATH", "USE_UPSCALING" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 
+	#PostSharpen
 	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "FF9A"
 
+	#ScaleformComposite
 	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "FFAA"
 
+	#BinkMovie
 	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "FFAB"
 }
 
