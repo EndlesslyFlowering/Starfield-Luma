@@ -1028,7 +1028,10 @@ PSOutput PS(PSInput psInput)
 		float3 outputColor = LUTColor;
 		if (HdrDllPluginConstants.DisplayMode <= 0) // SDR
 		{
-			//TODO1: apply gamma correction here?
+#if SDR_USE_GAMMA_2_2 && !GAMMA_CORRECTION_IN_LUTS
+			outputColor = lerp(outputColor, pow(gamma_linear_to_sRGB(outputColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
+#endif // SDR_USE_GAMMA_2_2 && !GAMMA_CORRECTION_IN_LUTS
+
 #if !SDR_LINEAR_INTERMEDIARY
 #if SDR_USE_GAMMA_2_2
 			outputColor = pow(outputColor, 1.f / 2.2f);
@@ -1141,11 +1144,12 @@ PSOutput PS(PSInput psInput)
 #endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 
 // Do this even if "ENABLE_LUT" is false, for consistency
-#if SDR_USE_GAMMA_2_2 && (!ENABLE_LUT || !GAMMA_CORRECTION_IN_LUTS) //TODO1
+#if SDR_USE_GAMMA_2_2 && (!ENABLE_LUT || !GAMMA_CORRECTION_IN_LUTS)
 	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
-	// If there's no color grading, we don't do this adjustment, as we assume the error was part of the LUTs setup, including on neutral LUTs
-	// (this is not entirely true, but the world is too black with this adjustment if there's no color grading).
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.GammaCorrection);
+	// Possibly, if there's no color grading LUT, there shouldn't be any gamma adjustment, as the error might have been exclusively baked into LUTs,
+	// while a neutral LUT (or no LUT) image would have never been calibrated, so we couldn't say for sure there was a gamma mismatch in it, but for the sake of simplicity,
+	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
+	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
 #endif // SDR_USE_GAMMA_2_2
 
 	// The dll makes sure this is 1 when we are in HDR.
