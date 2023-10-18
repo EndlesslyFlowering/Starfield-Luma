@@ -609,9 +609,11 @@ float3 PostProcess(
 
 	// saturation adjustment a la Hable
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicColorGrading.cpp#L307-L309
+	// NOTE: this can cause negative colors.
 	Color = ((Color - ColorLuminance) * hableSaturation) + ColorLuminance;
 
 	// Blend in another color based on the luminance.
+	// NOTE: this could cause negative colors.
 	Color += lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
 	Color *= brightnessMultiplier;
 
