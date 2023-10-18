@@ -197,7 +197,7 @@ namespace Settings
 		    SettingID::kHDR_ExtendGamut,
 		    "Extend Gamut",
 		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation. Neutral at 0\%.",
-		    { "Saturation", "HDR" },
+		    { "ExtendGamut", "HDR" },
 		    50.f,
 		    0.f,
 		    100.f,
