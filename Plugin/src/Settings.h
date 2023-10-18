@@ -7,7 +7,7 @@
 #include <d3d12.h>
 
 // TODO: set to false in release builds (use the build configuation to automatically define it)
-#define DEVELOPMENT 1
+#define DEVELOPMENT 0
 
 namespace Settings
 {
