@@ -29,6 +29,8 @@ float4 PS(PSInputs inputs) : SV_Target
 
 	if (HdrDllPluginConstants.IsAtEndOfFrame)
 	{
+		color.a = 1.f; // Force alpha to 1 for extra safety
+
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
@@ -65,13 +67,11 @@ float4 PS(PSInputs inputs) : SV_Target
 #if SDR_LINEAR_INTERMEDIARY
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)
 		{
-
 			color.rgb = LINEAR_TO_GAMMA(color.rgb);
 		}
 #endif // SDR_LINEAR_INTERMEDIARY
 
 #endif // defined(OUTPUT_TO_R10G10B10A2)
-
 	}
 
 #endif // defined(OUTPUT_TO_R16G16B16A16_SFLOAT) || defined(OUTPUT_TO_R10G10B10A2)
