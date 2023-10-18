@@ -55,7 +55,7 @@ struct StructHdrDllPluginConstants
 	float GammaCorrection; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs. 0 to 1. 1 is "neutral"
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint FilmGrainType; // 1 is default
-	float FilmGrainCap; // 24 is default
+	float FilmGrainCap; // 24 and 0 are common defaults
 	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
 	uint RuntimeMS;

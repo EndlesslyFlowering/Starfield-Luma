@@ -283,7 +283,7 @@ namespace Settings
 			"Film Grain Cap",
 			"Sets a framerate cap on the improved film grain. Set to 0 for uncapped framerate.",
 			{ "FilmGrainCap", "Main" },
-			24.f,
+			0.f,
 			0.f,
 			100.f,
 			"FPS"
