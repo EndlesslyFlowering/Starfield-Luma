@@ -544,12 +544,9 @@ static const float den = log2(C + 1.f);
 void Log2Adjust(inout float Channel)
 {
 #if (C != 1)
-	Channel = log2(Channel * c + 1.f)
-	        / den;
-	return;
+	Channel = log2(max(Channel * c + 1.f, 0.f)) / den;
 #else
-	Channel = log2(Channel + 1.f);
-	return;
+	Channel = log2(max(Channel + 1.f, 0.f));
 #endif
 }
 
@@ -574,8 +571,8 @@ float SigmoidalContrastAdjustment(
 		{
 			Log2Adjust(Channel);
 		}
-		Channel = pow(Channel, contrastIntensity)
-		        / normalizationFactorLower;
+		// abs/sign to handle negative case
+        Channel = pow(abs(Channel), contrastIntensity) * sign(Channel) / normalizationFactorLower;
 	}
 	else
 	{
@@ -588,8 +585,7 @@ float SigmoidalContrastAdjustment(
 		{
 			Log2Adjust(Channel);
 		}
-		Channel = (1.f - pow(Channel, contrastIntensity))
-		        / normalizationFactorUpper + contrastMidPoint;
+		Channel = (1.f - pow(Channel, contrastIntensity)) / normalizationFactorUpper + contrastMidPoint;
 	}
 
 	return Channel;
