@@ -27,7 +27,9 @@
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
 #else
-	#define LINEARIZE(x) pow(x, 2.2f)
+		// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens)
+		#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), pow(x, 2.2f), HdrDllPluginConstants.GammaCorrection)
+		//#define LINEARIZE(x) pow(x, 2.2f)
 	#if GAMMA_CORRECTION_IN_LUTS // 2.2->linear->LUT normalization
 		// If we correct gamma in LUTs, there's nothing more to do than linearize (interpret) them as gamma 2.2, while the input coordinates keep using sRGB gamma.
 		// This single difference will correct the gamma on output.
@@ -36,11 +38,13 @@
 		// If we don't correct gamma in LUTs, we convert them back to sRGB gamma at the end, so that it will match the input coordinates gamma, as they also use sRGB.
 		// A further correction step will be done after that to acknowledge the gamma mismatch baked into the game look.
 		#if GAMMA_CORRECT_SDR_RANGE_ONLY
-			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x)))
+			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(lerp(gamma_linear_to_sRGB(saturate(x)), pow(saturate(x), 1.f / 2.2f), HdrDllPluginConstants.GammaCorrection)) + (x - saturate(x)))
+			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x)))
 		#else
 			// NOTE: to somehow conserve some HDR colors and not generate NaNs, we are doing inverse pow as gamma on negative numbers.
 			// Alternatively we could try to do this in BT.2020, so there's no negative colors.
-			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f) * (sign(x))))
+			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(lerp(gamma_linear_to_sRGB(abs(x)), pow(abs(x), 1.f / 2.2f), HdrDllPluginConstants.GammaCorrection)) * sign(x))
+			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f)) * sign(x))
 		#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
