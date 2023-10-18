@@ -3,7 +3,7 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-#define FILM_GRAIN_TEXTURE_SIZE 1024u
+#define FILM_GRAIN_TEXTURE_SIZE 1024
 
 #if SDR_LINEAR_INTERMEDIARY
 	#define GAMMA_TO_LINEAR(x) x
@@ -18,7 +18,7 @@
 
 #define IMPROVED_FILM_GRAIN true
 
-cbuffer _13_15 : register(b0, space0)
+cbuffer CPushConstantWrapper_FilmGrain : register(b0, space0)
 {
 	float4 filmGrainColorAndIntensity : packoffset(c0);
 };
@@ -26,17 +26,9 @@ cbuffer _13_15 : register(b0, space0)
 Texture2D<float3> TonemappedColorTexture : register(t0, space8); // Possibly in gamma space in SDR
 SamplerState Sampler0 : register(s0, space8);
 
-static float4 TEXCOORD;
-static float4 SV_Target;
-
-struct SPIRV_Cross_Input
+struct PSInput
 {
 	float4 TEXCOORD : TEXCOORD0;
-};
-
-struct SPIRV_Cross_Output
-{
-	float4 SV_Target : SV_Target0;
 };
 
 // Better random generator
@@ -73,7 +65,8 @@ float computeFilmGraininess(float density) {
 }
 
 
-void frag_main()
+[RootSignature(ShaderRootSignature)]
+float4 PS(PSInput psInput) : SV_Target
 {
 // TEXCOORD = float2 [0,1] relative to screen
 // TonemappedColorTexture is the framebuffer?
@@ -83,7 +76,7 @@ void frag_main()
 //   .y = randomInt32? changed every frame?
 //   .z = Film Grading Intensity (0 - 0.03)
 
-	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
+	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, psInput.TEXCOORD.xy);
 	bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
 	bool isInOutColorLinear = isHDR;
 #if SDR_LINEAR_INTERMEDIARY
@@ -94,58 +87,76 @@ void frag_main()
 
 	if (HdrDllPluginConstants.FilmGrainType == 0)
 	{
-		float3 gammaColor = (isInOutColorLinear)
-			? LINEAR_TO_GAMMA(inputColor)
-			: inputColor;
+		float3 color = inputColor;
 
-		const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
-		const float filmGrainHalfSize = 521.f; //TODO: rename in case we keep this as 521
+		float filmGrainIntensity = filmGrainColorAndIntensity.z;
+
+		float luminance;
+
+		if (isInOutColorLinear) {
+			color /= PQMaxWhitePoint;
+
+			// get relative luminance in normalized space
+			luminance = Luminance(color);
+
+			color = BT709_To_AP0D65(color);
+
+			color = Linear_to_PQ_approx(color);
+		}
+		else {
+			luminance = Luminance(GAMMA_TO_LINEAR(color));
+		}
+
+		float inverseLuminance = saturate(1.f - luminance);
+
+		static const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1);
+		static const float filmGrainHalfSize = 511.f;
 		// Applying modulus against 1023 will give value between 0 and 1023
 		// Same two values for all texels this frame
-		float randomFromRange1 = float(int(uint(filmGrainColorAndIntensity.x) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
-		float randomFromRange2 = float(int(uint(filmGrainColorAndIntensity.y) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
+		float2 randomFromRange = int2(filmGrainColorAndIntensity.xy) & (FILM_GRAIN_TEXTURE_SIZE - 1);
 
 		// Divide by 1023 to get a number between 0 and 1
-		float randomNormalized1 = randomFromRange1 * filmGrainInvSize;
-		float randomNormalized2 = randomFromRange1 * filmGrainInvSize;
+		float2 randomNormalized = randomFromRange * filmGrainInvSize;
 
 		// Offset by x/y position
-		float uniqueX = randomNormalized1 + TEXCOORD.x;
-		float uniqueY = (randomNormalized2 + TEXCOORD.y) * filmGrainHalfSize;
+		float2 unique = randomNormalized + psInput.TEXCOORD.xy;
+		unique.y *= filmGrainHalfSize;
 
 		// Unique each frame and texel. (Is it though?)
-		float seed = (uniqueX + uniqueY);
+		float seed = (unique.x + unique.y);
 
 		// Generate a random number between 0 and 1;
 		float randomNumber = bethesdaRandom(seed);
 
-		float colorLuma = Luminance(gammaColor);
-		float inverseLuma = saturate(1.f - colorLuma); // inverseLuma
-
 		float luminanceShift = (randomNumber * 2.f) - 1.f;
 
-		float additiveFilmGrain = (luminanceShift * filmGrainColorAndIntensity.z * inverseLuma);
-		float3 newColor = float3(additiveFilmGrain, additiveFilmGrain, additiveFilmGrain);
+		float additiveFilmGrain = (luminanceShift * (filmGrainIntensity * inverseLuminance));
 
-		outputColor = gammaColor + newColor;
+		outputColor = color + additiveFilmGrain;
+
+		if (isInOutColorLinear)
+		{
+			outputColor = PQ_approx_to_Linear(outputColor);
+
+			outputColor = max(outputColor, 0.f);
+			outputColor = AP0D65_To_BT709(outputColor);
+
+			outputColor *= PQMaxWhitePoint;
+		}
 
 #if 0 // Output Visualization
-	float oldY = Luminance(GAMMA_TO_LINEAR(gammaColor));
+	float oldY = Luminance(GAMMA_TO_LINEAR(linearColor));
 	float newY = Luminance(GAMMA_TO_LINEAR(outputColor));
 	float yChange = (oldY/newY) - 1.f;
 	outputColor = abs(yChange);
 #endif
 
-		if (isInOutColorLinear)
-		{
-			outputColor = GAMMA_TO_LINEAR(outputColor);
-		}
 	}
 	else
 	{
 		float fps = HdrDllPluginConstants.FilmGrainCap;
 		// Mod by FPS to ensure consistent range
-		float2 seed = TEXCOORD.xy;
+		float2 seed = psInput.TEXCOORD.xy;
 		if (fps > 0.f) {
 			float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
 			// TODO: Use iteration? Use only if repeating is noticeable
@@ -158,9 +169,23 @@ void frag_main()
 
 		float randomNumber = rand(seed);
 
-		float3 linearColor = (isInOutColorLinear)
-			? inputColor
-			: GAMMA_TO_LINEAR(inputColor);
+		float colorY;
+
+		float3 linearColor = inputColor;
+		if (isInOutColorLinear) {
+			linearColor /= PQMaxWhitePoint;
+
+			// get relative luminance in normalized space
+			colorY = Luminance(linearColor);
+
+			linearColor = BT709_To_AP0D65(linearColor);
+
+			// approximation of PQ
+			linearColor = Linear_to_PQ_approx(linearColor);
+		}
+		else {
+			colorY = Luminance(GAMMA_TO_LINEAR(linearColor));
+		}
 		// Film grain is based on film density
 		// Film works in negative, meaning black has no density
 		// The greater the film density (lighter), more perceived grain
@@ -168,13 +193,12 @@ void frag_main()
 
 		// Scaling is not not linear
 
-		float colorY = Luminance(linearColor);
-
 		float yAdjustment = isHDR
-			? (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB)
+			? (HdrDllPluginConstants.HDRGamePaperWhiteNits / PQMaxWhitePoint)
 			: 1.f;
 
 		float adjustedColorY = linearNormalization(colorY,0.f,yAdjustment,0.f,1.f);
+		//float adjustedColorY = colorY;
 
 		// Emulate density from a chosen film stock (Removed)
 		// float density = computeFilmDensity(adjustedColorY);
@@ -189,35 +213,26 @@ void frag_main()
 		float yChange = randomFactor
 			* graininess
 			* filmGrainColorAndIntensity.z // fFilmGrainAmountMax (0.03)
-			* 3.333f // Bump to 10%
-		;
+			* 3.333f; // Bump to 10%
+
+		yChange *= 0.0666f;
 
 		outputColor = linearColor * (1.f + yChange);
+
+		if (isInOutColorLinear) {
+			outputColor = PQ_approx_to_Linear(outputColor);
+
+			outputColor = max(outputColor, 0.f);
+			outputColor = AP0D65_To_BT709(outputColor);
+
+			outputColor *= PQMaxWhitePoint;
+		}
 
 #if 0 // Output Visualization
 		outputColor = abs(yChange);
 #endif
-
-		if (!isInOutColorLinear) {
-			outputColor = LINEAR_TO_GAMMA(outputColor);
-		}
 	}
 
-	outputColor = BT709_To_AP0D65(outputColor);
-	outputColor = max(outputColor, 0.f);
-	outputColor = AP0D65_To_BT709(outputColor);
-
-	SV_Target.rgb = isHDR ? outputColor : saturate(outputColor);
-
-	SV_Target.w = 1.0f;
-}
-
-[RootSignature(ShaderRootSignature)]
-SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
-{
-	TEXCOORD = stage_input.TEXCOORD;
-	frag_main();
-	SPIRV_Cross_Output stage_output;
-	stage_output.SV_Target = SV_Target;
-	return stage_output;
+	return float4(isHDR ? outputColor
+	                    : saturate(outputColor), 1.f);
 }

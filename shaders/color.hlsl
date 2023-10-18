@@ -166,6 +166,25 @@ float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue)
 	return linearColor;
 }
 
+// PQ approximation for speeeeeeeeed
+float3 Linear_to_PQ_approx(float3 LinearColor)
+{
+	LinearColor = max(LinearColor, 0.f);
+	return pow(LinearColor , 1.f / 8.f);
+}
+
+float3 PQ_approx_to_Linear(float3 PQApproxColor)
+{
+	return PQApproxColor
+	     * PQApproxColor
+	     * PQApproxColor
+	     * PQApproxColor
+	     * PQApproxColor
+	     * PQApproxColor
+	     * PQApproxColor
+	     * PQApproxColor;
+}
+
 float Luminance(float3 color)
 {
 	// Fixed from "wrong" values: 0.2125 0.7154 0.0721f
