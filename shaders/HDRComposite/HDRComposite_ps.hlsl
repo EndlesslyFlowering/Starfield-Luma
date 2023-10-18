@@ -1300,15 +1300,6 @@ PSOutput PS(PSInput psInput)
 			}
 		}
 
-#if ALLOW_EXPAND_GAMUT
-		// We do this before applying "midGrayScale" as otherwise the input values would be too low. This way the are very close to the pre tonemapping range.
-		if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
-		{
-			// Pow by 2 to make the 0-1 setting slider more perceptually linear
-			inverseTonemappedColor = ExtendGamut(inverseTonemappedColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
-		}
-#endif
-
 		const float midGrayScale = midGrayOut / midGrayIn;
 
 		// Bring back the color to the same range as SDR by matching the mid gray level.
@@ -1318,6 +1309,16 @@ PSOutput PS(PSInput psInput)
 		float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
+#endif
+
+#if ALLOW_EXPAND_GAMUT
+		// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
+		// also they'd end up messing up the application of LUTs too badly.
+		if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
+		{
+			// Pow by 2 to make the 0-1 setting slider more perceptually linear
+			inverseTonemappedPostProcessedColor = ExtendGamut(inverseTonemappedPostProcessedColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
+		}
 #endif
 
 		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).

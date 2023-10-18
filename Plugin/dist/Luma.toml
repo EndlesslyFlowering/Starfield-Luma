@@ -11,7 +11,7 @@ Contrast = 50.0
 GamePaperWhite = 200
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
-ExtendGamut = 50.0
+ExtendGamut = 33.333
 Saturation = 50.0
 UIPaperWhite = 200
 
