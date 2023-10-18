@@ -118,9 +118,10 @@ namespace Settings
 		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR();
     }
 
-		bool Main::IsFilmGrainTypeImproved() const {
-			return FilmGrainType.value.get_data() == 1;
-		}
+	bool Main::IsFilmGrainTypeImproved() const
+	{
+		return FilmGrainType.value.get_data() == 1;
+	}
 
     RE::BS_DXGI_FORMAT Main::GetDisplayModeFormat() const
     {
@@ -345,7 +346,9 @@ namespace Settings
 		DrawReshadeSlider(ColorGradingStrength);
 		DrawReshadeCheckbox(VanillaMenuLUTs);
 		DrawReshadeEnumStepper(FilmGrainType);
-		DrawReshadeSlider(FilmGrainCap);
+		if (IsFilmGrainTypeImproved()) {
+			DrawReshadeSlider(FilmGrainCap);
+		}
 		DrawReshadeCheckbox(PostSharpen);
 
 #if DEVELOPMENT
