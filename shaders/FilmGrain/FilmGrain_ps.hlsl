@@ -144,7 +144,8 @@ void frag_main()
 	else
 	{
 		float fps = HdrDllPluginConstants.FilmGrainCap;
-		// Mod by FPS to ensure consistent range
+		// Mod by FPS to ensure consistent range.
+		// Note: we still don't know if "RuntimeMS" is stable over time, though it should be ok.
 		float2 seed = TEXCOORD.xy;
 		if (fps > 0.f) {
 			float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
