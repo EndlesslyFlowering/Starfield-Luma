@@ -1020,7 +1020,7 @@ PSOutput PS(PSInput psInput)
 	{
 		LUTColor = DrawLUTGradients(psInput.SV_Position.xy, DrawLUTGradientScale, drawnLUT);
 	}
-	
+
 	if (drawnLUT)
 	{
 		float3 outputColor = LUTColor;
@@ -1360,9 +1360,6 @@ PSOutput PS(PSInput psInput)
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-#if CLAMP_INPUT_OUTPUT
-		outputColor = clamp(outputColor, 0.f, FLT16_MAX); // Avoid extremely high numbers turning into NaN in FP16
-#endif // CLAMP_INPUT_OUTPUT
 	}
 	else // SDR
 	{
