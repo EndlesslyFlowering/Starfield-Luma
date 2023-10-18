@@ -21,7 +21,7 @@ $main =
 	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "2000FF59" -Defines "OUTPUT_TO_R16G16B16A16_SFLOAT"
 
 	#FilmGrain
-	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "FF75" -Entry "main"
+	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "FF75"
 
 	#ColorGradingMerge
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF81"
