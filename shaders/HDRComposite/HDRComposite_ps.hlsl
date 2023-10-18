@@ -1150,6 +1150,9 @@ PSOutput PS(PSInput psInput)
 	// while a neutral LUT (or no LUT) image would have never been calibrated, so we couldn't say for sure there was a gamma mismatch in it, but for the sake of simplicity,
 	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
 	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
+#elif SDR_USE_GAMMA_2_2 && (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
+	// If gamma correction is in LUTs but LUTs are disabled, do it here
+	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection * (1.f - HdrDllPluginConstants.ColorGradingStrength));
 #endif // SDR_USE_GAMMA_2_2
 
 	// The dll makes sure this is 1 when we are in HDR.
