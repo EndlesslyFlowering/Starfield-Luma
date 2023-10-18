@@ -175,7 +175,7 @@ void frag_main()
 		// Ideal film density matches 0-3. Skip emulating film stock
 		// https://www.mr-alvandi.com/technique/measuring-film-speed.html
 		float density = adjustedColorY * 3.f;
-		
+
 		float graininess = computeFilmGraininess(density);
 		float randomFactor = (randomNumber * 2.f) - 1.f;
 
@@ -195,6 +195,10 @@ void frag_main()
 			outputColor = LINEAR_TO_GAMMA(outputColor);
 		}
 	}
+
+	outputColor = BT709_To_AP0D65(outputColor);
+	outputColor = max(outputColor, 0.f);
+	outputColor = AP0D65_To_BT709(outputColor);
 
 	SV_Target.rgb = isHDR ? outputColor : saturate(outputColor);
 
