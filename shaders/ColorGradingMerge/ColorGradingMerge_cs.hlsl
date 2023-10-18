@@ -300,11 +300,12 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		// Optional step to keep colors in the SDR range.
 		outputLinear = saturate(outputLinear);
 	}
+#if 0 // Disabled out as this can cause "black dot issues" (???)
 	// To note, color channels may be negative, even if -0.00001, probably due to multiple color space conversions.
-//	else if (Luminance(outputLinear) < 0.f) {
-//		outputLinear = 0.f;
-//	}
-// commented out as this can cause "black dot issues"
+	else if (Luminance(outputLinear) < 0.f) {
+		outputLinear = 0.f;
+	}
+#endif
 	return outputLinear;
 #endif
 }
@@ -337,7 +338,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);
 	float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralLUTColor, SDRRange);
 	float3 LUT4Color = PatchLUTColor(LUT4, inUVW, neutralLUTColor, SDRRange);
-#else
+#elif LUT_MAPPING_TYPE == 2
 	LUT1Color = linear_srgb_to_oklab(LUT1Color);
 	LUT2Color = linear_srgb_to_oklab(LUT2Color);
 	LUT3Color = linear_srgb_to_oklab(LUT3Color);
