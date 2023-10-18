@@ -31,6 +31,7 @@ namespace Settings
 		kSecondaryBrightness,
         kVanillaMenuLUTs,
 		kFilmGrainType,
+		kFilmGrainCap,
 		kPostSharpen,
 
 		kEND,
@@ -132,6 +133,7 @@ namespace Settings
 		float    GammaCorrectionStrength;
 		float    SDRSecondaryBrightness;
 		uint32_t FilmGrainType;
+		float    FilmGrainCap;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
 		uint32_t RuntimeMS;
@@ -276,6 +278,16 @@ namespace Settings
 		    1,
 		    { "Vanilla", "Improved" }
 		};
+		Slider FilmGrainCap{
+			SettingID::kFilmGrainCap,
+			"Film Grain Cap",
+			"Sets a framerate cap on the improved film grain. Set to 0 for uncapped framerate.",
+			{ "FilmGrainCap", "Main" },
+			24.f,
+			0.f,
+			100.f,
+			"fps"
+		};
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
@@ -297,9 +309,11 @@ namespace Settings
 		void RefreshHDRDisplayEnableState();
 
 		bool IsHDRSupported() const { return bIsHDRSupported; }
-        bool IsSDRForcedOnHDR() const;
-        bool IsDisplayModeSetToHDR() const;
-        bool IsGameRenderingSetToHDR() const;
+		bool IsSDRForcedOnHDR() const;
+		bool IsDisplayModeSetToHDR() const;
+		bool IsGameRenderingSetToHDR() const;
+		bool IsFilmGrainTypeImproved() const;
+
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 

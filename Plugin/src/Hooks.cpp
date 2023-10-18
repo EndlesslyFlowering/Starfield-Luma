@@ -127,6 +127,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
 		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
+		CreateSliderSetting(a_settingList, settings->FilmGrainCap, settings->IsFilmGrainTypeImproved());
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
 
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
@@ -474,6 +475,9 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kFilmGrainType):
 			HandleSetting(settings->FilmGrainType);
+			if (const auto filmGrainCap = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kFilmGrainCap))) {
+				filmGrainCap->m_Enabled.SetValue(settings->IsFilmGrainTypeImproved());
+			}
 			break;
 		}
 
@@ -537,6 +541,9 @@ namespace Hooks
 			return true;
 		case static_cast<int>(Settings::SettingID::kSecondaryBrightness):
 			HandleSetting(settings->SecondaryBrightness);
+			return true;
+		case static_cast<int>(Settings::SettingID::kFilmGrainCap):
+			HandleSetting(settings->FilmGrainCap);
 			return true;
 		}
 

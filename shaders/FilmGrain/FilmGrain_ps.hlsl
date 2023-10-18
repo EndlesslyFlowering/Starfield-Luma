@@ -143,13 +143,20 @@ void frag_main()
 	}
 	else
 	{
-		float fps = 24.f; // TODO: Make external option and also verify that "RuntimeMS" is stable and accurate enough over time
+		float fps = HdrDllPluginConstants.FilmGrainCap;
 		// Mod by FPS to ensure consistent range
-		float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
-		// TODO: Use iteration? Use only if repeating is noticeable
-		// float iteration = fmod(frameNumber, (fps * fps));
-		float frame = fmod(frameNumber, fps);
-		float randomNumber = rand(TEXCOORD.xy + (frame / fps));
+		float2 seed = TEXCOORD.xy;
+		if (fps > 0.f) {
+			float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
+			// TODO: Use iteration? Use only if repeating is noticeable
+			// float iteration = fmod(frameNumber, (fps * fps));
+			float frame = fmod(frameNumber, fps);
+			seed += (frame / fps);
+		} else {
+			seed += frac(HdrDllPluginConstants.RuntimeMS / 1000.f);
+		}
+
+		float randomNumber = rand(seed);
 
 		float3 linearColor = (isInOutColorLinear)
 			? inputColor
