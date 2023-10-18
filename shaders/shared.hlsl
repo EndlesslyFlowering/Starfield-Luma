@@ -21,7 +21,6 @@
 // Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
 #define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
-//TODO1: link to "GAMMA_CORRECTION_IN_LUTS" case
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
 // 0) sRGB gamma mapping (Vanilla): it makes any intermediary sampled value (that doesn't exactly fall in the center of LUT texel) affected by gamma, and that's not good.
 // 1) Linear mapping: Makes LUTs sampling work in linear space, which is mathematically correct. This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
@@ -32,6 +31,8 @@
 #define LUT_MAX_UINT (uint)LUT_SIZE - 1u
 // If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
 // Requires "SDR_USE_GAMMA_2_2".
+// Cannot be set to false with "LUT_MAPPING_TYPE" == 2, as the point of doing LUTs mapping in OKLAB is for the blackest point to have no luminosity but still have a hue
+// to help out with tinting the dakest 1/16 part of the image, thus if we convert back from OKLAB to Rec.709 to OKLAB, we'd lose the hue on black, due to having no luminance. 
 #define GAMMA_CORRECTION_IN_LUTS 1
 #define FORCE_SDR_LUTS 0
 
