@@ -148,11 +148,11 @@ void frag_main()
 		// Note: we still don't know if "RuntimeMS" is stable over time, though it should be ok.
 		float2 seed = TEXCOORD.xy;
 		if (fps > 0.f) {
-			float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f/(fps)));
+			float frameNumber = floor(HdrDllPluginConstants.RuntimeMS / (1000.f / fps));
 			// TODO: Use iteration? Use only if repeating is noticeable
 			// float iteration = fmod(frameNumber, (fps * fps));
-			float frame = fmod(frameNumber, fps);
-			seed += (frame / fps);
+			float frame = fps == 1.f ? fmod(frameNumber, 2) : fmod(frameNumber, fps); // fmod(1,1) doesn't work
+			seed += frame / fps;
 		} else {
 			seed += frac(HdrDllPluginConstants.RuntimeMS / 1000.f);
 		}

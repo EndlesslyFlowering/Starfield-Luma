@@ -286,7 +286,7 @@ namespace Settings
 			24.f,
 			0.f,
 			100.f,
-			"fps"
+			"FPS"
 		};
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
