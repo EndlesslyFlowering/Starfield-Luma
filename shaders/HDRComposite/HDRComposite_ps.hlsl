@@ -1360,6 +1360,12 @@ PSOutput PS(PSInput psInput)
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
+		// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
+		// also make 1.0 = 100 nits
+		outputColor = BT709_To_WBT2020(outputColor);
+		outputColor = max(outputColor, 0.f);
+		outputColor /= 1.25f;
+
 	}
 	else // SDR
 	{

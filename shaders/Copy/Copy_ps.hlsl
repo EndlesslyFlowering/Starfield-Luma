@@ -34,12 +34,10 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
-#if 1
-			// Clamp to AP0D65 to avoid invalid colors
-			color.rgb = BT709_To_AP0D65(color.rgb);
+			color.rgb = WBT2020_To_BT2020(color.rgb);
 			color.rgb = max(color.rgb, 0.f);
-			color.rgb = AP0D65_To_BT709(color.rgb);
-#endif
+			color.rgb = BT2020_To_BT709(color.rgb);
+			color.rgb *= 1.25;
 		}
 		else if (HdrDllPluginConstants.DisplayMode == -1) // SDR on scRGB HDR (gamma to linear space conversion)
 		{
@@ -60,7 +58,7 @@ float4 PS(PSInputs inputs) : SV_Target
 		{
 			// There is no need to clamp values above 1 here as the output buffer is unorm10 so it will clip anything beyond 0-1.
 			// Negative values need to be clamped though to avoid doing pow on a negative values.
-			color.rgb = BT709_To_BT2020(color.rgb);
+			color.rgb = WBT2020_To_BT2020(color.rgb);
 			color.rgb = max(color.rgb, 0.f);
 			color.rgb = Linear_to_PQ(color.rgb, PQMaxWhitePoint);
 		}
