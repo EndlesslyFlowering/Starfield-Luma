@@ -5,14 +5,14 @@ all LUTs are now normalized at runtime without needing any content changes, band
 Luma was created by 4 HDR passionate developers (Ersh, Pumbo, Lilium, ShortFuse), whom all took on different roles to achieve this expansive refactor.
 It is a follow up to the "Native AutoHDR and Color Banding Fix" mod https://www.nexusmods.com/starfield/mods/588 (Ersh), which just increased the quality of the game buffers to 10bit+, leaving more room for AutoHDR to work.
 It is a spiritual successor to the CONTROL HDR mod https://www.nexusmods.com/control/mods/90 (Pumbo).
-It inclues an improved version of the "Normalized LUTs" mod https://www.nexusmods.com/starfield/mods/2407 (ShortFuse).
+It includes an improved version of the "Normalized LUTs" mod https://www.nexusmods.com/starfield/mods/2407 (ShortFuse).
 It was built by using the HDR analysis ReShade shaders https://github.com/EndlesslyFlowering/ReShade_HDR_shaders (Lilium).
 Join our discord here: https://discord.gg/DNGfMZgH3f.
 We plan on going open source soon and we hope for many of you to contribute.
 
 List of features:
--Native HDR (scRGB and HDR10)
--Increased buffers accuracy in SDR and HDR, which reduced banding all around (SDR is now 10bit instead of 8bit)
+-Native HDR (HDR10 and scRGB)
+-Increased buffers accuracy in SDR and HDR, reducing banding all around (SDR is now 10bit instead of 8bit)
 -Normalized LUTs, the grey/flat look is mostly gone, but the color tint is still there
 -Fixed bink fullscreen videos playing back with the wrong colors (BT.601 instead of BT.709) and made them use AutoHDR
 -Improved the sharpening passes
@@ -33,7 +33,7 @@ How to use:
 Drop the content of the mod into the game root folder, or install it with a mod manager in the game root folder.
 The game needs to be started through the SFSE loader on Steam and ASI loader on Microsoft Store (Game Pass).
 Please remove the old "NativeHDR" or "NativeAutoHDR" mods before starting Luma.
-You can access Luma's settings directly from the game graphics setting menu. If you ahve ReShade installed, our settings will also be visible there through a widget.
+You can access Luma's settings directly from the game graphics setting menu. If you have ReShade installed, our settings will also be visible there through a widget.
 There a .toml config file in the mod's dll/asi folders, delete it to reset settings.
 To uninstall, clear all the files (they are unique to the mod).
 
