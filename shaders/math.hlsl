@@ -1,7 +1,7 @@
 #pragma once
 
-#define FLT_MIN 1.175494351e-38f
-#define FLT_MAX 3.402823466e+38F
+#define FLT_MIN asfloat(0x00800000) //1.175494351e-38f
+#define FLT_MAX asfloat(0x7F7FFFFF) //3.402823466e+38f
 #define FLT10_MAX 64512.f
 #define FLT11_MAX 65024.f
 #define FLT16_MAX 65504.f

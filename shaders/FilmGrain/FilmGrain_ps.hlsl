@@ -204,9 +204,7 @@ void frag_main()
 		}
 	}
 
-	outputColor = BT709_To_AP0D65(outputColor);
 	outputColor = max(outputColor, 0.f);
-	outputColor = AP0D65_To_BT709(outputColor);
 
 	SV_Target.rgb = isHDR ? outputColor : saturate(outputColor);
 
