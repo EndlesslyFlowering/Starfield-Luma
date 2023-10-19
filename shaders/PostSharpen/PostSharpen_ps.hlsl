@@ -46,6 +46,7 @@ struct PSOutput
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
 #endif
 
+#define RCP6 0.16666667163372039794921875f
 
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
@@ -65,44 +66,111 @@ PSOutput PS(PSInput psInput)
 		if (sharpenIntensity > 0.f && sharpenIntensity != 1.f)
 		{
 			// Sharpening is best done in linear space, even if Bethesda made in gamma space
-			if (HdrDllPluginConstants.DisplayMode <= 0)
+			if (HdrDllPluginConstants.DisplayMode > 0)
+			{
+				inColor /= IntermediateNormalizationFactor;
+			}
+			else
 			{
 				inColor = GAMMA_TO_LINEAR(inColor);
 			}
-			float _70 = ((_15_m0[161u].z * psInput.TEXCOORD.x) * sharpenParams.x) + 0.5f;
-			float _72 = ((_15_m0[161u].w * psInput.TEXCOORD.y) * sharpenParams.y) + 0.5f;
-			float _76 = frac(_70);
-			float _77 = frac(_72);
-			float _87 = ((((((_76 * 2.f) + (-3.f)) * _76) + (-3.f)) * _76) + 5.f) * (1.f / 6.f);
-			float _89 = _76 * 3.f;
-			float _98 = ((((((3.f - _89) + _76) * _76) + 3.f) * _76) + 1.f) * (1.f / 6.f);
-			float _99 = _76 * _76;
-			float _113 = _77 * _77;
-			float _114 = _77 * 3.f;
-			float _125 = ((((((_77 * 2.f) + (-3.f)) * _77) + (-3.f)) * _77) + 5.f) * (1.f / 6.f);
-			float _136 = ((((((3.f - _114) + _77) * _77) + 3.f) * _77) + 1.f) * (1.f / 6.f);
-			float _139 = floor(_70) + (-0.5f);
-			float _142 = floor(_72) + (-0.5f);
-			float _144 = (_139 + (((((_99 * (_89 + (-6.f))) + 4.f) * (1.f / 6.f)) / _87) + (-1.f))) / _15_m0[161u].z;
-			float _145 = (_142 + (((((_113 * (_114 + (-6.f))) + 4.f) * (1.f / 6.f)) / _125) + (-1.f))) / _15_m0[161u].w;
-			float _147 = (_139 + ((((_99 * (1.f / 6.f)) * _76) / _98) + 1.f)) / _15_m0[161u].z;
-			float _149 = (_142 + ((((_113 * (1.f / 6.f)) * _77) / _136) + 1.f)) / _15_m0[161u].w;
-			float3 _152 = TonemappedColorTexture.Sample(Sampler1, float2(_144, _145));
-			float3 _157 = TonemappedColorTexture.Sample(Sampler1, float2(_147, _145));
-			float3 _162 = TonemappedColorTexture.Sample(Sampler1, float2(_144, _149));
-			float3 _167 = TonemappedColorTexture.Sample(Sampler1, float2(_147, _149));
-			if (HdrDllPluginConstants.DisplayMode <= 0)
+
+			static const float2 cbConst = _15_m0[161u].zw;
+
+			float2 _70 = (cbConst * psInput.TEXCOORD.xy * sharpenParams.xy) + 0.5f;
+
+			float2 _76 = frac(_70);
+
+			float2 _89 = _76 * 3.f;
+
+#if 0
+			float2 _87 = (((((_76 * 2.f - 3.f) * _76) - 3.f) * _76) + 5.f) * RCP6;
+
+			float2 _98 = (((((3.f - _89 + _76) * _76) + 3.f) * _76) + 1.f) * RCP6;
+#else
+			float4 _88 = float4(_76 * 2.f - 3.f,
+			                    3.f - _89 + _76);
+			_88.xzyw *= _76.xxyy;
+
+			_88.xy -= 3.f;
+			_88.zw += 3.f;
+
+			_88.xzyw *= _76.xxyy;
+
+			_88.xy += 5.f;
+			_88.zw += 1.f;
+
+			_88 *= RCP6;
+#endif
+			float2 _139 = floor(_70) - 0.5f;
+
+			float2 _99 = _76 * _76;
+
+#if 0
+			float2 _144 = (_139 + (((((_99 * (_89 - 6.f)) + 4.f) * RCP6) / _87) - 1.f)) / cbConst;
+
+			float2 _147 = (_139 + ((((_99 * RCP6) * _76) / _98) + 1.f)) / cbConst;
+
+			float3 _152 = TonemappedColorTexture.Sample(Sampler1, _144);
+			float3 _157 = TonemappedColorTexture.Sample(Sampler1, float2(_147.x, _144.y));
+			float3 _162 = TonemappedColorTexture.Sample(Sampler1, float2(_144.x, _147.y));
+			float3 _167 = TonemappedColorTexture.Sample(Sampler1, _147);
+#else
+			float4 _145 = float4(_89 - 6.f,
+			                     RCP6, RCP6);
+
+			_145.xzyw *= _99.xxyy;
+
+			_145.xy += 4.f;
+			_145.zw *= _76;
+
+			_145.xy *= RCP6;
+
+			_145 /= _88;
+
+			_145.xy -= 1.f;
+			_145.zw += 1.f;
+
+			_145.xzyw += _139.xxyy;
+
+			_145.xzyw /= cbConst.xxyy;
+
+			float3 _152 = TonemappedColorTexture.Sample(Sampler1, _145.xy);
+			float3 _157 = TonemappedColorTexture.Sample(Sampler1, _145.zy);
+			float3 _162 = TonemappedColorTexture.Sample(Sampler1, _145.xw);
+			float3 _167 = TonemappedColorTexture.Sample(Sampler1, _145.zw);
+#endif
+
+			if (HdrDllPluginConstants.DisplayMode > 0)
+			{
+				_152 /= IntermediateNormalizationFactor;
+				_157 /= IntermediateNormalizationFactor;
+				_162 /= IntermediateNormalizationFactor;
+				_167 /= IntermediateNormalizationFactor;
+			}
+			else
 			{
 				_152 = GAMMA_TO_LINEAR(_152);
 				_157 = GAMMA_TO_LINEAR(_157);
 				_162 = GAMMA_TO_LINEAR(_162);
 				_167 = GAMMA_TO_LINEAR(_167);
 			}
-			float3 unsharpenedColor = (((_167 * _98) + (_162 * _87)) * _136) + (((_157 * _98) + (_152 * _87)) * _125);
+
+#if 0
+			float3 unsharpenedColor = (((_167 * _98.x) + (_162 * _87.x)) * _98.y) + (((_157 * _98.x) + (_152 * _87.x)) * _87.y);
+#else
+			float3 unsharpenedColor = (((_167 * _88.z) + (_162 * _88.x)) * _88.w) + (((_157 * _88.z) + (_152 * _88.x)) * _88.y);
+#endif
 			// Controls the amount of a custom blurred bilinear filtering vs HW bilinear (which is blurry if there's upscaling),
 			// by lerping beyond 1 in the opposite direction of the blurred image, we apply sharpening.
 			outColor = lerp(unsharpenedColor, inColor, sharpenIntensity);
-			if (HdrDllPluginConstants.DisplayMode <= 0)
+
+			if (HdrDllPluginConstants.DisplayMode > 0)
+			{
+				outColor = max(outColor, 0.f);
+				outColor *= IntermediateNormalizationFactor;
+			}
+			else
 			{
 				outColor = LINEAR_TO_GAMMA(outColor);
 			}
