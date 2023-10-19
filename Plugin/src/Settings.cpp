@@ -192,6 +192,11 @@ namespace Settings
 		a_outShaderConstants.DevSetting05 = static_cast<float>(DevSetting05.value.get_data() * 0.01f);  // 0-100 to 0-1
     }
 
+    void Main::InitConfig(bool a_bIsSFSE)
+	{
+		config = a_bIsSFSE ? &sfseConfig : &asiConfig;
+	}
+
     void Main::RegisterReshadeOverlay()
     {
 		if (!bReshadeSettingsOverlayRegistered) {
@@ -210,28 +215,28 @@ namespace Settings
 	{
 		static std::once_flag ConfigInit;
 		std::call_once(ConfigInit, [&]() {
-			config.Bind(DisplayMode.value, DisplayMode.defaultValue);
-			config.Bind(ForceSDROnHDR.value, ForceSDROnHDR.defaultValue);
-			config.Bind(PeakBrightness.value, PeakBrightness.defaultValue);
-			config.Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
-			config.Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
-			config.Bind(ExtendGamut.value, ExtendGamut.defaultValue);
-			config.Bind(Saturation.value, Saturation.defaultValue);
-			config.Bind(Contrast.value, Contrast.defaultValue);
-			config.Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
-			config.Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
-			config.Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
-			config.Bind(GammaCorrectionStrength.value, GammaCorrectionStrength.defaultValue);
-			config.Bind(VanillaMenuLUTs.value, VanillaMenuLUTs.defaultValue);
-			config.Bind(FilmGrainType.value, FilmGrainType.defaultValue);
-			config.Bind(FilmGrainCap.value, FilmGrainCap.defaultValue);
-			config.Bind(PostSharpen.value, PostSharpen.defaultValue);
-			config.Bind(DevSetting01.value, DevSetting01.defaultValue);
-			config.Bind(DevSetting02.value, DevSetting02.defaultValue);
-			config.Bind(DevSetting03.value, DevSetting03.defaultValue);
-			config.Bind(DevSetting04.value, DevSetting04.defaultValue);
-			config.Bind(DevSetting05.value, DevSetting05.defaultValue);
-			config.Bind(RenderTargetsToUpgrade,
+			config->Bind(DisplayMode.value, DisplayMode.defaultValue);
+			config->Bind(ForceSDROnHDR.value, ForceSDROnHDR.defaultValue);
+			config->Bind(PeakBrightness.value, PeakBrightness.defaultValue);
+			config->Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
+			config->Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
+			config->Bind(ExtendGamut.value, ExtendGamut.defaultValue);
+			config->Bind(Saturation.value, Saturation.defaultValue);
+			config->Bind(Contrast.value, Contrast.defaultValue);
+			config->Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
+			config->Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
+			config->Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
+			config->Bind(GammaCorrectionStrength.value, GammaCorrectionStrength.defaultValue);
+			config->Bind(VanillaMenuLUTs.value, VanillaMenuLUTs.defaultValue);
+			config->Bind(FilmGrainType.value, FilmGrainType.defaultValue);
+			config->Bind(FilmGrainCap.value, FilmGrainCap.defaultValue);
+			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
+			config->Bind(DevSetting01.value, DevSetting01.defaultValue);
+			config->Bind(DevSetting02.value, DevSetting02.defaultValue);
+			config->Bind(DevSetting03.value, DevSetting03.defaultValue);
+			config->Bind(DevSetting04.value, DevSetting04.defaultValue);
+			config->Bind(DevSetting05.value, DevSetting05.defaultValue);
+			config->Bind(RenderTargetsToUpgrade,
 			    "ImageSpaceBuffer",
 				"ScaleformCompositeBuffer",
 				"SF_ColorBuffer",
@@ -246,18 +251,18 @@ namespace Settings
 				//"NativeResolutionColorBuffer01",  // issues on AMD
 				//"ColorBuffer01"
 				);
-			config.Bind(PeakBrightnessAutoDetected, false);
+			config->Bind(PeakBrightnessAutoDetected, false);
 		});
 
-		config.Load();
+		config->Load();
 
 		INFO("Config loaded"sv)
 	}
 
     void Main::Save() noexcept
     {
-		config.Generate();
-		config.Write();
+		config->Generate();
+		config->Write();
     }
 
     void Main::DrawReshadeSettings(reshade::api::effect_runtime*)
@@ -266,52 +271,79 @@ namespace Settings
 		settings->DrawReshadeSettings();
     }
 
+    void Main::DrawReshadeTooltip(const char* a_desc)
+	{
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 8, 8 });
+			if (ImGui::BeginTooltip()) {
+				ImGui::PushTextWrapPos(ImGui::GetFontSize() * 50.0f);
+				ImGui::TextUnformatted(a_desc);
+				ImGui::PopTextWrapPos();
+				ImGui::EndTooltip();
+			}
+			ImGui::PopStyleVar();
+		}
+	}
+
     bool Main::DrawReshadeCheckbox(Checkbox& a_checkbox)
     {
+		bool result = false;
 		bool tempValue = *a_checkbox.value;
 		if (ImGui::Checkbox(a_checkbox.name.c_str(), &tempValue)) {
 			*a_checkbox.value = tempValue;
 			Save();
-			return true;
+			result = true;
 		}
-		return false;
+		DrawReshadeTooltip(a_checkbox.description.c_str());
+	    return result;
     }
 
     bool Main::DrawReshadeEnumStepper(EnumStepper& a_stepper)
     {
+		bool result = false;
 		int tempValue = *a_stepper.value;
 		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, 0, a_stepper.GetNumOptions() - 1, a_stepper.GetStepperText(tempValue).c_str(), ImGuiSliderFlags_NoInput)) {
 			*a_stepper.value = tempValue;
 			Save();
-			return true;
+			result = true;
 		}
-		return false;
+		DrawReshadeTooltip(a_stepper.description.c_str());
+		return result;
     }
 
     bool Main::DrawReshadeValueStepper(ValueStepper& a_stepper)
 	{
+		bool result = false;
 		int tempValue = *a_stepper.value;
 		if (ImGui::SliderInt(a_stepper.name.c_str(), &tempValue, a_stepper.minValue, a_stepper.maxValue, std::to_string(tempValue).c_str())) {
 			*a_stepper.value = tempValue;
 			Save();
-			return true;
+			result = true;
 		}
-		return false;
+		DrawReshadeTooltip(a_stepper.description.c_str());
+		return result;
 	}
 
     bool Main::DrawReshadeSlider(Slider& a_slider)
     {
+		bool result = false;
 		float tempValue = *a_slider.value;
 		if (ImGui::SliderFloat(a_slider.name.c_str(), &tempValue, a_slider.sliderMin, a_slider.sliderMax, "%.0f")) {
 			*a_slider.value = tempValue;
 			Save();
-			return true;
+			result = true;
 		}
-		return false;
+		DrawReshadeTooltip(a_slider.description.c_str());
+		return result;
     }
 
     void Main::DrawReshadeSettings()
     {
+		ImGui::SetWindowSize(ImVec2(0, 0));
+		const auto& io = ImGui::GetIO();
+		const auto currentPos = ImGui::GetWindowPos();
+		ImGui::SetWindowPos(ImVec2(io.DisplaySize.x / 3, currentPos.y), ImGuiCond_FirstUseEver);
+
 		const bool isSDRForcedOnHDR = IsSDRForcedOnHDR();
 		const bool isGameRenderingSetToHDR = IsGameRenderingSetToHDR();
 #if DEVELOPMENT

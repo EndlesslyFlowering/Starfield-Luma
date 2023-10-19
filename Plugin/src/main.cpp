@@ -34,11 +34,19 @@ static inline bool bIsLoaded = false;
 
 void LoadPlugin(bool a_bIsSFSE)
 {
+#ifndef NDEBUG
+	while (!IsDebuggerPresent()) {
+		Sleep(100);
+	}
+#endif
+
 	dku::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));
 	INFO("{} v{} loaded", Plugin::NAME, Plugin::Version)
 
 	// do stuff
-	Settings::Main::GetSingleton()->Load();
+	const auto settings = Settings::Main::GetSingleton();
+	settings->InitConfig(a_bIsSFSE);
+	settings->Load();
 
 	if (a_bIsSFSE) {
 		SFSE::AllocTrampoline(1 << 8);
@@ -71,25 +79,11 @@ DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
 	return true;
 }
 
-BOOL APIENTRY DllMain(HMODULE a_hModule, DWORD a_ul_reason_for_call, LPVOID a_lpReserved)
+DLLEXPORT void InitializeASI()
 {
-	switch (a_ul_reason_for_call) {
-	case DLL_PROCESS_ATTACH:
-#ifndef NDEBUG
-		while (!IsDebuggerPresent()) {
-			Sleep(100);
-		}
-#endif
-		if (bIsLoaded) {
-			return TRUE;
-		}
-
-		LoadPlugin(false);
-	    break;
-	case DLL_PROCESS_DETACH:
-	    reshade::unregister_addon(a_hModule);
-	    break;
+	if (bIsLoaded) {
+		return;
 	}
 
-	return TRUE;
+	LoadPlugin(false);
 }
