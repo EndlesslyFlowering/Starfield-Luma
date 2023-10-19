@@ -60,3 +60,12 @@ Comparison with other "HDR" methods:
 -Windows 11 AutoHDR: Windows 11 can apply fake HDR as post process filter, but this is still limited by 8bits output (causing banding), interprets games as gamma sRGB instead of 2.2, and doesn't go anywhere beyond 1000 nits. Additionally, it makes the game UI too bright.
 -SpecialK HDR Retrofit: It can upgrade all buffers to 16bit but the game tonemapping remains SDR, and highlights gets mushed together and clipped.
 -Pumbo's Advanced Auto HDR + DXVK: Same problems as SpecialK HDR.
+
+Donations:
+https://ko-fi.com/ershin
+https://www.buymeacoffee.com/realfiloppi (Pumbo)
+https://ko-fi.com/shortfuse
+Lilium: link upcoming
+
+Thanks:
+Phinix (testing), Fank (testing), MPaul (testing)
