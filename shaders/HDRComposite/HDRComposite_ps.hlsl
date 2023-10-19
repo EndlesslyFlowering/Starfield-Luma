@@ -544,9 +544,9 @@ static const float den = log2(C + 1.f);
 void Log2Adjust(inout float Channel)
 {
 #if (C != 1)
-	Channel = log2(max(Channel * c + 1.f, 0.f)) / den;
+	Channel = log2(max(Channel * c + 1.f, FLT_MIN)) / den;
 #else
-	Channel = log2(max(Channel + 1.f, 0.f));
+	Channel = log2(max(Channel + 1.f, FLT_MIN));
 #endif
 }
 
@@ -609,7 +609,7 @@ float3 PostProcess(
 
 	// saturation adjustment a la Hable
 	// https://github.com/johnhable/fw-public/blob/37de36e662336415f5ef654d8edfc46b4ad025ed/FilmicCurve/FilmicColorGrading.cpp#L307-L309
-	// NOTE: this can cause negative colors.
+	// NOTE: this can cause negative colors. Use "Aurora" drug for the worst in game case.
 	Color = ((Color - ColorLuminance) * hableSaturation) + ColorLuminance;
 
 	// Blend in another color based on the luminance.
