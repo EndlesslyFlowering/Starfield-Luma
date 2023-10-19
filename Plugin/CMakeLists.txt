@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21)
 # info
 project(
 	Luma
-	VERSION 0.3.3
+	VERSION 0.3.4
 	LANGUAGES CXX
 )
 
