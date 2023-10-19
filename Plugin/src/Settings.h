@@ -1,8 +1,11 @@
 #pragma once
 #include "Offsets.h"
-#include "DKUtil/Config.hpp"
 #include "RE/Buffers.h"
+
 #include "reshade/reshade.hpp"
+
+#define CONFIG_ENTRY ""
+#include "DKUtil/Config.hpp"
 
 #include <d3d12.h>
 
@@ -166,7 +169,7 @@ namespace Settings
 		ValueStepper PeakBrightness{
 			SettingID::kHDR_PeakBrightness,
 			"Peak Brightness",
-			"Sets the peak brightness in HDR modes, this should match your display peak brightness.\nThis will not influence the game average brightness.",
+			"Sets the peak brightness in HDR modes.\nThe value should match your display's peak brightness.\n\nThis does not affect the game's average brightness.",
 			"PeakBrightness", "HDR",
 			1000,
 			80,
@@ -176,7 +179,7 @@ namespace Settings
 		ValueStepper GamePaperWhite{
 			SettingID::kHDR_GamePaperWhite,
 			"Game Paper White",
-			"Sets the game paper white brightness in HDR modes.\nThis influences the average brightness of the image without affecting the peak brightness.\nDefault is 200.",
+			"Sets the game paper white brightness in HDR modes.\nThis setting affects the average brightness of the image without impacting the peak brightness.\n\nThe default value is 200.",
 			"GamePaperWhite", "HDR",
 			200, /*ITU reference default is 203 but we don't want to confuse users*/
 		    80,
@@ -186,7 +189,7 @@ namespace Settings
 		ValueStepper UIPaperWhite{
 			SettingID::kHDR_UIPaperWhite,
 			"UI Paper White",
-			"Sets the UI paper white brightness in HDR modes.\nDefault is 200.",
+			"Sets the user interface paper white brightness in HDR modes.\n\nThe default value is 200.",
 			"UIPaperWhite", "HDR",
 			200, /*ITU reference default is 203 but we don't want to confuse users*/
 			80,
@@ -196,7 +199,7 @@ namespace Settings
 		Slider   ExtendGamut{
 		    SettingID::kHDR_ExtendGamut,
 		    "Extend Gamut",
-		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation. Neutral at 0\%.",
+		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation.\n\nNeutral at 0\%.",
 		    { "ExtendGamut", "HDR" },
 		    33.333f,
 		    0.f,
@@ -206,7 +209,7 @@ namespace Settings
 		Slider   Saturation{
 		    SettingID::kHDR_Saturation,
 		    "Saturation",
-		    "Sets the saturation strength in HDR modes. Neutral default at 50\%.",
+		    "Sets the saturation strength in HDR modes.\n\nNeutral default at 50\%.",
 		    { "Saturation", "HDR" },
 		    50.f,
 		    0.f,
@@ -216,7 +219,7 @@ namespace Settings
 		Slider   Contrast{
 		    SettingID::kHDR_Contrast,
 		    "Contrast",
-		    "Sets the contrast strength in HDR modes. Neutral default at 50\%.",
+		    "Sets the contrast strength in HDR modes.\n\nNeutral default at 50\%.",
 		    { "Contrast", "HDR" },
 		    50.f,
 		    0.f,
@@ -226,7 +229,7 @@ namespace Settings
 		Slider   SecondaryBrightness{
 		    SettingID::kSecondaryBrightness,
 		    "Brightness",
-		    "Modulates the brightness in SDR modes. Neutral default at 50\%.",
+		    "Modulates the brightness in SDR modes.\n\nNeutral default at 50\%.",
 		    { "SecondaryBrightness", "Main" },
 		    50.f,
 		    0.f,
@@ -236,7 +239,7 @@ namespace Settings
 		Slider   LUTCorrectionStrength{
 		    SettingID::kLUTCorrectionStrength,
 		    "LUT Correction Strength",
-		    "Sets the LUT correction (normalization) strength. This removes the fogginess from the game vanilla LUTs.",
+		    "Sets the LUT correction (normalization) strength.\nThis removes the fogginess from the game vanilla LUTs.",
 		    { "LUTCorrectionStrength", "Main" },
 		    100.f,
 		    0.f,
@@ -246,7 +249,7 @@ namespace Settings
 		Slider   ColorGradingStrength{
 		    SettingID::kColorGradingStrength,
 		    "Color Grading Strength",
-		    "Sets the color grading strength - how much the LUTs influence the final image.",
+		    "Sets the color grading strength.\nThis setting influences how much the LUTs influence the final image.",
 		    { "ColorGradingStrength", "Main" },
 		    100.f,
 		    0.f,
@@ -256,7 +259,7 @@ namespace Settings
 		Slider   GammaCorrectionStrength{
 		    SettingID::kGammaCorrectionStrength,
 		    "Gamma Correction Strength",
-		    "Sets the gamma correction strength. The game used the sRGB gamma formula but was calibrated on gamma 2.2 displays. 100\% should be closer to the original look.",
+		    "Sets the gamma correction strength.\nThe game used the sRGB gamma formula but was calibrated on gamma 2.2 displays.\n\n100\% should be closer to the original look.",
 		    { "GammaCorrectionStrength", "Main" },
 		    100.f,
 		    0.f,
@@ -273,25 +276,25 @@ namespace Settings
 		EnumStepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
 		    "Film Grain Type",
-		    "Sets the film grain type. Luma offers an improved version, we suggest setting the strength to 50\% for it.",
+		    "Sets the film grain type.\nLuma offers an improved version, we suggest setting the \"Film Grain Strength\" setting to 50\% or lower.",
 		     "FilmGrainType", "Main",
 		    1,
 		    { "Vanilla", "Improved" }
 		};
 		Slider FilmGrainCap{
 			SettingID::kFilmGrainCap,
-			"Film Grain Cap",
-			"Sets a framerate cap on the improved film grain. Set to 0 for uncapped framerate.",
+			"Film Grain Framerate",
+			"Sets a framerate cap on the improved film grain.\nSet to 0 for uncapped film grain framerate.",
 			{ "FilmGrainCap", "Main" },
 			0.f,
 			0.f,
 			100.f,
-			"FPS"
+			""
 		};
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
-			"Toggles the game default post sharpen pass. By default this was running after other sharpening or upscaling methods, and was always forced on.",
+			"Toggles the game's default post-sharpen pass.\nBy default, this pass runs after other sharpening or upscaling methods, and it is always forced on.",
 			{ "PostSharpen", "Main" },
 			true
 		};
@@ -324,6 +327,8 @@ namespace Settings
 
 		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
 
+		void InitConfig(bool a_bIsSFSE);
+
 		void RegisterReshadeOverlay();
 
         void Load() noexcept;
@@ -332,7 +337,10 @@ namespace Settings
 		static void DrawReshadeSettings(reshade::api::effect_runtime*);
 
     private:
-		TomlConfig config = COMPILE_PROXY("Luma.toml"sv);
+		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");
+		TomlConfig asiConfig = COMPILE_PROXY("Luma.toml");
+		TomlConfig* config = nullptr;
+
 		std::atomic_bool bIsAtEndOfFrame = false;
 		std::atomic_bool bIsHDRSupported = false;
 		std::atomic_bool bIsHDREnabled = false;
@@ -341,6 +349,7 @@ namespace Settings
 
 		bool bReshadeSettingsOverlayRegistered = false;
 
+		void DrawReshadeTooltip(const char* a_desc);
 		bool DrawReshadeCheckbox(Checkbox& a_checkbox);
 		bool DrawReshadeEnumStepper(EnumStepper& a_stepper);
 		bool DrawReshadeValueStepper(ValueStepper& a_stepper);
