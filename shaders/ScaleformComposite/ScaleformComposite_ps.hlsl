@@ -107,13 +107,23 @@ float4 PS(PSInputs psInputs) : SV_Target
 		return 0;
 	}
 	// This is always in linear unless "SDR_LINEAR_INTERMEDIARY" was false and we were in SDR
-	const float3 backgroundColor = WBT2020_To_BT709(FinalColorTexture[psInputs.pos.xy].rgb) * 1.25f;
+	float3 backgroundColor = FinalColorTexture[psInputs.pos.xy].rgb;
 	float3 outputColor;
 #if !OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 	// Do this even if "UIColor.a" is 1, as we still need to tonemap the HDR background
 	if (isLinear)
 	{
-		float GamePaperWhite = isHDR ? (HdrDllPluginConstants.HDRGamePaperWhiteNits / IntermediateNormalizationFactor) : 1.f;
+		float GamePaperWhite;
+
+		if (isHDR)
+		{
+			backgroundColor = WBT2020_To_BT709(backgroundColor) * 1.25f;
+			GamePaperWhite = (HdrDllPluginConstants.HDRGamePaperWhiteNits / IntermediateNormalizationFactor);
+		}
+		else
+		{
+			GamePaperWhite = 1.f;
+		}
 
 		// 1) Emulate SDR gamma space blends:
 
