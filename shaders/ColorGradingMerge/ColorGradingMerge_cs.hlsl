@@ -49,13 +49,6 @@
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
 
-// Behaviour when the color Lightness goes beyond 1
-// -0: Allow lightness above 1
-// -1: Revert to original (non-normalized) color
-// -2: Clamp lightness to 1
-#define LUT_SDR_ON_CLIP 1u
-#define LUT_HDR_ON_CLIP 0u
-
 static const float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
@@ -231,21 +224,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Use hue from original LUT color
 	const float targetHue = originalLCh[2];
 
-	float3 outputLCh;
-
-	if (targetL >= 1.f) {
-		const uint clipBehavior = SDRRange ? LUT_SDR_ON_CLIP : LUT_HDR_ON_CLIP;
-		if (clipBehavior == 0) // As is (treat it the same as any other color)
-			outputLCh = float3(targetL, targetChroma, targetHue);
-		else if (clipBehavior == 1) {
-			outputLCh = originalLCh; // Keep original color (do nothing)
-		} else if (clipBehavior == 2) {
-			outputLCh = float3(1.f, targetChroma, targetHue);
-		}
-	}
-	else {
-		outputLCh = float3(targetL, targetChroma, targetHue);
-	}
+	float3 outputLCh = float3(targetL, targetChroma, targetHue);
 
 #if LUT_DEBUG_VALUES // Debug black point
 	float3 debugLinear = oklch_to_linear_srgb(outputLCh);
