@@ -564,6 +564,11 @@ float SigmoidalContrastAdjustment(
 	if (Channel <= contrastMidPoint)
 	{
 		Channel *= normalizationFactorLower;
+
+		// abs/sign to handle negative case
+		float signChannel = sign(Channel);
+		Channel = abs(Channel);
+
 		// doing this for contrastIntensity below 1 greatly desaturates compared to not doing this
 		// look into if contrastIntensity ever goes below 1
 		// and remove this check if it does not
@@ -571,8 +576,7 @@ float SigmoidalContrastAdjustment(
 		{
 			Log2Adjust(Channel);
 		}
-		// abs/sign to handle negative case
-        Channel = pow(abs(Channel), contrastIntensity) * sign(Channel) / normalizationFactorLower;
+		Channel = pow(Channel, contrastIntensity) * signChannel / normalizationFactorLower;
 	}
 	else
 	{
