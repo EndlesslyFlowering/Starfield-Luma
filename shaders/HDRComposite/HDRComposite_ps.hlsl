@@ -484,7 +484,7 @@ float3 DICETonemap(
 	}
 	return Color;
 
-#elif HDR_TONEMAP_TYPE == 2 // By ICtCp "luma"
+#elif HDR_TONEMAP_TYPE == 2 // By ICtCp; I is the luminance encoded in PQ
 
 	//optimisation needed to not execute this for every pixel...
 	static const float TargetCllInPq     = Linear_to_PQ(MaxOutputLuminance, PQMaxWhitePoint);
@@ -492,7 +492,6 @@ float3 DICETonemap(
 
 	//to L'M'S' and normalize to 1 = 10000 nits
 	float3 PQ_LMS = BT709_to_LMS(Color / PQMaxWhitePoint);
-	PQ_LMS = max(PQ_LMS, 0.f);
 	PQ_LMS = Linear_to_PQ(PQ_LMS);
 
 	//Intensity
@@ -514,8 +513,6 @@ float3 DICETonemap(
 		PQ_LMS = ICtCp_to_PQ_LMS(float3(i2,
 			                              dot(PQ_LMS, PQ_LMS_2_ICtCp[1]) * minI,
 			                              dot(PQ_LMS, PQ_LMS_2_ICtCp[2]) * minI));
-
-		PQ_LMS = max(PQ_LMS, 0.f);
 
 		//to LMS
 		float3 LMS = PQ_to_Linear(PQ_LMS);
