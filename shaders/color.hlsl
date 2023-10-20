@@ -388,6 +388,8 @@ float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
 
 	float  LumaAP1   = dot(ColorAP1, AP1D65_2_XYZ[1]);
 	float3 ChromaAP1 = ColorAP1 / LumaAP1;
+	if (LumaAP1 <= 0.f) // Skip invalid colors
+		return Color;
 
 	float3 ChromaAP1Minus1  = ChromaAP1 - 1.f;
 	float  ChromaDistSqr    = dot(ChromaAP1Minus1, ChromaAP1Minus1);
