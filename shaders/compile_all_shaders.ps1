@@ -106,7 +106,7 @@ function Compile-Shader {
 	Write-Host "Compiling ${outputBinName}..."
 
 	# Build the shader in its staging directory
-	$args = "`"${inputHlslPath}`" -Fo `"${stagedBinPath}`" -T ${Type}_6_6 -E ${Entry} "
+	$args = "`"${inputHlslPath}`" -WX -Fo `"${stagedBinPath}`" -T ${Type}_6_6 -E ${Entry} "
 
 	if ($ShaderOutputEmbedPDB -eq $true) {
 		$args = $args + "-Qembed_debug -Zi "
