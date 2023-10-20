@@ -141,40 +141,39 @@ float3 gamma_sRGB_to_linear(float3 Color)
 }
 
 // PQ (Perceptual Quantizer - ST.2084) encode/decode used for HDR10 BT.2100
-float3 Linear_to_PQ(float3 LinearColor)
+template<class T>
+T Linear_to_PQ(T LinearColor)
 {
-	float3 colorPow = pow(LinearColor, PQ_constant_M1);
-	float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
-	float3 denominator = 1.f + PQ_constant_C3 * colorPow;
-	float3 pq = pow(numerator / denominator, PQ_constant_M2);
+	LinearColor = max(LinearColor, 0.f);
+	T colorPow = pow(LinearColor, PQ_constant_M1);
+	T numerator = PQ_constant_C1 + PQ_constant_C2 * colorPow;
+	T denominator = 1.f + PQ_constant_C3 * colorPow;
+	T pq = pow(numerator / denominator, PQ_constant_M2);
 	return pq;
 }
 
-float3 Linear_to_PQ(float3 LinearColor, const float PQMaxValue)
+template<class T>
+T Linear_to_PQ(T LinearColor, const float PQMaxValue)
 {
 	LinearColor /= PQMaxValue;
 	return Linear_to_PQ(LinearColor);
 }
 
-float PQ_to_Linear(float ST2084Color)
+template<class T>
+T PQ_to_Linear(T ST2084Color)
 {
-	float colorPow = pow(ST2084Color, 1.f / PQ_constant_M2 );
-	float numerator = max(colorPow - PQ_constant_C1, 0.f);
-	float denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
-	float linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
+	ST2084Color = max(ST2084Color, 0.f);
+	T colorPow = pow(ST2084Color, 1.f / PQ_constant_M2);
+	T numerator = max(colorPow - PQ_constant_C1, 0.f);
+	T denominator = PQ_constant_C2 - (PQ_constant_C3 * colorPow);
+	T linearColor = pow(numerator / denominator, 1.f / PQ_constant_M1);
 	return linearColor;
 }
 
-float3 PQ_to_Linear(float3 ST2084Color)
+template<class T>
+T PQ_to_Linear(T ST2084Color, const float PQMaxValue)
 {
-	return float3(PQ_to_Linear(ST2084Color.r),
-	              PQ_to_Linear(ST2084Color.g),
-	              PQ_to_Linear(ST2084Color.b));
-}
-
-float3 PQ_to_Linear(float3 ST2084Color, const float PQMaxValue)
-{
-	float3 linearColor = PQ_to_Linear(ST2084Color);
+	T linearColor = PQ_to_Linear(ST2084Color);
 	linearColor *= PQMaxValue;
 	return linearColor;
 }
