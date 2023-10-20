@@ -42,6 +42,7 @@
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
+#define DRAW_TONEMAPPER 0
 
 
 cbuffer CSharedFrameData : register(b0, space6)
@@ -1054,6 +1055,41 @@ PSOutput PS(PSInput psInput)
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
 	float3 inputColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
 
+#if DRAW_TONEMAPPER
+	static const uint DrawToneMapperSize = 512;
+	static const uint toneMapperPadding = 8;
+	static const uint toneMapperBins = DrawToneMapperSize - (2 * toneMapperPadding);
+	float width;
+	float height;
+	float valueX;
+	float valueY;
+	uint toneMapperX;
+	uint toneMapperY;
+	
+	bool drawToneMapper = false;
+	InputColorTexture.GetDimensions(width, height);
+	int2 offset = int2(
+		psInput.SV_Position.x - (width - DrawToneMapperSize),
+		(DrawToneMapperSize) - psInput.SV_Position.y
+	);
+	if (offset.x >= 0 && offset.y >= 0) {
+		inputColor = float3(0.5f,0.5f,0.5f);
+		if (
+			offset.x >= toneMapperPadding
+			&& offset.y >= toneMapperPadding
+			&& offset.x < (DrawToneMapperSize - toneMapperPadding)
+			&& offset.y < (DrawToneMapperSize - toneMapperPadding)
+		) {
+			drawToneMapper = true;
+			toneMapperX = offset.x - toneMapperPadding;
+			toneMapperY = offset.y - toneMapperPadding;
+			valueX = float(toneMapperX) / float(toneMapperBins);
+			valueY = float(toneMapperY) / float(toneMapperBins);
+			inputColor = float3(valueX,valueX,valueX);
+		}
+	}
+#endif
+
 #if CLAMP_INPUT_OUTPUT
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
 	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
@@ -1387,6 +1423,16 @@ PSOutput PS(PSInput psInput)
 #endif // CLAMP_INPUT_OUTPUT
 	}
 
+#if DRAW_TONEMAPPER
+	if (drawToneMapper) {
+		float binnedOutput = Luminance(outputColor);
+		if (floor(binnedOutput * toneMapperBins) == toneMapperY) {
+			outputColor *= 0;
+		} else {
+			outputColor = float3(1.f,1.f,1.f);
+		}
+	}
+#endif
 	PSOutput psOutput;
 	psOutput.SV_Target.rgb = outputColor;
 	psOutput.SV_Target.a = 1.f;
