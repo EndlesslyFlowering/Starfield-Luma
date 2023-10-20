@@ -60,7 +60,8 @@ float4 PS(PSInputs inputs) : SV_Target
 			// Negative values need to be clamped though to avoid doing pow on a negative values.
 			color.rgb = WBT2020_To_BT2020(color.rgb);
 			color.rgb /= IntermediateNormalizationFactor;
-			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits / IntermediateNormalizationFactor * 0.0105f);
+			// Linear_to_PQ does max(x, 0.f)
+			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits / IntermediateNormalizationFactor * 0.0105f);
 			color.rgb = Linear_to_PQ(color.rgb);
 		}
 #if SDR_LINEAR_INTERMEDIARY
