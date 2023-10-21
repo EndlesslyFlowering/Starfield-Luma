@@ -35,6 +35,7 @@ namespace Settings
         kVanillaMenuLUTs,
 		kFilmGrainType,
 		kFilmGrainCap,
+		kFilmGrainBoost,
 		kPostSharpen,
 
 		kEND,
@@ -137,6 +138,7 @@ namespace Settings
 		float    SDRSecondaryBrightness;
 		uint32_t FilmGrainType;
 		float    FilmGrainCap;
+		float    FilmGrainBoost;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
 		uint32_t RuntimeMS;
@@ -290,6 +292,13 @@ namespace Settings
 			0.f,
 			100.f,
 			""
+		};
+		Checkbox FilmGrainBoost{
+			SettingID::kFilmGrainBoost,
+			"Film Grain Boost",
+			"Applies a 3.333x boost to improved film grain intensity",
+			{ "FilmGrainBoost", "Main" },
+			false
 		};
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,

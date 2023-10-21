@@ -182,6 +182,7 @@ namespace Settings
 		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR() ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
 		a_outShaderConstants.FilmGrainCap = static_cast<float>(FilmGrainCap.value.get_data());
+		a_outShaderConstants.FilmGrainBoost = static_cast<uint32_t>(FilmGrainBoost.value.get_data());
 		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
 		a_outShaderConstants.bIsAtEndOfFrame = static_cast<uint32_t>(bIsAtEndOfFrame.load());
 		a_outShaderConstants.RuntimeMS = *Offsets::g_durationOfApplicationRunTimeMS;
@@ -230,6 +231,7 @@ namespace Settings
 			config->Bind(VanillaMenuLUTs.value, VanillaMenuLUTs.defaultValue);
 			config->Bind(FilmGrainType.value, FilmGrainType.defaultValue);
 			config->Bind(FilmGrainCap.value, FilmGrainCap.defaultValue);
+			config->Bind(FilmGrainBoost.value, FilmGrainBoost.defaultValue);
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
 			config->Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config->Bind(DevSetting02.value, DevSetting02.defaultValue);
@@ -380,6 +382,7 @@ namespace Settings
 		DrawReshadeEnumStepper(FilmGrainType);
 		if (IsFilmGrainTypeImproved()) {
 			DrawReshadeSlider(FilmGrainCap);
+			DrawReshadeCheckbox(FilmGrainBoost);
 		}
 		DrawReshadeCheckbox(PostSharpen);
 

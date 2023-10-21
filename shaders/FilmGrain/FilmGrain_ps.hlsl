@@ -190,7 +190,7 @@ void frag_main()
 		float yChange = randomFactor
 			* graininess
 			* filmGrainColorAndIntensity.z // fFilmGrainAmountMax (0.03)
-			* 3.333f // Bump to 10%
+			* (HdrDllPluginConstants.FilmGrainBoost ? 3.3333f : 1.f) // Boost to (10%)
 		;
 
 		outputColor = linearColor * (1.f + yChange);
