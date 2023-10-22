@@ -285,6 +285,7 @@ namespace Hooks
 			}
 
 		case 0xFF81:
+		case 0xFF82:
 			{
 				Settings::ShaderConstants shaderConstants;
 				const auto settings = Settings::Main::GetSingleton();
@@ -293,7 +294,7 @@ namespace Hooks
 				    shaderConstants.LUTCorrectionStrength = 0.f;
 				    shaderConstants.ColorGradingStrength = 1.f;
 				}
-				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge
+				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge / HDRColorGradingMerge
 				break;
 			}
 

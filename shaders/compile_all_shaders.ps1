@@ -25,6 +25,8 @@ $main =
 
 	#ColorGradingMerge
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF81"
+	#HDRColorGradingMerge
+	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF82" -OutputName "HDRColorGradingMerge"
 
 	#ContrastAdaptiveSharpening
 	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "FF94" -Entry "main"
@@ -89,6 +91,9 @@ function Compile-Shader {
 		[string]$TechniqueId,
 
 		[Parameter(Mandatory = $false)]
+		[string]$OutputName = $TechniqueName,
+
+		[Parameter(Mandatory = $false)]
 		[string]$Entry = $Type.ToUpper(),
 
 		[parameter(Mandatory = $false)]
@@ -99,8 +104,8 @@ function Compile-Shader {
 	)
 
 	$inputHlslName = "${TechniqueName}_${Type}.hlsl"
-	$outputBinName = "${TechniqueName}_${TechniqueId}_${Type}.bin"
-	$outputSigName = "${TechniqueName}_${TechniqueId}_rsg.bin"
+	$outputBinName = "${OutputName}_${TechniqueId}_${Type}.bin"
+	$outputSigName = "${OutputName}_${TechniqueId}_rsg.bin"
 
 	$inputHlslPath = "${PSScriptRoot}\${TechniqueName}\${inputHlslName}"
 	$stagedBinPath = "${PSScriptRoot}\${TechniqueName}\${outputBinName}"
@@ -131,15 +136,15 @@ function Compile-Shader {
 	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
 
     # Copy the resulting bins to the dist directory.
-    New-Item -Force -ItemType Directory -Path "${DistDirectory}\${TechniqueName}" | Out-Null
-    Copy-Item -Force -Path $stagedBinPath -Destination "${DistDirectory}\${TechniqueName}\${outputBinName}"
-    Copy-Item -Force -Path $stagedSigPath -Destination "${DistDirectory}\${TechniqueName}\${outputSigName}"
+    New-Item -Force -ItemType Directory -Path "${DistDirectory}\${OutputName}" | Out-Null
+    Copy-Item -Force -Path $stagedBinPath -Destination "${DistDirectory}\${OutputName}\${outputBinName}"
+    Copy-Item -Force -Path $stagedSigPath -Destination "${DistDirectory}\${OutputName}\${outputSigName}"
 
 	# Move the resulting bins to the game directory. Move-Item is to avoid partial reads when live shader editing
 	# is enabled.
-	New-Item -Force -ItemType Directory -Path "${ShaderOutputDirectory}\${TechniqueName}" | Out-Null
-	Move-Item -Force -Path $stagedBinPath -Destination "${ShaderOutputDirectory}\${TechniqueName}\${outputBinName}"
-	Move-Item -Force -Path $stagedSigPath -Destination "${ShaderOutputDirectory}\${TechniqueName}\${outputSigName}"
+	New-Item -Force -ItemType Directory -Path "${ShaderOutputDirectory}\${OutputName}" | Out-Null
+	Move-Item -Force -Path $stagedBinPath -Destination "${ShaderOutputDirectory}\${OutputName}\${outputBinName}"
+	Move-Item -Force -Path $stagedSigPath -Destination "${ShaderOutputDirectory}\${OutputName}\${outputSigName}"
 }
 
 try {
