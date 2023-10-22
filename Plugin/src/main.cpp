@@ -85,5 +85,19 @@ DLLEXPORT void InitializeASI()
 		return;
 	}
 
+	auto module = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
+	auto ntHeaders = reinterpret_cast<const PIMAGE_NT_HEADERS>(module + reinterpret_cast<PIMAGE_DOS_HEADER>(module)->e_lfanew);
+
+	auto& directory = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+	auto  descriptor = reinterpret_cast<const PIMAGE_EXPORT_DIRECTORY>(module + directory.VirtualAddress);
+
+	// Plugin dlls can be loaded into non-game processes when people use broken ASI loader setups. The only
+	// version-agnostic and file-name-agnostic method to detect Starfield.exe is to check the export directory
+	// name.
+	if (directory.VirtualAddress == 0 ||
+		directory.Size == 0 ||
+		memcmp(reinterpret_cast<void*>(module + descriptor->Name), "Starfield.exe", 14) != 0)
+		return;
+
 	LoadPlugin(false);
 }
