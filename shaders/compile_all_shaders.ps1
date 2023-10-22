@@ -39,6 +39,9 @@ $main =
 
 	#BinkMovie
 	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "FFAB"
+
+	#LensFlare
+	Compile-Shader -Type "ps" -TechniqueName "LensFlare" -TechniqueId "2FF7F" -Entry "main"
 }
 
 
