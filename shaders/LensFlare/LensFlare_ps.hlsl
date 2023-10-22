@@ -73,6 +73,8 @@ void frag_main()
 	texHandle.GetDimensions(heapTextureWidth,
 	                        heapTextureHeight);
 
+	// there is probably another textre that is white here?
+	// the one that gets applied first?
 	float3 testIfSun = texHandle.Load(int3(127, 127, 0)).rgb;
 
 	if (heapTextureWidth == 256
@@ -84,11 +86,17 @@ void frag_main()
 		// with targeting 100000+ nits making the outer line blurry is harder
 		// 80000 nits seems to be a good choice
 
+#if 0
+		_116 = (pow(51.f, _116) - 1.f) * 10.f;
+#elif 1
+		_116 = (pow(51.f, _116) - (1.f + _116 * 3.84f)) * (500.f / 46.16f);
+#else
 		// only increase the bright parts of the texture
 		// after 3 slight banding starts appearing
 		_116 = _116 * _116 * _116;
 		// 400 gives 80000+ nits for when the sun is pure white (for example noon)
 		_116 *= 400.f;
+#endif
 	}
 
 	float3 _158;
