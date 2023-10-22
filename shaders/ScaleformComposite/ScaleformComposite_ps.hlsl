@@ -117,8 +117,8 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		if (isHDR)
 		{
-			backgroundColor = WBT2020_To_BT709(backgroundColor) * 1.25f;
-			GamePaperWhite = (HdrDllPluginConstants.HDRGamePaperWhiteNits / IntermediateNormalizationFactor);
+			backgroundColor = WBT2020_To_BT709(backgroundColor);
+			GamePaperWhite = (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB);
 		}
 		else
 		{
@@ -160,7 +160,6 @@ float4 PS(PSInputs psInputs) : SV_Target
 		if (isHDR)
 		{
 			outputColor = BT709_To_WBT2020(outputColor);
-			outputColor /= 1.25f;
 			outputColor = max(outputColor, 0.f);
 		}
 	}

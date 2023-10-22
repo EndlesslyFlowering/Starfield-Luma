@@ -68,7 +68,7 @@ PSOutput PS(PSInput psInput)
 			// Sharpening is best done in linear space, even if Bethesda made in gamma space
 			if (HdrDllPluginConstants.DisplayMode > 0)
 			{
-				inColor /= IntermediateNormalizationFactor;
+				inColor /= PQMaxWhitePoint;
 			}
 			else
 			{
@@ -143,10 +143,10 @@ PSOutput PS(PSInput psInput)
 
 			if (HdrDllPluginConstants.DisplayMode > 0)
 			{
-				_152 /= IntermediateNormalizationFactor;
-				_157 /= IntermediateNormalizationFactor;
-				_162 /= IntermediateNormalizationFactor;
-				_167 /= IntermediateNormalizationFactor;
+				_152 /= PQMaxWhitePoint;
+				_157 /= PQMaxWhitePoint;
+				_162 /= PQMaxWhitePoint;
+				_167 /= PQMaxWhitePoint;
 			}
 			else
 			{
@@ -168,7 +168,7 @@ PSOutput PS(PSInput psInput)
 			if (HdrDllPluginConstants.DisplayMode > 0)
 			{
 				outColor = max(outColor, 0.f);
-				outColor *= IntermediateNormalizationFactor;
+				outColor *= PQMaxWhitePoint;
 			}
 			else
 			{

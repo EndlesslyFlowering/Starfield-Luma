@@ -25,10 +25,10 @@ static const float BinkVideosAutoHDRShoulderPow = 2.75f; // A somewhat conservat
 // https://github.com/Filoppi/PumboAutoHDR
 float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
 {
-	const float SDRRatio = LuminanceIntermediate(Color);
+	const float SDRRatio = Luminance(Color);
 	// Limit AutoHDR brightness, it won't look good beyond a certain level.
 	// The paper white multiplier is applied later so we account for that.
-	const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, IntermediateNormalizationFactor) / IntermediateNormalizationFactor;
+	const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, WhiteNits_sRGB) / WhiteNits_sRGB;
 	const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
 	const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, BinkVideosAutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
 	const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
@@ -77,7 +77,7 @@ float4 PS(PSInputs inputs) : SV_Target
 		{
 			color = BT709_To_WBT2020(color);
 
-			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / IntermediateNormalizationFactor;
+			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			if (BinkVideosAutoHDR)
 				color = PumboAutoHDR(color, HdrDllPluginConstants.HDRPeakBrightnessNits, paperWhite);
 

@@ -60,7 +60,7 @@ half3 PrepareForProcessing(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
-		return saturate(Color / IntermediateNormalizationFactor);
+		return saturate(Color / PQMaxWhitePoint);
 	}
 	else
 	{
@@ -72,7 +72,7 @@ half3 PrepareForOutput(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
-		return Color * IntermediateNormalizationFactor;
+		return Color * PQMaxWhitePoint;
 	}
 	else
 	{
@@ -715,7 +715,7 @@ void CS(CSInput csInput)
 #elif defined(USE_PACKED_MATH) \
   && !defined(USE_UPSCALING)
 #if 0 // Disable the CS so it just outputs the input
-	uint2 _55 = CASData.cas2.xy;
+	uint2 _55 = CASData.rectLimits0.xy;
 	uint _58 = _55.x + (((csInput.SV_GroupThreadID.x >> 1u) & 7u) | (csInput.SV_GroupID.x << 4u));
 	uint ppx = _58;
 	uint ppy = ((((csInput.SV_GroupThreadID.x >> 3u) & 6u) | (csInput.SV_GroupThreadID.x & 1u)) | (csInput.SV_GroupID.y << 4u)) + _55.y;

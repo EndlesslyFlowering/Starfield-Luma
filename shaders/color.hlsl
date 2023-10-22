@@ -18,8 +18,6 @@ static const float PQMaxNits = 10000.0f;
 // SMPTE ST 2084 is defined as using BT.2020 white point.
 static const float PQMaxWhitePoint = PQMaxNits / WhiteNits_sRGB;
 
-static const float IntermediateNormalizationFactor = 100.f;
-
 // These have been calculated to be as accurate as possible
 static const float3x3 BT709_2_BT2020 = float3x3(
 	0.62722527980804443359375f,       0.329476892948150634765625f, 0.04329781234264373779296875f,
@@ -182,12 +180,6 @@ float Luminance(float3 color)
 {
 	// Fixed from "wrong" values: 0.2125 0.7154 0.0721f
 	return dot(color, float3(0.2125072777271270751953125f, 0.71535003185272216796875f, 0.07214272022247314453125f));
-}
-
-// for the intermediate color space
-float LuminanceIntermediate(float3 color)
-{
-	return dot(color, float3(0.2608852386474609375f, 0.69623935222625732421875f, 0.04287539422512054443359375f));
 }
 
 float3 Saturation(float3 color, float saturation)
