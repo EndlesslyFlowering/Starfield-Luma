@@ -89,7 +89,11 @@ void frag_main()
 #if 0
 		_116 = (pow(51.f, _116) - 1.f) * 10.f;
 #elif 1
-		_116 = (pow(51.f, _116) - (1.f + _116 * 3.84f)) * (500.f / 46.16f);
+		// exactly tuned as to not decrease the input value
+		static const float adj = 3.8395f;
+		// keeps the output = input for input <= 0.001
+		// for input = 0.01 output is still 0.0185
+		_116 = (pow(51.f, _116) - (1.f + _116 * adj)) * (500.f / (50.f - adj));
 #else
 		// only increase the bright parts of the texture
 		// after 3 slight banding starts appearing
