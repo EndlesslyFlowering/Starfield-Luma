@@ -81,7 +81,7 @@ void frag_main()
 // filmGrainColorAndIntensity
 //   .x - randomInt32? changed every frame?
 //   .y = randomInt32? changed every frame?
-//   .z = Film Grading Intensity (0 - 0.03)
+//   .z = Film Grading Intensity (fFilmGrainAmountMax=0.03)
 
 	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
 	bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
@@ -187,11 +187,7 @@ void frag_main()
 		float graininess = computeFilmGraininess(density);
 		float randomFactor = (randomNumber * 2.f) - 1.f;
 
-		float yChange = randomFactor
-			* graininess
-			* filmGrainColorAndIntensity.z // fFilmGrainAmountMax (0.03)
-			* (HdrDllPluginConstants.FilmGrainBoost ? 3.3333f : 1.f) // Boost to (10%)
-		;
+		float yChange = randomFactor * graininess * filmGrainColorAndIntensity.z;
 
 		outputColor = linearColor * (1.f + yChange);
 

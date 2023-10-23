@@ -56,7 +56,6 @@ struct StructHdrDllPluginConstants
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint FilmGrainType; // 1 is default
 	float FilmGrainCap; // 24 and 0 are common defaults
-	uint FilmGrainBoost; // false is default
 	uint PostSharpen; // true is default
 	uint IsAtEndOfFrame;
 	uint RuntimeMS;
