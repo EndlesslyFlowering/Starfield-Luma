@@ -20,7 +20,6 @@ ColorGradingStrength = 100.0
 DisplayMode = 0
 FilmGrainType = 1
 FilmGrainCap = 0.0
-FilmGrainBoost = false
 GammaCorrectionStrength = 100.0
 LUTCorrectionStrength = 100.0
 PostSharpen = true
