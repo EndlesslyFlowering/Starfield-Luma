@@ -43,8 +43,6 @@
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
-#define DRAW_TONEMAPPER_CHANNELS 0
-
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -1097,8 +1095,14 @@ PSOutput PS(PSInput psInput)
 			drawToneMapper = true;
 			toneMapperX = offset.x - toneMapperPadding;
 			toneMapperY = offset.y - toneMapperPadding;
-			valueX = float(toneMapperX) / float(toneMapperBins);
-			valueY = float(toneMapperY) / float(toneMapperBins);
+
+			const float xMin = -1;
+			const float xMax = 3;
+			const float xRange = xMax - xMin;
+			// 0 exposure should map to 18% gray
+			valueX = (float(toneMapperX) / float(toneMapperBins)) * (xRange);
+			valueX = pow(10.f, valueX + xMin);
+			valueX *= 0.18; // Mid gray at 0 exposure
 			inputColor = float3(valueX,valueX,valueX);
 		}
 	}
@@ -1424,26 +1428,17 @@ PSOutput PS(PSInput psInput)
 
 #if DRAW_TONEMAPPER
 	if (drawToneMapper) {
-	#if DRAW_TONEMAPPER_CHANNELS
-		float3 tmpOutputColor = outputColor;
-		outputColor = 0.f;
-		if (floor(tmpOutputColor.r * toneMapperBins) == toneMapperY) {
-			outputColor.r = 1.f;
-		}
-		if (floor(tmpOutputColor.g * toneMapperBins) == toneMapperY) {
-			outputColor.g = 1.f;
-		}
-		if (floor(tmpOutputColor.b * toneMapperBins) == toneMapperY) {
-			outputColor.b = 1.f;
-		}
-	#else // DRAW_TONEMAPPER_CHANNELS
-		float binnedOutput = Luminance(outputColor);
-		if (floor(binnedOutput * toneMapperBins) == toneMapperY) {
-			outputColor = float3(1.f,1.f,1.f);
+		const float yMin = 0.f;
+		const float yMax = HdrDllPluginConstants.HDRPeakBrightnessNits;
+		const float yRange = yMax - yMin;
+		float valueY = (float(toneMapperY) / float(toneMapperBins)) * (yRange);
+		valueY /= 80.f;
+		float outputY = Luminance(outputColor);
+		if (outputY > valueY ) {
+			outputColor = valueY;
 		} else {
 			outputColor = 0;
 		}
-	#endif // DRAW_TONEMAPPER_CHANNELS
 	}
 #endif // DRAW_TONEMAPPER
 
