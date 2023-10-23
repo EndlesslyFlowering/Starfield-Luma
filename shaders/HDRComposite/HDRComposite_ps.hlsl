@@ -43,6 +43,7 @@
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
+#define DRAW_TONEMAPPER_CHANNELS 0
 
 
 cbuffer CSharedFrameData : register(b0, space6)
@@ -1055,6 +1056,19 @@ PSOutput PS(PSInput psInput)
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
 	float3 inputColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
 
+#if CLAMP_INPUT_OUTPUT
+	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
+	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
+	inputColor = max(inputColor, 0.f);
+#endif // CLAMP_INPUT_OUTPUT
+
+#if defined(APPLY_BLOOM)
+
+	float3 bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD);
+	inputColor += PcwHdrComposite.BloomMultiplier * bloom;
+
+#endif // APPLY_BLOOM
+
 #if DRAW_TONEMAPPER
 	static const uint DrawToneMapperSize = 512;
 	static const uint toneMapperPadding = 8;
@@ -1073,7 +1087,7 @@ PSOutput PS(PSInput psInput)
 		(DrawToneMapperSize) - psInput.SV_Position.y
 	);
 	if (offset.x >= 0 && offset.y >= 0) {
-		inputColor = float3(0.5f,0.5f,0.5f);
+		inputColor = float3(0.15f,0.15f,0.15f);
 		if (
 			offset.x >= toneMapperPadding
 			&& offset.y >= toneMapperPadding
@@ -1089,19 +1103,6 @@ PSOutput PS(PSInput psInput)
 		}
 	}
 #endif
-
-#if CLAMP_INPUT_OUTPUT
-	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
-	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
-	inputColor = max(inputColor, 0.f);
-#endif // CLAMP_INPUT_OUTPUT
-
-#if defined(APPLY_BLOOM)
-
-	float3 bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD);
-	inputColor += PcwHdrComposite.BloomMultiplier * bloom;
-
-#endif // APPLY_BLOOM
 
 	float3 outputColor = inputColor;
 
@@ -1423,14 +1424,29 @@ PSOutput PS(PSInput psInput)
 
 #if DRAW_TONEMAPPER
 	if (drawToneMapper) {
+	#if DRAW_TONEMAPPER_CHANNELS
+		float3 tmpOutputColor = outputColor;
+		outputColor = 0.f;
+		if (floor(tmpOutputColor.r * toneMapperBins) == toneMapperY) {
+			outputColor.r = 1.f;
+		}
+		if (floor(tmpOutputColor.g * toneMapperBins) == toneMapperY) {
+			outputColor.g = 1.f;
+		}
+		if (floor(tmpOutputColor.b * toneMapperBins) == toneMapperY) {
+			outputColor.b = 1.f;
+		}
+	#else // DRAW_TONEMAPPER_CHANNELS
 		float binnedOutput = Luminance(outputColor);
 		if (floor(binnedOutput * toneMapperBins) == toneMapperY) {
-			outputColor *= 0;
-		} else {
 			outputColor = float3(1.f,1.f,1.f);
+		} else {
+			outputColor = 0;
 		}
+	#endif // DRAW_TONEMAPPER_CHANNELS
 	}
-#endif
+#endif // DRAW_TONEMAPPER
+
 	PSOutput psOutput;
 	psOutput.SV_Target.rgb = outputColor;
 	psOutput.SV_Target.a = 1.f;
