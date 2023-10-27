@@ -234,7 +234,7 @@ namespace Settings
 			SettingID::kHDR_Shadows,
 			"Shadows",
 			"Sets the shadows strength in HDR modes.\n\nNeutral default at 50\%.",
-			{ "Contrast", "HDR" },
+			{ "Shadows", "HDR" },
 			50.f,
 			0.f,
 			100.f,
