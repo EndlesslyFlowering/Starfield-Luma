@@ -28,6 +28,8 @@ namespace Settings
 		kHDR_ExtendGamut,
 		kHDR_Contrast,
 		kHDR_Saturation,
+		kHDR_Shadows,
+		kHDR_Highlights,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
 		kGammaCorrectionStrength,
@@ -131,6 +133,8 @@ namespace Settings
 		float    ExtendGamut;
 		float    Saturation;
 		float    Contrast;
+		float    Shadows;
+		float    Highlights;
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
@@ -224,6 +228,26 @@ namespace Settings
 		    50.f,
 		    0.f,
 		    100.f,
+			"%"
+		};
+		Slider Shadows{
+			SettingID::kHDR_Shadows,
+			"Shadows",
+			"Sets the shadows strength in HDR modes.\n\nNeutral default at 50\%.",
+			{ "Contrast", "HDR" },
+			50.f,
+			0.f,
+			100.f,
+			"%"
+		};
+		Slider Highlights{
+			SettingID::kHDR_Highlights,
+			"Highlights",
+			"Sets the highlights strength in HDR modes.\n\nNeutral default at 50\%.",
+			{ "Highlights", "HDR" },
+			50.f,
+			0.f,
+			100.f,
 			"%"
 		};
 		Slider   SecondaryBrightness{

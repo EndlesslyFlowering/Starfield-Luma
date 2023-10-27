@@ -260,7 +260,7 @@ float3 Hable(
 	const float shoulderAngle    =       saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
 	//dstParams
-	float dstParams_x0 = toeLength * 0.5f;
+	float dstParams_x0 = toeLength * (1.f - HdrDllPluginConstants.HDRShadows);
 	float dstParams_y0 = (1.f - toeStrength) * dstParams_x0;
 
 	float remainingY = 1.f - dstParams_y0;
@@ -1390,7 +1390,7 @@ PSOutput PS(PSInput psInput)
 #else // New method (looks better but struggles more with high paper white on low peak brightness configurations)
 		// Never compress highlights before the top 2/3 of the image, even if it means we have two separate mid tones sections,
 		// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
-		float highlightsShoulderStart = max(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut);
+		float highlightsShoulderStart = max(maxOutputLuminance * HdrDllPluginConstants.HDRHighlights, minHighlightsColorOut);
 #endif
 		highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
 

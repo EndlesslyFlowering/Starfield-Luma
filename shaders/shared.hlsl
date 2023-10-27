@@ -50,6 +50,8 @@ struct StructHdrDllPluginConstants
 	float HDRExtendGamut; // 0-1. 0 is neutral
 	float HDRSaturation; // 0-2. 1 is neutral
 	float HDRSecondaryContrast; // 0-2. 1 is neutral
+	float HDRShadows; // 0-1 0.5 is neutral
+	float HDRHighlights; // 0-1 0.5 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
 	float GammaCorrection; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs. 0 to 1. 1 is "neutral"
