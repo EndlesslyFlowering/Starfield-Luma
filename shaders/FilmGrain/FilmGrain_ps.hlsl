@@ -186,8 +186,9 @@ void frag_main()
 
 		float graininess = computeFilmGraininess(density);
 		float randomFactor = (randomNumber * 2.f) - 1.f;
+		float boost = 1.667f; // Boost max to 0.05
 
-		float yChange = randomFactor * graininess * filmGrainColorAndIntensity.z;
+		float yChange = randomFactor * graininess * filmGrainColorAndIntensity.z * boost;
 
 		outputColor = linearColor * (1.f + yChange);
 
