@@ -65,7 +65,7 @@ Donations:
 https://ko-fi.com/ershin
 https://www.buymeacoffee.com/realfiloppi (Pumbo)
 https://ko-fi.com/shortfuse
-Lilium: link upcoming
+https://ko-fi.com/endlesslyflowering (Lilium)
 
 Thanks:
 Phinix (testing), Fank (testing), MPaul (testing)
