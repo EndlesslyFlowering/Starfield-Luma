@@ -950,6 +950,7 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 #elif LUT_MAPPING_TYPE == 0
 		loadedColor = gamma_sRGB_to_linear(loadedColor);
 #endif // LUT_MAPPING_TYPE
+		loadedColor = lerp(gamma_sRGB_to_linear(LUTPixelPosition3D / float(LUT_MAX_UINT)), loadedColor, HdrDllPluginConstants.ColorGradingStrength);
 		return loadedColor;
 	}
 	return 0;
@@ -961,8 +962,9 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 	float height;
 	// We draw this on the bottom left
 	InputColorTexture.GetDimensions(width, height);
-	if (PixelPosition.y < (height - DrawLUTSquareSize))
+	if (PixelPosition.y < (height - DrawLUTSquareSize)) {
 		return 0;
+	}
 
 	const uint2 position = uint2(PixelPosition.x / PixelScale, (PixelPosition.y - (height - DrawLUTSquareSize)) / PixelScale);
 	uint xPoint = position.x;
@@ -971,38 +973,40 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 	if ((xPoint <= LUT_MAX_UINT && yPoint >= 0 && yPoint <= LUT_MAX_UINT))
 	{
 		DrawnLUT = true;
-		float3 xyz;
+		uint3 xyz;
 		uint row = 0u;
-		float coord = float(xPoint) / float(LUT_MAX_UINT);
-		float inverse = float(LUT_MAX_UINT - xPoint) / float(LUT_MAX_UINT);
-		if (yPoint == row++) xyz = float3(coord  , coord  , coord  ); // Black => White
+		uint coord = xPoint;
+		uint cmax = LUT_MAX_UINT;
+		uint inverse = LUT_MAX_UINT - xPoint;
+		if (yPoint == row++) xyz = uint3(coord  , coord  , coord  ); // Black => White
 
-		else if (yPoint == row++) xyz = float3(coord  , 0      , 0      ); // Black => Red
-		else if (yPoint == row++) xyz = float3(0      , coord  , 0      ); // Black => Green
-		else if (yPoint == row++) xyz = float3(0      , 0      , coord  ); // Black => Blue
+		else if (yPoint == row++) xyz = uint3(coord  , 0      , 0      ); // Black => Red
+		else if (yPoint == row++) xyz = uint3(0      , coord  , 0      ); // Black => Green
+		else if (yPoint == row++) xyz = uint3(0      , 0      , coord  ); // Black => Blue
 
-		else if (yPoint == row++) xyz = float3(0      , coord  , coord  ); // Black => Cyan
-		else if (yPoint == row++) xyz = float3(coord  , coord  , 0      ); // Black => Yellow
-		else if (yPoint == row++) xyz = float3(coord  , 0      , coord  ); // Black => Magenta
+		else if (yPoint == row++) xyz = uint3(0      , coord  , coord  ); // Black => Cyan
+		else if (yPoint == row++) xyz = uint3(coord  , coord  , 0      ); // Black => Yellow
+		else if (yPoint == row++) xyz = uint3(coord  , 0      , coord  ); // Black => Magenta
 
-		else if (yPoint == row++) xyz = float3(1u     , coord  , coord  ); // Red to White
-		else if (yPoint == row++) xyz = float3(coord  , 1u     , coord  ); // Green to White
-		else if (yPoint == row++) xyz = float3(coord  , coord  , 1u     ); // Blue to White
+		else if (yPoint == row++) xyz = uint3(cmax   , coord  , coord  ); // Red to White
+		else if (yPoint == row++) xyz = uint3(coord  , cmax   , coord  ); // Green to White
+		else if (yPoint == row++) xyz = uint3(coord  , coord  , cmax   ); // Blue to White
 
-		else if (yPoint == row++) xyz = float3(coord  , 1u     , 1u     ); // Cyan to White
-		else if (yPoint == row++) xyz = float3(1u     , 1u     , coord  ); // Yellow to White
-		else if (yPoint == row++) xyz = float3(1u     , coord  , 1u     ); // Magenta to White
+		else if (yPoint == row++) xyz = uint3(coord  , cmax   , cmax   ); // Cyan to White
+		else if (yPoint == row++) xyz = uint3(cmax   , cmax   , coord  ); // Yellow to White
+		else if (yPoint == row++) xyz = uint3(cmax   , coord  , cmax   ); // Magenta to White
 
-		else if (yPoint == row++) xyz = float3(inverse, coord  , coord  ); // Red to Cyan
-		else if (yPoint == row++) xyz = float3(coord  , inverse, coord  ); // Green to Magenta
-		else if (yPoint == row++) xyz = float3(coord  , coord  , inverse); // Blue to Yellow
+		else if (yPoint == row++) xyz = uint3(inverse, coord  , coord  ); // Red to Cyan
+		else if (yPoint == row++) xyz = uint3(coord  , inverse, coord  ); // Green to Magenta
+		else if (yPoint == row++) xyz = uint3(coord  , coord  , inverse); // Blue to Yellow
 
-		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb * LUT_MAX_UINT, 0)).rgb;
+		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb, 0)).rgb;
 #if LUT_MAPPING_TYPE == 2
 		loadedColor = oklab_to_linear_srgb(loadedColor);
 #elif LUT_MAPPING_TYPE == 0
 		loadedColor = gamma_sRGB_to_linear(loadedColor);
 #endif // LUT_MAPPING_TYPE
+		loadedColor = lerp(gamma_sRGB_to_linear(xyz.rgb / float(LUT_MAX_UINT)), loadedColor, HdrDllPluginConstants.ColorGradingStrength);
 		return loadedColor;
 	}
 	return 0;
