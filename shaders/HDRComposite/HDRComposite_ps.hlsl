@@ -1,6 +1,7 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
 #include "../math.hlsl"
+#include "ACES.hlsl"
 #include "RootSignature.hlsl"
 
 // These are defined at compile time (shaders permutations),
@@ -43,6 +44,7 @@
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
+#define EXPERIMENTAL_ACES 0
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -254,13 +256,15 @@ float3 Hable(
 	// Note that all these variables can vary depending on the level.
 	// The 2.2 pow is so you don't have to input very small numbers, it's not related to gamma.
 	const float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
-	const float toeStrength      =       saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
+	float toeStrength      =       saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
 	const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
 	const float shoulderStrength =            max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
 	const float shoulderAngle    =       saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
+	toeStrength *= lerp(0.f, 2.f, HdrDllPluginConstants.HDRShadows);
+
 	//dstParams
-	float dstParams_x0 = toeLength * (1.f - HdrDllPluginConstants.HDRShadows);
+	float dstParams_x0 = toeLength * 0.5f;
 	float dstParams_y0 = (1.f - toeStrength) * dstParams_x0;
 
 	float remainingY = 1.f - dstParams_y0;
@@ -1100,13 +1104,12 @@ PSOutput PS(PSInput psInput)
 			toneMapperX = offset.x - toneMapperPadding;
 			toneMapperY = offset.y - toneMapperPadding;
 
-			const float xMin = -1;
-			const float xMax = 3;
+			// From 0.01 to Peak nits (in log)
+			const float xMin = log10(0.01 / 80.0f);
+			const float xMax = log10(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f);
 			const float xRange = xMax - xMin;
-			// 0 exposure should map to 18% gray
-			valueX = (float(toneMapperX) / float(toneMapperBins)) * (xRange);
-			valueX = pow(10.f, valueX + xMin);
-			valueX *= 0.18; // Mid gray at 0 exposure
+			valueX = (float(toneMapperX) / float(toneMapperBins)) * (xRange) + xMin;
+			valueX = pow(10.f, valueX);
 			inputColor = float3(valueX,valueX,valueX);
 		}
 	}
@@ -1123,6 +1126,10 @@ PSOutput PS(PSInput psInput)
 	float3 tonemappedPostProcessedColor = tonemappedColor;
 #else
 
+#if EXPERIMENTAL_ACES
+	tonemappedColor = RRTODTSDR(inputColor);
+	tonemappedByLuminanceColor = tonemappedColor;
+#else
 	float acesParam_modE;
 	float acesParam_modA;
 
@@ -1163,6 +1170,8 @@ PSOutput PS(PSInput psInput)
 	}
 
 	tonemappedByLuminanceColor = inputColor * safeDivision(tonemappedColorLuminance, untonemappedColorLuminance);
+
+#endif // EXPERIMENTAL_ACES
 
 #if defined(APPLY_CINEMATICS)
 	float prePostProcessColorLuminance;
@@ -1215,7 +1224,7 @@ PSOutput PS(PSInput psInput)
 
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
-#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+#if !EXPERIMENTAL_ACES && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 	const bool SDRTonemapByLuminance = (HDR_TONEMAP_TYPE > 0) && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
 #if 1 // This is delicate and could make things worse, especially within "RestorePostProcess()", but without it, highlights have uncontiguos gradients that shift color (due to strong LUTs)
 	if (SDRTonemapByLuminance)
@@ -1226,12 +1235,25 @@ PSOutput PS(PSInput psInput)
 
 	const float3 postProcessColorRatio = safeDivision(finalOriginalColor, tonemappedColor);
 	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
-#endif
+#endif // !EXPERIMENTAL_ACES && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 	if (HdrDllPluginConstants.DisplayMode > 0) // HDR
 	{
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-
+#if EXPERIMENTAL_ACES
+	float3 acesHDR = RRTODT(
+		inputColor,
+		lerp(0.00001f, 0.02f, HdrDllPluginConstants.HDRShadows * 2.0f),
+		0.18f * clamp(HdrDllPluginConstants.HDRGamePaperWhiteNits, 80.f, 400.f) / 203.f,
+		HdrDllPluginConstants.HDRPeakBrightnessNits
+	);
+	float acesHDRY = Luminance(max(0, acesHDR));
+	float acesSDRY = Luminance(max(0, tonemappedColor));
+	float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
+	float acesYScale = lerp(1.f, hdrYDelta, acesSDRY);
+	float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * acesYScale);
+	float3 inverseTonemappedPostProcessedColor = acesHDRGraded;
+#else
 		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
 		const float midGrayIn = MidGray;
@@ -1358,6 +1380,8 @@ PSOutput PS(PSInput psInput)
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #endif
 
+#endif // !EXPERIMENTAL_ACES
+
 #if ALLOW_EXPAND_GAMUT
 		// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
 		// also they'd end up messing up the application of LUTs too badly.
@@ -1384,6 +1408,9 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
 #endif
 
+#if EXPERIMENTAL_ACES
+		outputColor = inverseTonemappedPostProcessedColor;
+#else
 		inverseTonemappedPostProcessedColor *= paperWhite;
 		minHighlightsColorOut *= paperWhite;
 
@@ -1400,14 +1427,18 @@ PSOutput PS(PSInput psInput)
 
 		outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
 
+#endif // !EXPERIMENTAL_ACES
+
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 		outputColor = finalOriginalColor * (HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408); // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
+#if !EXPERIMENTAL_ACES
 		// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
 		outputColor = BT709_To_WBT2020(outputColor);
+#endif
 		outputColor = max(outputColor, 0.f);
 
 	}
@@ -1432,16 +1463,26 @@ PSOutput PS(PSInput psInput)
 
 #if DRAW_TONEMAPPER
 	if (drawToneMapper) {
-		const float yMin = 0.f;
-		const float yMax = HdrDllPluginConstants.HDRPeakBrightnessNits;
+		// From 0.01 to Peak nits (in log)
+		const float yMin = log10(0.01);
+		const float yMax = log10(HdrDllPluginConstants.HDRPeakBrightnessNits);
 		const float yRange = yMax - yMin;
-		float valueY = (float(toneMapperY) / float(toneMapperBins)) * (yRange);
+		float valueY = (float(toneMapperY) / float(toneMapperBins)) * (yRange) + yMin;
+		valueY = pow(10.f, valueY);
 		valueY /= 80.f;
 		float outputY = Luminance(outputColor);
 		if (outputY > valueY ) {
-			outputColor = valueY;
+			if (outputY < 0.18f) {
+				outputColor = float3(0.3f,0,0.3f);
+			} else {
+				outputColor = max(0.05f, valueY);
+			}
 		} else {
-			outputColor = 0;
+			if (valueX < 0.18f) {
+				outputColor = float3(0,0.3f,0);
+			} else {
+				outputColor = 0.05f;
+			}
 		}
 	}
 #endif // DRAW_TONEMAPPER
