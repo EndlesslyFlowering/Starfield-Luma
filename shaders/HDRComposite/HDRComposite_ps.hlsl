@@ -1127,7 +1127,13 @@ PSOutput PS(PSInput psInput)
 #else
 
 #if EXPERIMENTAL_ACES
-	tonemappedColor = RRTODTSDR(inputColor);
+	// Paperwhite is being used as midgray bias
+	tonemappedColor = RRTODT(
+		inputColor,
+		pow(10.0, lerp(0.0f, -8.0f, HdrDllPluginConstants.HDRShadows)),
+		80.f,
+		(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f
+	);
 	tonemappedByLuminanceColor = tonemappedColor;
 #else
 	float acesParam_modE;
@@ -1241,11 +1247,13 @@ PSOutput PS(PSInput psInput)
 	{
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 #if EXPERIMENTAL_ACES
+	float expShiftHdr = log2(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f)
+		/ log2(0.18 + (0.18 - 0.18f * (2.f * HdrDllPluginConstants.HDRHighlights / 1.f)));
 	float3 acesHDR = RRTODT(
 		inputColor,
-		lerp(0.00001f, 0.02f, HdrDllPluginConstants.HDRShadows * 2.0f),
-		0.18f * clamp(HdrDllPluginConstants.HDRGamePaperWhiteNits, 80.f, 400.f) / 203.f,
-		HdrDllPluginConstants.HDRPeakBrightnessNits
+		0.00001f,
+		HdrDllPluginConstants.HDRPeakBrightnessNits,
+		expShiftHdr
 	);
 	float acesHDRY = Luminance(max(0, acesHDR));
 	float acesSDRY = Luminance(max(0, tonemappedColor));
