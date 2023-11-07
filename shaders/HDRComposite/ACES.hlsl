@@ -395,7 +395,7 @@ float3 darkToDim(float3 XYZ) {
 
 
 
-float3 RRTODT(float3 rgb, float minY, float midY, float maxY) {
+float3 RRTODT(float3 rgb, float minY, float maxY, float expShift = 0) {
 
 	float3 aces = srgb_to_aces(rgb);
 
@@ -404,7 +404,6 @@ float3 RRTODT(float3 rgb, float minY, float midY, float maxY) {
 
 	float3 rgbPost;
 
-	float expShift = log2(maxY / 80.f) / log2(0.18 + (0.18 - midY));
 	// Aces-dev has more expensive version
 	TsParams PARAMS = init_TsParams(minY / 48.0f , 48.0f, expShift);
 	rgbPost.x = SSTS(rgbPre.x, PARAMS);
