@@ -42,10 +42,6 @@ namespace Hooks
 		if (const auto contrast = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Contrast))) {
 			contrast->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
-		
-		if (const auto shadows = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Shadows))) {
-			shadows->m_Enabled.SetValue(a_bGameRenderingHDREnable);
-		}
 
 		if (const auto highlights = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Highlights))) {
 			highlights->m_Enabled.SetValue(a_bGameRenderingHDREnable);
@@ -129,9 +125,10 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
-		CreateSliderSetting(a_settingList, settings->Shadows, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Highlights, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
+		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
+		CreateSliderSetting(a_settingList, settings->Shadows, true);
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
@@ -484,6 +481,9 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite):
 			HandleSetting(settings->UIPaperWhite);
 			break;
+		case static_cast<int>(Settings::SettingID::kToneMapperType):
+			HandleSetting(settings->ToneMapperType);
+			break;
 		case static_cast<int>(Settings::SettingID::kFilmGrainType):
 			HandleSetting(settings->FilmGrainType);
 			if (const auto filmGrainCap = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kFilmGrainCap))) {
@@ -541,11 +541,11 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kHDR_Contrast):
 			HandleSetting(settings->Contrast);
 			return true;
-		case static_cast<int>(Settings::SettingID::kHDR_Shadows):
-			HandleSetting(settings->Shadows);
-			return true;
 		case static_cast<int>(Settings::SettingID::kHDR_Highlights):
 			HandleSetting(settings->Highlights);
+			return true;
+		case static_cast<int>(Settings::SettingID::kToneMapperShadows):
+			HandleSetting(settings->Shadows);
 			return true;
 		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
 			HandleSetting(settings->LUTCorrectionStrength);

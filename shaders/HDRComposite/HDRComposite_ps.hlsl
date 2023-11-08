@@ -44,7 +44,6 @@
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
-#define EXPERIMENTAL_ACES 0
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -115,7 +114,7 @@ struct PSOutput
 
 static const float SDRTonemapHDRStrength = 1.f;
 static const float PostProcessStrength = 1.f;
-// 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable, 4+ Disable tonemapper
+// 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable/Custom, 4 CustomACES 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
 // 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
 // Exposure to the user for more customization.
@@ -261,7 +260,7 @@ float3 Hable(
 	const float shoulderStrength =            max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
 	const float shoulderAngle    =       saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
-	toeStrength *= lerp(0.f, 2.f, HdrDllPluginConstants.HDRShadows);
+	toeStrength *= lerp(0.f, 2.f, HdrDllPluginConstants.ToneMapperShadows);
 
 	//dstParams
 	float dstParams_x0 = toeLength * 0.5f;
@@ -1126,23 +1125,7 @@ PSOutput PS(PSInput psInput)
 	float3 tonemappedPostProcessedColor = tonemappedColor;
 #else
 
-#if EXPERIMENTAL_ACES
-	// Paperwhite is being used as midgray bias
-	const float3 acesRrt = aces_rrt(inputColor);
-
-	const float targetShadow = -1.6989700043360187f; // log10(0.02);
-	const float targetMax = targetShadow + (1.f * targetShadow);
-	const float targetMin = targetShadow - (1.f * targetShadow);
-
-	tonemappedColor = aces_odt(
-		acesRrt,
-		pow(10.0, lerp(targetMin, targetMax, HdrDllPluginConstants.HDRShadows)),
-		80.f,
-		(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f,
-		true
-	);
-	tonemappedByLuminanceColor = tonemappedColor;
-#else
+	float3 acesRrt;
 	float acesParam_modE;
 	float acesParam_modA;
 
@@ -1151,6 +1134,10 @@ PSOutput PS(PSInput psInput)
 	const bool clampACES = false;
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
+
+	if (tonemapperIndex == 3 && HdrDllPluginConstants.ToneMapperType == 1) {
+		tonemapperIndex = 4;
+	}
 
 	const float untonemappedColorLuminance = Luminance(inputColor);
 	float tonemappedColorLuminance;
@@ -1175,6 +1162,19 @@ PSOutput PS(PSInput psInput)
 			tonemappedColorLuminance = Hable(untonemappedColorLuminance.xxx, hableParams).x; //TODO: make hable templatable
 		} break;
 
+		case 4:
+		{
+			acesRrt = aces_rrt(inputColor);
+			tonemappedColor = aces_odt(
+				acesRrt,
+				pow(10.0, lerp(0, 2.f * log10(0.02), HdrDllPluginConstants.ToneMapperShadows)),
+				80.f,
+				(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f,
+				true
+			);
+			tonemappedByLuminanceColor = tonemappedColor;
+		} break;
+
 		default:
 		{
 			tonemappedColor          = inputColor;
@@ -1183,8 +1183,6 @@ PSOutput PS(PSInput psInput)
 	}
 
 	tonemappedByLuminanceColor = inputColor * safeDivision(tonemappedColorLuminance, untonemappedColorLuminance);
-
-#endif // EXPERIMENTAL_ACES
 
 #if defined(APPLY_CINEMATICS)
 	float prePostProcessColorLuminance;
@@ -1237,7 +1235,7 @@ PSOutput PS(PSInput psInput)
 
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
-#if !EXPERIMENTAL_ACES && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 	const bool SDRTonemapByLuminance = (HDR_TONEMAP_TYPE > 0) && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
 #if 1 // This is delicate and could make things worse, especially within "RestorePostProcess()", but without it, highlights have uncontiguos gradients that shift color (due to strong LUTs)
 	if (SDRTonemapByLuminance)
@@ -1248,32 +1246,17 @@ PSOutput PS(PSInput psInput)
 
 	const float3 postProcessColorRatio = safeDivision(finalOriginalColor, tonemappedColor);
 	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
-#endif // !EXPERIMENTAL_ACES && ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+#endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 	if (HdrDllPluginConstants.DisplayMode > 0) // HDR
 	{
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-#if EXPERIMENTAL_ACES
-	float expShiftHdr = log2(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f)
-		/ log2(0.18 + (0.18 - 0.18f * (2.f * HdrDllPluginConstants.HDRHighlights / 1.f)));
-	float3 acesHDR = aces_odt(
-		acesRrt,
-		0.0001f,
-		HdrDllPluginConstants.HDRPeakBrightnessNits,
-		expShiftHdr
-	);
-	float acesHDRY = Luminance(max(0, acesHDR));
-	float acesSDRY = Luminance(max(0, tonemappedColor));
-	float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
-	float acesYScale = lerp(1.f, hdrYDelta, acesSDRY);
-	float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * acesYScale);
-	float3 inverseTonemappedPostProcessedColor = acesHDRGraded;
-#else
 		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
 		const float midGrayIn = MidGray;
 		float midGrayOut = midGrayIn;
 
+		float3 inverseTonemappedPostProcessedColor;
 //TODO: rename "minHighlightsColorIn" and "minHighlightsColorOut" to something more generic, as now we have "INVERT_TONEMAP_TYPE" (so it could be highlights or midtones, ...)
 #if INVERT_TONEMAP_TYPE != 1 // invert highlights
 		float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception SDR space
@@ -1339,6 +1322,24 @@ PSOutput PS(PSInput psInput)
 #endif
 			} break;
 
+			case 4:
+			{
+				float expShiftHdr = log2(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f)
+					/ log2(0.18 + (0.18 - 0.18f * (2.f * HdrDllPluginConstants.HDRHighlights / 1.f)));
+				float3 acesHDR = aces_odt(
+					acesRrt,
+					0.0001f,
+					HdrDllPluginConstants.HDRPeakBrightnessNits,
+					expShiftHdr
+				);
+				float acesHDRY = Luminance(max(0, acesHDR));
+				float acesSDRY = Luminance(max(0, tonemappedColor));
+				float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
+				float acesYScale = lerp(1.f, hdrYDelta, acesSDRY);
+				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * acesYScale);
+				inverseTonemappedPostProcessedColor = acesHDRGraded;
+			}
+
 			default:
 				break;
 		}
@@ -1354,7 +1355,7 @@ PSOutput PS(PSInput psInput)
 			PostInverseTonemapByChannel(inputColor.g, tonemappedColor.g, inverseTonemappedColor.g, sPP);
 			PostInverseTonemapByChannel(inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
 		}
-		else
+		else if (tonemapperIndex != 4) 
 		{
 #if 1
 			const bool isHighlight = untonemappedColorLuminance >= minHighlightsColorOut;
@@ -1390,13 +1391,13 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedColor /= midGrayScale;
 		minHighlightsColorOut  /= midGrayScale;
 
-		float3 inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
+		if (tonemapperIndex != 4) {
+			inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
+		}
+
 #if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #endif
-
-#endif // !EXPERIMENTAL_ACES
-
 #if ALLOW_EXPAND_GAMUT
 		// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
 		// also they'd end up messing up the application of LUTs too badly.
@@ -1423,9 +1424,9 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
 #endif
 
-#if EXPERIMENTAL_ACES
-		outputColor = inverseTonemappedPostProcessedColor;
-#else
+		if (tonemapperIndex == 4) {
+			outputColor = inverseTonemappedPostProcessedColor;
+		} else {
 		inverseTonemappedPostProcessedColor *= paperWhite;
 		minHighlightsColorOut *= paperWhite;
 
@@ -1441,19 +1442,17 @@ PSOutput PS(PSInput psInput)
 		highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
 
 		outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
-
-#endif // !EXPERIMENTAL_ACES
-
+	}
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 		outputColor = finalOriginalColor * (HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408); // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image
 
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
-#if !EXPERIMENTAL_ACES
 		// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
-		outputColor = BT709_To_WBT2020(outputColor);
-#endif
+		if (tonemapperIndex != 4) {
+			outputColor = BT709_To_WBT2020(outputColor);
+		}
 		outputColor = max(outputColor, 0.f);
 
 	}
