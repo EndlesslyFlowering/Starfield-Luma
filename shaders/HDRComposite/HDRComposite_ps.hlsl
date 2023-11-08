@@ -1128,8 +1128,10 @@ PSOutput PS(PSInput psInput)
 
 #if EXPERIMENTAL_ACES
 	// Paperwhite is being used as midgray bias
-	tonemappedColor = RRTODT(
-		inputColor,
+	const float3 acesRrt = aces_rrt(inputColor);
+
+	tonemappedColor = aces_odt(
+		acesRrt,
 		pow(10.0, lerp(0.0f, -8.0f, HdrDllPluginConstants.HDRShadows)),
 		80.f,
 		(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f
@@ -1249,8 +1251,8 @@ PSOutput PS(PSInput psInput)
 #if EXPERIMENTAL_ACES
 	float expShiftHdr = log2(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f)
 		/ log2(0.18 + (0.18 - 0.18f * (2.f * HdrDllPluginConstants.HDRHighlights / 1.f)));
-	float3 acesHDR = RRTODT(
-		inputColor,
+	float3 acesHDR = aces_odt(
+		acesRrt,
 		0.00001f,
 		HdrDllPluginConstants.HDRPeakBrightnessNits,
 		expShiftHdr
