@@ -1130,9 +1130,13 @@ PSOutput PS(PSInput psInput)
 	// Paperwhite is being used as midgray bias
 	const float3 acesRrt = aces_rrt(inputColor);
 
+	const float targetShadow = -1.6989700043360187f; // log10(0.02);
+	const float targetMax = targetShadow + (1.f * targetShadow);
+	const float targetMin = targetShadow - (1.f * targetShadow);
+
 	tonemappedColor = aces_odt(
 		acesRrt,
-		pow(10.0, lerp(0.0f, -8.0f, HdrDllPluginConstants.HDRShadows)),
+		pow(10.0, lerp(targetMin, targetMax, HdrDllPluginConstants.HDRShadows)),
 		80.f,
 		(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f,
 		true
@@ -1254,7 +1258,7 @@ PSOutput PS(PSInput psInput)
 		/ log2(0.18 + (0.18 - 0.18f * (2.f * HdrDllPluginConstants.HDRHighlights / 1.f)));
 	float3 acesHDR = aces_odt(
 		acesRrt,
-		0.00001f,
+		0.0001f,
 		HdrDllPluginConstants.HDRPeakBrightnessNits,
 		expShiftHdr
 	);
