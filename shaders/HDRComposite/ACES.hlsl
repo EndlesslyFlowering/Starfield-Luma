@@ -258,11 +258,11 @@ void init_coefsLow(
 	// float halfKnotInc = (log10(TsPointMid.x) - log10(TsPointLow.x)) / 6.;
 
 	// Determine two lowest coefficients (straddling minPt)
-	coefsLow[0] = (TsPointLow.slope * (log10(TsPointLow.x)- 0.5 * knotIncLow)) + ( log10(TsPointLow.y) - TsPointLow.slope * log10(TsPointLow.x));
-	coefsLow[1] = (TsPointLow.slope * (log10(TsPointLow.x)+ 0.5 * knotIncLow)) + ( log10(TsPointLow.y) - TsPointLow.slope * log10(TsPointLow.x));
+	// coefsLow[0] = (TsPointLow.slope * (log10(TsPointLow.x)- 0.5 * knotIncLow)) + ( log10(TsPointLow.y) - TsPointLow.slope * log10(TsPointLow.x));
+	// coefsLow[1] = (TsPointLow.slope * (log10(TsPointLow.x)+ 0.5 * knotIncLow)) + ( log10(TsPointLow.y) - TsPointLow.slope * log10(TsPointLow.x));
 	// NOTE: if slope=0, then the above becomes just
-		// coefsLow[0] = log10(TsPointLow.y);
-		// coefsLow[1] = log10(TsPointLow.y);
+		coefsLow[0] = log10(TsPointLow.y);
+		coefsLow[1] = coefsLow[0];
 	// leaving it as a variable for now in case we decide we need non-zero slope extensions
 
 	// Determine two highest coefficients (straddling midPt)
@@ -287,11 +287,11 @@ void init_coefsHigh(TsPoint TsPointMid, TsPoint TsPointMax, out float coefsHigh[
 	coefsHigh[1] = (TsPointMid.slope * (log10(TsPointMid.x)+0.5*knotIncHigh)) + ( log10(TsPointMid.y) - TsPointMid.slope * log10(TsPointMid.x));
 
 	// Determine two highest coefficients (straddling maxPt)
-	coefsHigh[3] = (TsPointMax.slope * (log10(TsPointMax.x)-0.5*knotIncHigh)) + ( log10(TsPointMax.y) - TsPointMax.slope * log10(TsPointMax.x));
-	coefsHigh[4] = (TsPointMax.slope * (log10(TsPointMax.x)+0.5*knotIncHigh)) + ( log10(TsPointMax.y) - TsPointMax.slope * log10(TsPointMax.x));
+	// coefsHigh[3] = (TsPointMax.slope * (log10(TsPointMax.x)-0.5*knotIncHigh)) + ( log10(TsPointMax.y) - TsPointMax.slope * log10(TsPointMax.x));
+	// coefsHigh[4] = (TsPointMax.slope * (log10(TsPointMax.x)+0.5*knotIncHigh)) + ( log10(TsPointMax.y) - TsPointMax.slope * log10(TsPointMax.x));
 	// NOTE: if slope=0, then the above becomes just
-		// coefsHigh[0] = log10(TsPointHigh.y);
-		// coefsHigh[1] = log10(TsPointHigh.y);
+		coefsHigh[3] = log10(TsPointMax.y);
+		coefsHigh[4] = coefsHigh[3];
 	// leaving it as a variable for now in case we decide we need non-zero slope extensions
 
 	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
@@ -352,7 +352,8 @@ float SSTS(float x, TsParams C) {
 		// If MAX_PT slope is 0, this is just a straight line and always returns
 		// maxLum
 		// y = mx+b
-		logy = computeGraphY(C.Max.slope, logx, log10(C.Max.y) - (C.Max.slope * log10(C.Max.x)));
+		// logy = computeGraphY(C.Max.slope, logx, log10(C.Max.y) - (C.Max.slope * log10(C.Max.x)));
+		logy = log10(C.Max.y);
 	} else if (logx >= log10(C.Mid.x)) {
 		// Part of Midtones area (Must have slope)
 		float knot_coord = (N_KNOTS_HIGH-1) * (logx-log10(C.Mid.x))/(log10(C.Max.x)-log10(C.Mid.x));
@@ -374,7 +375,8 @@ float SSTS(float x, TsParams C) {
 		logy = dot(monomials, mul(M, cf));
 	} else { //(logx <= log10(C.Min.x))
 		// Below min breakpoint (undershoot)
-		logy = computeGraphY(C.Min.slope, logx, (log10(C.Min.y) - C.Min.slope * log10(C.Min.x)));
+		// logy = computeGraphY(C.Min.slope, logx, (log10(C.Min.y) - C.Min.slope * log10(C.Min.x)));
+		logy = log10(C.Min.y);
 	}
 
 	return pow(10.0, logy);
@@ -394,13 +396,13 @@ float3 darkToDim(float3 XYZ) {
 }
 
 
-
-float3 RRTODT(float3 rgb, float minY, float maxY, float expShift = 0) {
-
+float3 aces_rrt(float3 rgb) {
 	float3 aces = srgb_to_aces(rgb);
-
 	// RRT sweeteners
-	float3 rgbPre = RRTSweeteners(aces);
+	return RRTSweeteners(aces);
+}
+
+float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0) {
 
 	float3 rgbPost;
 
@@ -426,203 +428,5 @@ float3 RRTODT(float3 rgb, float minY, float maxY, float expShift = 0) {
 	float3 linearCV = mul( XYZ_2_sRGB_MAT, XYZ );
 	linearCV = lerp(minY / 80.f, maxY / 80.f, linearCV);
 	return linearCV;
-}
-
-
-// SDR
-
-struct SegmentedSplineParams_c5
-{
-	float coefsLow[6];    // coefs for B-spline between minPoint and midPoint (units of log luminance)
-	float coefsHigh[6];   // coefs for B-spline between midPoint and maxPoint (units of log luminance)
-	float2 minPoint; // {luminance, luminance} linear extension below this
-	float2 midPoint; // {luminance, luminance} 
-	float2 maxPoint; // {luminance, luminance} linear extension above this
-	float slopeLow;       // log-log slope of low linear extension
-	float slopeHigh;      // log-log slope of high linear extension
-};
-
-struct SegmentedSplineParams_c9
-{
-	float coefsLow[10];    // coefs for B-spline between minPoint and midPoint (units of log luminance)
-	float coefsHigh[10];   // coefs for B-spline between midPoint and maxPoint (units of log luminance)
-	float2 minPoint; // {luminance, luminance} linear extension below this
-	float2 midPoint; // {luminance, luminance} 
-	float2 maxPoint; // {luminance, luminance} linear extension above this
-	float slopeLow;       // log-log slope of low linear extension
-	float slopeHigh;      // log-log slope of high linear extension
-};
-
-float segmented_spline_c5_fwd( float x )
-{
-	// RRT_PARAMS
-	const SegmentedSplineParams_c5 C =
-	{
-		// coefsLow[6]
-		{ -4.0000000000, -4.0000000000, -3.1573765773, -0.4852499958, 1.8477324706, 1.8477324706 },
-		// coefsHigh[6]
-		{ -0.7185482425, 2.0810307172, 3.6681241237, 4.0000000000, 4.0000000000, 4.0000000000 },
-		{ 0.18*exp2(-15.0), 0.0001},    // minPoint
-		{ 0.18,              4.8},    // midPoint
-		{ 0.18*exp2(18.0),  10000.},    // maxPoint
-		0.0,  // slopeLow
-		0.0   // slopeHigh
-	};
-
-	const int N_KNOTS_LOW = 4;
-	const int N_KNOTS_HIGH = 4;
-
-	// Check for negatives or zero before taking the log. If negative or zero,
-	// set to ACESMIN.1
-	float xCheck = x <= 0 ? exp2(-14.0) : x;
-
-	float logx = log10( xCheck);
-	float logy;
-
-	if ( logx <= log10(C.minPoint.x) )
-	{ 
-		logy = logx * C.slopeLow + ( log10(C.minPoint.y) - C.slopeLow * log10(C.minPoint.x) );
-	}
-	else if (( logx > log10(C.minPoint.x) ) && ( logx < log10(C.midPoint.x) ))
-	{
-		float knot_coord = (N_KNOTS_LOW-1) * (logx-log10(C.minPoint.x))/(log10(C.midPoint.x)-log10(C.minPoint.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = { C.coefsLow[ j], C.coefsLow[ j + 1], C.coefsLow[ j + 2]};
-	
-		float3 monomials = { t * t, t, 1.0 };
-		logy = dot( monomials, mul(M, cf));
-	}
-	else if (( logx >= log10(C.midPoint.x) ) && ( logx < log10(C.maxPoint.x) ))
-	{
-		float knot_coord = (N_KNOTS_HIGH-1) * (logx-log10(C.midPoint.x))/(log10(C.maxPoint.x)-log10(C.midPoint.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = { C.coefsHigh[ j], C.coefsHigh[ j + 1], C.coefsHigh[ j + 2]};
-
-		float3 monomials = { t * t, t, 1.0 };
-		logy = dot( monomials, mul(M, cf));
-	}
-	else
-	{ //if ( logIn >= log10(C.maxPoint.x) ) { 
-		logy = logx * C.slopeHigh + ( log10(C.maxPoint.y) - C.slopeHigh * log10(C.maxPoint.x) );
-	}
-
-	return pow( 10, logy );
-}
-
-float segmented_spline_c9_fwd( float x, const SegmentedSplineParams_c9 C )
-{
-	const int N_KNOTS_LOW = 8;
-	const int N_KNOTS_HIGH = 8;
-
-	// Check for negatives or zero before taking the log. If negative or zero,
-	// set to OCESMIN.
-	float xCheck = x <= 0 ? 1e-4 : x;
-
-	float logx = log10(xCheck);
-	float logy;
-
-	if (logx <= log10(C.minPoint.x))
-	{
-		logy = logx * C.slopeLow + (log10(C.minPoint.y) - C.slopeLow * log10(C.minPoint.x));
-	}
-	else if ((logx > log10(C.minPoint.x)) && (logx < log10(C.midPoint.x)))
-	{
-		float knot_coord = (N_KNOTS_LOW - 1) * (logx - log10(C.minPoint.x)) / (log10(C.midPoint.x) - log10(C.minPoint.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = { C.coefsLow[j], C.coefsLow[j + 1], C.coefsLow[j + 2] };
-
-		float3 monomials = { t * t, t, 1.0 };
-		logy = dot(monomials, mul(M, cf));
-	}
-	else if ((logx >= log10(C.midPoint.x)) && (logx < log10(C.maxPoint.x)))
-	{
-		float knot_coord = (N_KNOTS_HIGH - 1) * (logx - log10(C.midPoint.x)) / (log10(C.maxPoint.x) - log10(C.midPoint.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = { C.coefsHigh[j], C.coefsHigh[j + 1], C.coefsHigh[j + 2] };
-
-		float3 monomials = { t * t, t, 1.0 };
-		logy = dot(monomials, mul(M, cf));
-	}
-	else//if ( logIn >= log10(C.maxPoint.x) )
-	{
-		logy = logx * C.slopeHigh + (log10(C.maxPoint.y) - C.slopeHigh * log10(C.maxPoint.x));
-	}
-
-	return pow( 10, logy );
-}
-
-float3 RRTODTSDR(float3 rgb) {
-
-	float3 aces = srgb_to_aces(rgb);
-	float3 ap1 = RRTSweeteners(aces);
-
-	// 1.0 SDR
-	ap1[0] = segmented_spline_c5_fwd( ap1[0] );
-	ap1[1] = segmented_spline_c5_fwd( ap1[1] );
-	ap1[2] = segmented_spline_c5_fwd( ap1[2] );
-
-	const float CINEMA_WHITE = 48.0;
-	const float CINEMA_BLACK = 0.02; // CINEMA_WHITE / 2400.
-
-	const SegmentedSplineParams_c9 ODT_48nits =
-	{
-		// coefsLow[10]
-		{ -1.6989700043, -1.6989700043, -1.4779000000, -1.2291000000, -0.8648000000, -0.4480000000, 0.0051800000, 0.4511080334, 0.9113744414, 0.9113744414},
-		// coefsHigh[10]
-		{ 0.5154386965, 0.8470437783, 1.1358000000, 1.3802000000, 1.5197000000, 1.5985000000, 1.6467000000, 1.6746091357, 1.6878733390, 1.6878733390 },
-		{segmented_spline_c5_fwd( 0.18*exp2(-6.5) ),  CINEMA_BLACK},    // minPoint
-		{segmented_spline_c5_fwd( 0.18 ),              4.8},    // midPoint  
-		{segmented_spline_c5_fwd( 0.18*exp2(6.5) ),   CINEMA_WHITE},    // maxPoint
-		0.00,  // slopeLow
-		0.04  // slopeHigh
-	};
-
-	// Apply the tonescale independently in rendering-space RGB
-	
-	ap1[0] = segmented_spline_c9_fwd( ap1[0], ODT_48nits );
-	ap1[1] = segmented_spline_c9_fwd( ap1[1], ODT_48nits );
-	ap1[2] = segmented_spline_c9_fwd( ap1[2], ODT_48nits );
-
-	// Target white and black points for cinema system tonescale
-	
-
-	// Scale luminance to linear code value
-	float3 linearCV = Y_2_linCV( ap1, CINEMA_WHITE, CINEMA_BLACK );
-
-
-	// Convert to display primary encoding
-	// Rendering space RGB to XYZ
-	float3 XYZ = mul( AP1_2_XYZ_MAT, linearCV );
-	
-	// Dark to Dim
-	float3 xyY = XYZ_2_xyY(XYZ);
-	xyY[2] = clamp( xyY[2], 0, 65535 );
-	xyY[2] = pow( xyY[2], DIM_SURROUND_GAMMA );
-	XYZ = xyY_2_XYZ(xyY);
-
-	// Apply desaturation to compensate for luminance difference
-	// const float ODT_SAT_FACTOR = 0.93;
-	// linearCV = lerp( dot( linearCV, AP1_RGB2Y ), linearCV, ODT_SAT_FACTOR );
-
-	// Apply CAT from ACES white point to assumed observer adapted white point
-	XYZ = mul( D60_2_D65_CAT, XYZ );
-
-	// CIE XYZ to display primaries
-	linearCV = mul( XYZ_2_sRGB_MAT, XYZ );
-
-	// Handle out-of-gamut values
-	// Clip values < 0 or > 1 (i.e. projecting outside the display primaries)
-	linearCV = saturate( linearCV );
-
-	return linearCV;
-
 }
 
