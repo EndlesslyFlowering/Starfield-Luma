@@ -11,10 +11,9 @@ Contrast = 50.0
 GamePaperWhite = 200
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
-ExtendGamut = 33.333
+ExtendGamut = 0.0
 Saturation = 50.0
 UIPaperWhite = 200
-Shadows = 50.0
 Highlights = 50.0
 
 [Main]
@@ -27,6 +26,10 @@ LUTCorrectionStrength = 100.0
 PostSharpen = true
 SecondaryBrightness = 50.0
 VanillaMenuLUTs = true
+
+[ToneMapper]
+ToneMapperType = 0
+Shadows = 50.0
 
 [RenderTargets]
 RenderTargetsToUpgrade = [

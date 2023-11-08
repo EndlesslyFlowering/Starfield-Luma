@@ -20,21 +20,22 @@ namespace Settings
     {
 		kSTART = 600,
 
-        kDisplayMode,
+		kDisplayMode,
 		kForceSDROnHDR,
-        kHDR_PeakBrightness,
-        kHDR_GamePaperWhite,
+		kHDR_PeakBrightness,
+		kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
 		kHDR_ExtendGamut,
-		kHDR_Contrast,
 		kHDR_Saturation,
-		kHDR_Shadows,
+		kHDR_Contrast,
 		kHDR_Highlights,
+		kSecondaryBrightness,
+		kToneMapperType,
+		kToneMapperShadows,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
 		kGammaCorrectionStrength,
-		kSecondaryBrightness,
-        kVanillaMenuLUTs,
+		kVanillaMenuLUTs,
 		kFilmGrainType,
 		kFilmGrainCap,
 		kPostSharpen,
@@ -133,12 +134,13 @@ namespace Settings
 		float    ExtendGamut;
 		float    Saturation;
 		float    Contrast;
-		float    Shadows;
 		float    Highlights;
+		float    SDRSecondaryBrightness;
+		uint32_t ToneMapperType;
+		float    Shadows;
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
-		float    SDRSecondaryBrightness;
 		uint32_t FilmGrainType;
 		float    FilmGrainCap;
 		uint32_t PostSharpen;
@@ -205,7 +207,7 @@ namespace Settings
 		    "Extend Gamut",
 		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation.\n\nNeutral at 0\%.",
 		    { "ExtendGamut", "HDR" },
-		    33.333f,
+		    0.f,
 		    0.f,
 		    100.f,
 			"%"
@@ -230,16 +232,6 @@ namespace Settings
 		    100.f,
 			"%"
 		};
-		Slider Shadows{
-			SettingID::kHDR_Shadows,
-			"Shadows",
-			"Sets the shadows strength in HDR modes.\n\nNeutral default at 50\%.",
-			{ "Shadows", "HDR" },
-			50.f,
-			0.f,
-			100.f,
-			"%"
-		};
 		Slider Highlights{
 			SettingID::kHDR_Highlights,
 			"Highlights",
@@ -258,6 +250,24 @@ namespace Settings
 		    50.f,
 		    0.f,
 		    100.f,
+			"%"
+		};
+		EnumStepper ToneMapperType{
+			SettingID::kToneMapperType,
+			"Tone Mapper Type",
+			"Sets the tone mapper type.\n\nLuma offers an improved filmic tone mapper based on ACES 1.3.",
+			"ToneMapperType", "ToneMapper",
+			0,
+			{ "Vanilla", "Improved" }
+		};
+		Slider Shadows{
+			SettingID::kToneMapperShadows,
+			"Shadows",
+			"Sets the shadows strength in the tone mapper.\n\nNeutral default at 50\%.",
+			{ "Shadows", "ToneMapper" },
+			50.f,
+			0.f,
+			100.f,
 			"%"
 		};
 		Slider   LUTCorrectionStrength{
@@ -300,7 +310,7 @@ namespace Settings
 		EnumStepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
 		    "Film Grain Type",
-		    "Sets the film grain type.\nLuma offers an improved version, we suggest setting the \"Film Grain Strength\" setting to 50\% or lower.",
+		    "Sets the film grain type.\nLuma offers an improved version film grain that does not raise the black floor.",
 		     "FilmGrainType", "Main",
 		    1,
 		    { "Vanilla", "Improved" }

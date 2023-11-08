@@ -25,7 +25,7 @@
 // 0) sRGB gamma mapping (Vanilla): it makes any intermediary sampled value (that doesn't exactly fall in the center of LUT texel) affected by gamma, and that's not good.
 // 1) Linear mapping: Makes LUTs sampling work in linear space, which is mathematically correct. This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
 // 2) OKLAB mapping: this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black.
-#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
+#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 #define LUT_MAX_UINT (uint)LUT_SIZE - 1u
@@ -50,12 +50,13 @@ struct StructHdrDllPluginConstants
 	float HDRExtendGamut; // 0-1. 0 is neutral
 	float HDRSaturation; // 0-2. 1 is neutral
 	float HDRSecondaryContrast; // 0-2. 1 is neutral
-	float HDRShadows; // 0-1 0.5 is neutral
 	float HDRHighlights; // 0-1 0.5 is neutral
+	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
+	uint ToneMapperType; // 0 is default (Hable)
+	float ToneMapperShadows; // 0-1 0.5 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
 	float GammaCorrection; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs. 0 to 1. 1 is "neutral"
-	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint FilmGrainType; // 1 is default
 	float FilmGrainCap; // 24 and 0 are common defaults
 	uint PostSharpen; // true is default

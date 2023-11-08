@@ -175,13 +175,14 @@ namespace Settings
 		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data() * 0.01f);                      // 0-100 to 0-1
 		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                        // 0-100 to 0-2
 		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                            // 0-100 to 0-2
-		a_outShaderConstants.Shadows = static_cast<float>(Shadows.value.get_data() * 0.01f);                              // 0-100 to 0-1
 		a_outShaderConstants.Highlights = static_cast<float>(Highlights.value.get_data() * 0.01f);                        // 0-100 to 0-1
+		// There is no reason this wouldn't work in HDR, but for now it's disabled
+		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR() ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
+		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
+		a_outShaderConstants.Shadows = static_cast<float>(Shadows.value.get_data() * 0.01f);                              // 0-100 to 0-1
 		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
 		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
 		a_outShaderConstants.GammaCorrectionStrength = static_cast<float>(GammaCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
-		// There is no reason this wouldn't work in HDR, but for now it's disabled
-		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR() ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
 		a_outShaderConstants.FilmGrainCap = static_cast<float>(FilmGrainCap.value.get_data());
 		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
@@ -225,9 +226,10 @@ namespace Settings
 			config->Bind(ExtendGamut.value, ExtendGamut.defaultValue);
 			config->Bind(Saturation.value, Saturation.defaultValue);
 			config->Bind(Contrast.value, Contrast.defaultValue);
-			config->Bind(Shadows.value, Shadows.defaultValue);
 			config->Bind(Highlights.value, Highlights.defaultValue);
 			config->Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
+			config->Bind(ToneMapperType.value, ToneMapperType.defaultValue);
+			config->Bind(Shadows.value, Shadows.defaultValue);
 			config->Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
 			config->Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
 			config->Bind(GammaCorrectionStrength.value, GammaCorrectionStrength.defaultValue);
@@ -370,7 +372,6 @@ namespace Settings
 			DrawReshadeSlider(ExtendGamut);
 			DrawReshadeSlider(Saturation);
 			DrawReshadeSlider(Contrast);
-			DrawReshadeSlider(Shadows);
 			DrawReshadeSlider(Highlights);
 		}
 		else {
@@ -379,6 +380,8 @@ namespace Settings
 			}
 			DrawReshadeSlider(SecondaryBrightness);
 		}
+		DrawReshadeEnumStepper(ToneMapperType);
+		DrawReshadeSlider(Shadows);
 		DrawReshadeSlider(GammaCorrectionStrength);
 		DrawReshadeSlider(LUTCorrectionStrength);
 		DrawReshadeSlider(ColorGradingStrength);
