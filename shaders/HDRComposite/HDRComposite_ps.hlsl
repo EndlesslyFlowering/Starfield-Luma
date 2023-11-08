@@ -1134,7 +1134,8 @@ PSOutput PS(PSInput psInput)
 		acesRrt,
 		pow(10.0, lerp(0.0f, -8.0f, HdrDllPluginConstants.HDRShadows)),
 		80.f,
-		(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f
+		(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f,
+		true
 	);
 	tonemappedByLuminanceColor = tonemappedColor;
 #else

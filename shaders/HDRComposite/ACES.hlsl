@@ -60,6 +60,18 @@ static const half3x3 M = {
 	 0.5,  0.5, 0.0
 };
 
+static const half3x3 RRT_SAT_MAT = {
+	0.9708890, 0.0269633, 0.00214758,
+	0.0108892, 0.9869630, 0.00214758,
+	0.0108892, 0.0269633, 0.96214800
+};
+
+static const half3x3 ODT_SAT_MAT = {
+	0.949056, 0.0471857, 0.00375827,
+	0.019056, 0.9771860, 0.00375827,
+	0.019056, 0.0471857, 0.93375800
+};
+
 static const float MIN_STOP_SDR = -6.5;
 static const float MAX_STOP_SDR = 6.5;
 
@@ -183,49 +195,8 @@ float3 Y_2_linCV( float3 Y, float Ymax, float Ymin) {
 	return (Y - Ymin) / (Ymax - Ymin);
 }
 
-float3 linCV_2_Y( float3 linCV, float Ymax, float Ymin)
-{
+float3 linCV_2_Y( float3 linCV, float Ymax, float Ymin) {
   return linCV * (Ymax - Ymin) + Ymin;
-}
-
-float3 RRTSweeteners(float3 aces) {
-	// --- Glow module --- //
-	// "Glow" module constants
-	const float RRT_GLOW_GAIN = 0.05;
-	const float RRT_GLOW_MID = 0.08;
-	float saturation = rgb_2_saturation( aces);
-	float ycIn = rgb_2_yc( aces);
-	float s = sigmoid_shaper( (saturation - 0.4) / 0.2);
-	float addedGlow = 1.0 + glow_fwd( ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
-	aces *= addedGlow;
-
-	// --- Red modifier --- //
-	// Red modifier constants
-	const float RRT_RED_SCALE = 0.82;
-	const float RRT_RED_PIVOT = 0.03;
-	const float RRT_RED_HUE = 0.;
-	const float RRT_RED_WIDTH = 135.;
-	float hue = rgb_2_hue( aces);
-	float centeredHue = center_hue( hue, RRT_RED_HUE);
-	float hueWeight;
-	{
-		//hueWeight = cubic_basis_shaper(centeredHue, RRT_RED_WIDTH);
-		hueWeight = smoothstep(0.0, 1.0, 1.0 - abs(2.0 * centeredHue / RRT_RED_WIDTH));
-		hueWeight *= hueWeight;
-	}
-
-	aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
-
-	// --- ACES to RGB rendering space --- //
-	aces = clamp(aces, 0,  65504.0);
-	float3 rgbPre = mul(AP0_2_AP1_MAT, aces);
-	rgbPre = clamp( rgbPre, 0,  65504.0);
-
-	// --- Global desaturation --- //
-	// Desaturation contants
-	const float RRT_SAT_FACTOR = 0.96;
-	rgbPre = lerp(dot(rgbPre, AP1_RGB2Y).xxx, rgbPre, RRT_SAT_FACTOR.xxx);
-	return rgbPre;
 }
 
 float lookup_ACESmin(float minLum)
@@ -382,30 +353,51 @@ float SSTS(float x, TsParams C) {
 	return pow(10.0, logy);
 }
 
-float3 srgb_to_aces(float3 x) {
-  return mul(sRGB_2_AP0, x);
-}
-
-static const half DIM_SURROUND_GAMMA = 0.9811;
-
-float3 darkToDim(float3 XYZ) {
-	float3 xyY = XYZ_2_xyY(XYZ);
-	xyY.z = clamp(xyY.z, 0.0, 65504.0);
-	xyY.z = pow(xyY.z, DIM_SURROUND_GAMMA);
-	return xyY_2_XYZ(xyY);
-}
 
 
 float3 aces_rrt(float3 rgb) {
-	float3 aces = srgb_to_aces(rgb);
-	// RRT sweeteners
-	return RRTSweeteners(aces);
+	float3 aces = mul(sRGB_2_AP0, rgb);
+		// --- Glow module --- //
+	// "Glow" module constants
+	const float RRT_GLOW_GAIN = 0.05;
+	const float RRT_GLOW_MID = 0.08;
+	float saturation = rgb_2_saturation( aces);
+	float ycIn = rgb_2_yc( aces);
+	float s = sigmoid_shaper( (saturation - 0.4) / 0.2);
+	float addedGlow = 1.0 + glow_fwd( ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
+	aces *= addedGlow;
+
+	// --- Red modifier --- //
+	// Red modifier constants
+	const float RRT_RED_SCALE = 0.82;
+	const float RRT_RED_PIVOT = 0.03;
+	const float RRT_RED_HUE = 0.;
+	const float RRT_RED_WIDTH = 135.;
+	float hue = rgb_2_hue( aces);
+	float centeredHue = center_hue( hue, RRT_RED_HUE);
+	float hueWeight;
+	{
+		//hueWeight = cubic_basis_shaper(centeredHue, RRT_RED_WIDTH);
+		hueWeight = smoothstep(0.0, 1.0, 1.0 - abs(2.0 * centeredHue / RRT_RED_WIDTH));
+		hueWeight *= hueWeight;
+	}
+
+	aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
+
+	// --- ACES to RGB rendering space --- //
+	aces = clamp(aces, 0,  65504.0);
+	float3 rgbPre = mul(AP0_2_AP1_MAT, aces);
+	rgbPre = clamp( rgbPre, 0,  65504.0);
+
+	// --- Global desaturation --- //
+	rgbPre = mul( RRT_SAT_MAT, rgbPre);
+	
+	return rgbPre;
 }
 
-float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0) {
+float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool darkToDim = false) {
 
 	float3 rgbPost;
-
 	// Aces-dev has more expensive version
 	TsParams PARAMS = init_TsParams(minY / 48.0f , 48.0f, expShift);
 	rgbPost.x = SSTS(rgbPre.x, PARAMS);
@@ -413,19 +405,22 @@ float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0) {
 	rgbPost.z = SSTS(rgbPre.z, PARAMS);
 
 	float3 scaled = Y_2_linCV( rgbPost, 48.0f, minY / 48.0f);
-	
-	// Convert to display primary encoding
-	// Rendering space RGB to XYZ
-	float3 XYZ = mul( AP1_2_XYZ_MAT, scaled );
-	
-	// This was already done with RRT sweeteners??
-	// Apply desaturation to compensate for luminance difference
-	// const float ODT_SAT_FACTOR = 0.93;
-	// linearCV = lerp( dot( linearCV, AP1_RGB2Y ), linearCV, ODT_SAT_FACTOR );
 
+	float3 XYZ = mul( AP1_2_XYZ_MAT, scaled );
 	XYZ = mul( D60_2_D65_CAT, XYZ );
 
+	if (darkToDim) {
+		float3 xyY = XYZ_2_xyY(XYZ);
+		xyY.z = clamp(xyY.z, 0.0, 65504.0);
+		xyY.z = pow(xyY.z, 0.9811); // DIM_SURROUND_GAMMA
+		XYZ = xyY_2_XYZ(xyY);
+	}
+
 	float3 linearCV = mul( XYZ_2_sRGB_MAT, XYZ );
+
+	// This step is missing in ACES's OutputTransform but is present on ODTs
+	linearCV = mul(ODT_SAT_MAT, linearCV);
+
 	linearCV = lerp(minY / 80.f, maxY / 80.f, linearCV);
 	return linearCV;
 }
