@@ -1164,12 +1164,18 @@ PSOutput PS(PSInput psInput)
 
 		case 4:
 		{
+			float expShift = (HdrDllPluginConstants.DisplayMode > 0)
+				? (HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f
+				: 0;
+			float targetMin = HdrDllPluginConstants.ToneMapperShadows < 0.50f
+				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
+				: 2.f * pow(10.0f, lerp(20.f, -24.f, HdrDllPluginConstants.ToneMapperShadows));
 			acesRrt = aces_rrt(inputColor);
 			tonemappedColor = aces_odt(
 				acesRrt,
-				pow(10.0, lerp(0, 2.f * log10(0.02), HdrDllPluginConstants.ToneMapperShadows)),
+				targetMin,
 				80.f,
-				(HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f,
+				expShift,
 				true
 			);
 			tonemappedByLuminanceColor = tonemappedColor;
