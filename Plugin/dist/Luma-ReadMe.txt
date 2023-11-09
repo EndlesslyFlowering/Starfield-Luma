@@ -14,6 +14,7 @@ List of features:
 -Native HDR (HDR10 and scRGB)
 -Increased buffers accuracy in SDR and HDR, reducing banding all around (SDR is now 10bit instead of 8bit)
 -Normalized LUTs, the grey/flat look is mostly gone, but the color tint is still there
+-New filmic tone mapper based on ACES
 -Fixed bink fullscreen videos playing back with the wrong colors (BT.601 instead of BT.709) and made them use AutoHDR
 -Improved the sharpening passes
 -Improved film grain to be more realistic and nice to look at (e.g. rebalancing the grain size and strength on dark/bright colors)
@@ -44,7 +45,7 @@ Dependencies:
 
 Compatibility:
 This mod should work with any other mod, including DLSS Super Resolution and DLSS Frame Generation (scRGB is NOT supported by FG).
-You can also use customized LUTs mods, but if you do, make sure to disable "LUTs Correction" in the mods settings, or they will be corrected twice.
+You can also use customized LUTs mods. If the customized LUT is in limited range, the "LUTs Correction" slider can be used to scale it.
 Our suggestion is to use the LUT correction that is built in Luma, as it extract extracts HDR detail out of SDR LUTs while normalizing them, something that cannot be achieved by replacing assets.
 Additionally Luma should be compatible with any story content and new location, whether official added by Bethesda as DLCs, or unofficial mods.
 You do NOT need any other HDR related mod, like AutoHDR ReShades, SpecialK, or "HUD for HDR" (which dimmed the UI for AutoHDR).
@@ -56,6 +57,7 @@ Issues and limitations:
 -You can not take screenshots directly from Starfield in photo mode
 
 Comparison with other "HDR" methods:
+-Starfield PC HDR: Starfield on PC does some minor LUT correction to stretch the black floor and peak white, but the output is still 8bit SDR.
 -Starfield Xbox HDR: Starfield on Xbox uses an internal version of AutoHDR, the output image in HDR is extracted from an SDR one, thus its visual quality is still bottlenecked by that.
 -Windows 11 AutoHDR: Windows 11 can apply fake HDR as post process filter, but this is still limited by 8bits output (causing banding), interprets games as gamma sRGB instead of 2.2, and doesn't go anywhere beyond 1000 nits. Additionally, it makes the game UI too bright.
 -SpecialK HDR Retrofit: It can upgrade all buffers to 16bit but the game tonemapping remains SDR, and highlights gets mushed together and clipped.
