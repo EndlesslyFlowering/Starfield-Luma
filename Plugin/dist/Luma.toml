@@ -30,6 +30,7 @@ VanillaMenuLUTs = true
 [ToneMapper]
 ToneMapperType = 0
 Shadows = 50.0
+Bloom = 50.0
 
 [RenderTargets]
 RenderTargetsToUpgrade = [

@@ -129,6 +129,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
 		CreateSliderSetting(a_settingList, settings->Shadows, true);
+		CreateSliderSetting(a_settingList, settings->Bloom, true);
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
@@ -546,6 +547,9 @@ namespace Hooks
 			return true;
 		case static_cast<int>(Settings::SettingID::kToneMapperShadows):
 			HandleSetting(settings->Shadows);
+			return true;
+		case static_cast<int>(Settings::SettingID::kToneMapperBloom):
+			HandleSetting(settings->Bloom);
 			return true;
 		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
 			HandleSetting(settings->LUTCorrectionStrength);
