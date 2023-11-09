@@ -1070,7 +1070,7 @@ PSOutput PS(PSInput psInput)
 #if defined(APPLY_BLOOM)
 
 	float3 bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD);
-	inputColor += PcwHdrComposite.BloomMultiplier * bloom;
+	inputColor += PcwHdrComposite.BloomMultiplier * bloom * (2.f * HdrDllPluginConstants.ToneMapperBloom);
 
 #endif // APPLY_BLOOM
 

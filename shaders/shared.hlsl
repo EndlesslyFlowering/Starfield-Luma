@@ -54,6 +54,7 @@ struct StructHdrDllPluginConstants
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint ToneMapperType; // 0 is default (Hable)
 	float ToneMapperShadows; // 0-1 0.5 is neutral
+	float ToneMapperBloom; // 0-1 0.5 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	float ColorGradingStrength; // 1 is full strength
 	float GammaCorrection; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs. 0 to 1. 1 is "neutral"

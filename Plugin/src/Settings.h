@@ -32,6 +32,7 @@ namespace Settings
 		kSecondaryBrightness,
 		kToneMapperType,
 		kToneMapperShadows,
+		kToneMapperBloom,
 		kLUTCorrectionStrength,
 		kColorGradingStrength,
 		kGammaCorrectionStrength,
@@ -138,6 +139,7 @@ namespace Settings
 		float    SDRSecondaryBrightness;
 		uint32_t ToneMapperType;
 		float    Shadows;
+		float    Bloom;
 		float    LUTCorrectionStrength;
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
@@ -265,6 +267,16 @@ namespace Settings
 			"Shadows",
 			"Sets the shadows strength in the tone mapper.\n\nNeutral default at 50\%.",
 			{ "Shadows", "ToneMapper" },
+			50.f,
+			0.f,
+			100.f,
+			"%"
+		};
+		Slider Bloom{
+			SettingID::kToneMapperBloom,
+			"Bloom",
+			"Sets the bloom strength in the tone mapper.\n\nNeutral default at 50\%.",
+			{ "Bloom", "ToneMapper" },
 			50.f,
 			0.f,
 			100.f,
