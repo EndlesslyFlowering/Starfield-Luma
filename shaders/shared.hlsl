@@ -70,6 +70,6 @@ struct StructHdrDllPluginConstants
 	float DevSetting05; // 0-1 variable for development. Default 0.5
 };
 
-#define HDR_PLUGIN_CONSTANTS_SIZE "19"
+#define HDR_PLUGIN_CONSTANTS_SIZE "20"
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);
