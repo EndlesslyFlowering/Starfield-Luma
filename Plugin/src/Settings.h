@@ -154,7 +154,7 @@ namespace Settings
 		float    DevSetting04;
 		float    DevSetting05;
 	};
-	static inline uint32_t shaderConstantsSize = 19;
+	static inline uint32_t shaderConstantsSize = 25;
 
     class Main : public DKUtil::model::Singleton<Main>
     {
