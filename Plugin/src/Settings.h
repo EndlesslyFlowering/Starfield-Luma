@@ -28,9 +28,9 @@ namespace Settings
 		kHDR_ExtendGamut,
 		kHDR_Saturation,
 		kHDR_Contrast,
-		kHDR_Highlights,
 		kSecondaryBrightness,
 		kToneMapperType,
+		kToneMapperHighlights,
 		kToneMapperShadows,
 		kToneMapperBloom,
 		kLUTCorrectionStrength,
@@ -135,9 +135,9 @@ namespace Settings
 		float    ExtendGamut;
 		float    Saturation;
 		float    Contrast;
-		float    Highlights;
 		float    SDRSecondaryBrightness;
 		uint32_t ToneMapperType;
+		float    Highlights;
 		float    Shadows;
 		float    Bloom;
 		float    LUTCorrectionStrength;
@@ -234,16 +234,6 @@ namespace Settings
 		    100.f,
 			"%"
 		};
-		Slider Highlights{
-			SettingID::kHDR_Highlights,
-			"Highlights",
-			"Sets the highlights strength in HDR modes.\n\nNeutral default at 50\%.",
-			{ "Highlights", "HDR" },
-			50.f,
-			0.f,
-			100.f,
-			"%"
-		};
 		Slider   SecondaryBrightness{
 		    SettingID::kSecondaryBrightness,
 		    "Brightness",
@@ -261,6 +251,16 @@ namespace Settings
 			"ToneMapperType", "ToneMapper",
 			0,
 			{ "Vanilla", "Improved" }
+		};
+		Slider Highlights{
+			SettingID::kToneMapperHighlights,
+			"Highlights",
+			"Sets the highlights strength in the tone mapper modes.\n\nNeutral default at 50\%.",
+			{ "Highlights", "ToneMapper" },
+			50.f,
+			0.f,
+			100.f,
+			"%"
 		};
 		Slider Shadows{
 			SettingID::kToneMapperShadows,

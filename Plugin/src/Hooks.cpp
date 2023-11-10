@@ -43,10 +43,6 @@ namespace Hooks
 			contrast->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
-		if (const auto highlights = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Highlights))) {
-			highlights->m_Enabled.SetValue(a_bGameRenderingHDREnable);
-		}
-
 		if (const auto secondaryBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryBrightness))) {
 			secondaryBrightnessSetting->m_Enabled.SetValue(!a_bGameRenderingHDREnable);
 		}
@@ -125,9 +121,9 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
-		CreateSliderSetting(a_settingList, settings->Highlights, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
+		CreateSliderSetting(a_settingList, settings->Highlights, true);
 		CreateSliderSetting(a_settingList, settings->Shadows, true);
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
@@ -542,7 +538,7 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kHDR_Contrast):
 			HandleSetting(settings->Contrast);
 			return true;
-		case static_cast<int>(Settings::SettingID::kHDR_Highlights):
+		case static_cast<int>(Settings::SettingID::kToneMapperHighlights):
 			HandleSetting(settings->Highlights);
 			return true;
 		case static_cast<int>(Settings::SettingID::kToneMapperShadows):

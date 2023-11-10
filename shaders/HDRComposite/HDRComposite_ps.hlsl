@@ -43,7 +43,7 @@
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
-#define DRAW_TONEMAPPER 0
+#define DRAW_TONEMAPPER 1
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -1126,6 +1126,10 @@ PSOutput PS(PSInput psInput)
 #else
 
 	float3 acesRrt;
+	float acesRrtMin;
+	float acesMidgray = 1.f;
+	float acesHighlightsScaling = (2.f * HdrDllPluginConstants.ToneMapperHighlights);
+
 	float acesParam_modE;
 	float acesParam_modA;
 
@@ -1135,7 +1139,7 @@ PSOutput PS(PSInput psInput)
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
 
-	if (tonemapperIndex == 3 && HdrDllPluginConstants.ToneMapperType == 1) {
+	if ((tonemapperIndex == 1 || tonemapperIndex == 3) && HdrDllPluginConstants.ToneMapperType == 1) {
 		tonemapperIndex = 4;
 	}
 
@@ -1164,21 +1168,26 @@ PSOutput PS(PSInput psInput)
 
 		case 4:
 		{
-			float expShift = (HdrDllPluginConstants.DisplayMode > 0)
-				? (HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f) - 1.f
-				: 0;
-			float targetMin = HdrDllPluginConstants.ToneMapperShadows < 0.50f
+			if (HdrDllPluginConstants.DisplayMode > 0) {
+				acesMidgray *= HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f;
+			}
+			if (PcwHdrComposite.Tmo == 1) {
+				acesMidgray *= 3.5f;
+				acesHighlightsScaling *= 2.f / 3.5f;
+			}
+			acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.50f
 				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
 				: 2.f * pow(10.0f, lerp(20.f, -24.f, HdrDllPluginConstants.ToneMapperShadows));
-			acesRrt = aces_rrt(inputColor);
+			acesRrt = aces_rrt(inputColor * acesMidgray);
 			tonemappedColor = aces_odt(
 				acesRrt,
-				targetMin,
-				80.f,
-				expShift,
+				acesRrtMin,
+				100.f * acesHighlightsScaling,
+				0,
 				true
 			);
-			tonemappedByLuminanceColor = tonemappedColor;
+			tonemappedColor *= acesHighlightsScaling;
+			tonemappedColorLuminance = Luminance(tonemappedColor);
 		} break;
 
 		default:
@@ -1330,19 +1339,20 @@ PSOutput PS(PSInput psInput)
 
 			case 4:
 			{
-				float expShiftHdr = log2(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f)
-					/ log2(0.18 + (0.18 - 0.18f * (2.f * HdrDllPluginConstants.HDRHighlights / 1.f)));
 				float3 acesHDR = aces_odt(
 					acesRrt,
-					0.0001f,
-					HdrDllPluginConstants.HDRPeakBrightnessNits,
-					expShiftHdr
+					acesRrtMin,
+					HdrDllPluginConstants.HDRPeakBrightnessNits * acesHighlightsScaling,
+					0
 				);
+				acesHDR *= acesHighlightsScaling // Scale black level
+					* (HdrDllPluginConstants.HDRPeakBrightnessNits / 100.f) // Scale by how much peak white over SDR target
+					* (203.f / 80.f); // Scale to 1.f in SDR (to match luminance)
 				float acesHDRY = Luminance(max(0, acesHDR));
-				float acesSDRY = Luminance(max(0, tonemappedColor));
+				float acesSDRY = Luminance(max(0, tonemappedColor * 203.f / 80.f));
 				float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
-				float acesYScale = lerp(1.f, hdrYDelta, acesSDRY);
-				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * acesYScale);
+				float acesYScale = max(1.f, hdrYDelta);
+				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * 203.f / 80.f * acesYScale);
 				inverseTonemappedPostProcessedColor = acesHDRGraded;
 			}
 
@@ -1443,7 +1453,7 @@ PSOutput PS(PSInput psInput)
 #else // New method (looks better but struggles more with high paper white on low peak brightness configurations)
 		// Never compress highlights before the top 2/3 of the image, even if it means we have two separate mid tones sections,
 		// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
-		float highlightsShoulderStart = max(maxOutputLuminance * HdrDllPluginConstants.HDRHighlights, minHighlightsColorOut);
+		float highlightsShoulderStart = max(maxOutputLuminance * HdrDllPluginConstants.ToneMapperHighlights, minHighlightsColorOut);
 #endif
 		highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
 
