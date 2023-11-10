@@ -43,7 +43,7 @@
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 #define DRAW_LUT 0
-#define DRAW_TONEMAPPER 1
+#define DRAW_TONEMAPPER 0
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
