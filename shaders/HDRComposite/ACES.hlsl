@@ -399,12 +399,12 @@ float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool 
 
 	float3 rgbPost;
 	// Aces-dev has more expensive version
-	TsParams PARAMS = init_TsParams(minY, 48.0f, expShift);
+	TsParams PARAMS = init_TsParams(minY, maxY, expShift);
 	rgbPost.x = SSTS(rgbPre.x, PARAMS);
 	rgbPost.y = SSTS(rgbPre.y, PARAMS);
 	rgbPost.z = SSTS(rgbPre.z, PARAMS);
 
-	float3 scaled = Y_2_linCV( rgbPost, 48.0f, minY);
+	float3 scaled = Y_2_linCV( rgbPost, maxY, minY);
 
 	float3 XYZ = mul( AP1_2_XYZ_MAT, scaled );
 	XYZ = mul( D60_2_D65_CAT, XYZ );
@@ -420,8 +420,6 @@ float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool 
 
 	// This step is missing in ACES's OutputTransform but is present on ODTs
 	linearCV = mul(ODT_SAT_MAT, linearCV);
-
-	linearCV = lerp(minY / 80.f, maxY / 80.f, linearCV);
 	return linearCV;
 }
 

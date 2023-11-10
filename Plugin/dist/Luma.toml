@@ -14,7 +14,6 @@ PeakBrightnessAutoDetected = false
 ExtendGamut = 0.0
 Saturation = 50.0
 UIPaperWhite = 200
-Highlights = 50.0
 
 [Main]
 ColorGradingStrength = 100.0
@@ -29,6 +28,7 @@ VanillaMenuLUTs = true
 
 [ToneMapper]
 ToneMapperType = 0
+Highlights = 50.0
 Shadows = 50.0
 Bloom = 50.0
 

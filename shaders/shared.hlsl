@@ -50,9 +50,9 @@ struct StructHdrDllPluginConstants
 	float HDRExtendGamut; // 0-1. 0 is neutral
 	float HDRSaturation; // 0-2. 1 is neutral
 	float HDRSecondaryContrast; // 0-2. 1 is neutral
-	float HDRHighlights; // 0-1 0.5 is neutral
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint ToneMapperType; // 0 is default (Hable)
+	float ToneMapperHighlights; // 0-1 0.5 is neutral
 	float ToneMapperShadows; // 0-1 0.5 is neutral
 	float ToneMapperBloom; // 0-1 0.5 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
