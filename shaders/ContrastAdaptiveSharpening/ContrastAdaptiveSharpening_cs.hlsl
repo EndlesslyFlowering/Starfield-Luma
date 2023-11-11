@@ -5,11 +5,11 @@
 //#define USE_PACKED_MATH
 //#define USE_UPSCALING
 
-// this is CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [100FF94]
-// other variants are also available but seemingly unused, which are:
-// - CAS upscaling in FP32 [200FF94]
-// - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH and FFX_CAS_BETTER_DIAGONALS [300FF94]
-// - just CAS sharpening in FP32 [FF94]
+// shader permutations:
+// - CAS sharpening in FP32 [FF94] (USE_PACKED_MATH)
+// - CAS sharpening in FP16 with FFX_CAS_USE_PRECISE_MATH [100FF94]
+// - CAS upscaling in FP32 [200FF94] (USE_UPSCALING)
+// - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [300FF94] (USE_PACKED_MATH + USE_UPSCALING)
 
 // TODO: make full process in half not just after csp conversion? (needs matrices in half)
 
@@ -743,222 +743,162 @@ void CS(CSInput csInput)
 	         | (csInput.SV_GroupID.y << 4);
 	_59 += _55.y;
 
-	uint2 pp = uint2(_58, _59);
+	uint4 _71 = CASData.rectLimits1;
 
-	uint _107 = pp.x - 1;
-	uint  _87 = pp.x;
-	uint _118 = pp.x + 1;
+	//unpack sharp stored as half
+	static const half hSharp = f16tof32(CASData.upscalingConst1.sharpAsHalf & 0xFFFF);
 
-	uint  _89 = pp.y - 1;
-	uint _105 = pp.y;
-	uint _127 = pp.y + 1;
+	uint minX = _71.x;
+	uint minY = _71.y;
+	uint maxX = _71.z;
+	uint maxY = _71.w;
 
-	uint _150 = pp.x + 7;
-	uint _138 = pp.x + 8;
-	uint _167 = pp.x + 9;
+	uint  _89 = clamp(_58,     minX, maxX);
+	uint _100 = clamp(_58 - 1, minX, maxX);
+	uint _120 = clamp(_58 + 1, minX, maxX);
 
-	half3  _91 = ColorIn.Load(int3( _87,  _89, 0)).rgb;
-	half3 _106 = ColorIn.Load(int3(_107, _105, 0)).rgb;
-	half3 _109 = ColorIn.Load(int3( _87, _105, 0)).rgb;
-	half3 _119 = ColorIn.Load(int3(_118, _105, 0)).rgb;
-	half3 _128 = ColorIn.Load(int3( _87, _127, 0)).rgb;
-	half3 _139 = ColorIn.Load(int3(_138,  _89, 0)).rgb;
-	half3 _151 = ColorIn.Load(int3(_150, _105, 0)).rgb;
-	half3 _156 = ColorIn.Load(int3(_138, _105, 0)).rgb;
-	half3 _168 = ColorIn.Load(int3(_167, _105, 0)).rgb;
-	half3 _173 = ColorIn.Load(int3(_138, _127, 0)).rgb;
+	uint _108 = clamp(_59,     minY, maxY);
+	uint  _91 = clamp(_59 - 1, minY, maxY);
+	uint _133 = clamp(_59 + 1, minY, maxY);
 
-	 _91 = PrepareForProcessing( _91);
-	_106 = PrepareForProcessing(_106);
+	uint _156 = _58 + 7;
+	uint _141 = _58 + 8;
+	uint _179 = _58 + 9;
+
+	uint _157 = clamp(_156, minX, maxX);
+	uint _145 = clamp(_141, minX, maxX);
+	uint _180 = clamp(_179, minX, maxX);
+
+	half3  _93 = half3(ColorIn.Load(int3( _89,  _91, 0)).rgb);
+	half3 _109 = half3(ColorIn.Load(int3(_100, _108, 0)).rgb);
+	half3 _113 = half3(ColorIn.Load(int3( _89, _108, 0)).rgb);
+	half3 _124 = half3(ColorIn.Load(int3(_120, _108, 0)).rgb);
+	half3 _134 = half3(ColorIn.Load(int3( _89, _133, 0)).rgb);
+	half3 _146 = half3(ColorIn.Load(int3(_145,  _91, 0)).rgb);
+	half3 _161 = half3(ColorIn.Load(int3(_157, _108, 0)).rgb);
+	half3 _169 = half3(ColorIn.Load(int3(_145, _108, 0)).rgb);
+	half3 _184 = half3(ColorIn.Load(int3(_180, _108, 0)).rgb);
+	half3 _192 = half3(ColorIn.Load(int3(_145, _133, 0)).rgb);
+
+	 _93 = PrepareForProcessing( _93);
 	_109 = PrepareForProcessing(_109);
-	_119 = PrepareForProcessing(_119);
-	_128 = PrepareForProcessing(_128);
-	_139 = PrepareForProcessing(_139);
-	_151 = PrepareForProcessing(_151);
-	_156 = PrepareForProcessing(_156);
-	_168 = PrepareForProcessing(_168);
-	_173 = PrepareForProcessing(_173);
+	_113 = PrepareForProcessing(_113);
+	_124 = PrepareForProcessing(_124);
+	_134 = PrepareForProcessing(_134);
+	_146 = PrepareForProcessing(_146);
+	_161 = PrepareForProcessing(_161);
+	_169 = PrepareForProcessing(_169);
+	_184 = PrepareForProcessing(_184);
+	_192 = PrepareForProcessing(_192);
 
-	half _193 =  _91.y;
-	half _194 = _139.y;
-	half _213 = _106.y;
-	half _214 = _151.y;
-	half _233 = _109.y;
-	half _234 = _156.y;
-	half _253 = _119.y;
-	half _254 = _168.y;
-	half _273 = _128.y;
-	half _274 = _173.y;
+	half _215 =  _93.y;
+	half _216 = _146.y;
+	half _235 = _109.y;
+	half _236 = _161.y;
+	half _255 = _113.y;
+	half _256 = _169.y;
+	half _275 = _124.y;
+	half _276 = _184.y;
+	half _295 = _134.y;
+	half _296 = _192.y;
 
-	half _280 = min(_193, _213);
-	half _281 = min(_194, _214);
-	half _282 = min(_280, _233);
-	half _283 = min(_281, _234);
-	half _284 = min(_253, _273);
-	half _285 = min(_254, _274);
-	half _286 = min(_284, _282);
-	half _287 = min(_285, _283);
+	half _316 = max(max(_275, _295), max(max(_215, _235), _255));
+	half _317 = max(max(_276, _296), max(max(_216, _236), _256));
 
-	half _288 = max(_193, _213);
-	half _289 = max(_194, _214);
-	half _290 = max(_288, _233);
-	half _291 = max(_289, _234);
-	half _292 = max(_253, _273);
-	half _293 = max(_254, _274);
-	half _294 = max(_292, _290);
-	half _295 = max(_293, _291);
+	half _338 = hSharp * sqrt(saturate(min(min(min(_275, _295), min(min(_215, _235), _255)), 1.h - _316) * (1.h / _316)));
+	half _339 = hSharp * sqrt(saturate(min(min(min(_276, _296), min(min(_216, _236), _256)), 1.h - _317) * (1.h / _317)));
 
-	half _299 = 1.h - _294;
-	half _300 = 1.h - _295;
+	half _345 = 1.h / ((_338 * 4.h) + 1.h);
+	half _346 = 1.h / ((_339 * 4.h) + 1.h);
 
-	half _303 = 1.h / _294;
-	half _304 = 1.h / _295;
-
-	_303 *= min(_286, _299);
-	_304 *= min(_287, _300);
-
-	half _981 = saturate(_303);
-	half _992 = saturate(_304);
-
-	half hSharp = f16tof32(CASData.upscalingConst1.sharpAsHalf & 0xFFFF);
-
-	half _315 = sqrt(_981);
-	half _316 = sqrt(_992);
-
-	_315 *= hSharp;
-	_316 *= hSharp;
-
-	half2 _321 = half2(_315, _316);
-
-	_321 *= 4.h;
-
-	_321 += 1.h;
-
-	_321 = 1.h / _321;
-
-	half3 _329 = (((_151 + _139 + _168 + _173) * _316) + _156) * _321.y;
-	half3 colorOut2 = saturate(_329);
-
-	colorOut2 = PrepareForOutput(colorOut2);
-
-	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	if ((_58 <= _55.z) && (_59 <= _55.w))
 	{
-		half3 _388 = (((_106 + _91 + _119 + _128) * _315) + _109) * _321.x;
-		half3 colorOut1 = saturate(_388);
+		half3 colorOut = (((_109 + _93 + _124 + _134) * _338) + _113) * _345;
 
-		colorOut1 = PrepareForOutput(colorOut1);
+		colorOut = saturate(colorOut);
+		colorOut = PrepareForOutput(colorOut);
 
-		ColorOut[pp] = float4(colorOut1, 1.f);
+		ColorOut[uint2(_58, _59)] = float4(float3(colorOut), 1.f);
 	}
 
-	pp.x += 8;
+	uint _495 = _58 + 8;
 
-	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	if ((_495 <= _55.z) && (_59 <= _55.w))
 	{
-		ColorOut[pp] = float4(colorOut2, 1.f);
+		half3 colorOut = (((_161 + _146 + _184 + _192) * _339) + _169) * _346;
+
+		colorOut = saturate(colorOut);
+		colorOut = PrepareForOutput(colorOut);
+
+		ColorOut[uint2(_495, _59)] = float4(float3(colorOut), 1.f);
 	}
 
-	pp.y += 8;
+	uint _529 = _59 + 8;
 
-	uint _507 = pp.y - 1;
-	uint _520 = pp.y;
-	uint _539 = pp.y + 1;
+	uint _561 = clamp(_529,     minY, maxY);
+	uint _547 = clamp(_529 - 1, minY, maxY);
+	uint _583 = clamp(_529 + 1, minY, maxY);
 
-	half3 _509 = ColorIn.Load(int3( _87, _507, 0)).rgb;
-	half3 _521 = ColorIn.Load(int3(_107, _520, 0)).rgb;
-	half3 _524 = ColorIn.Load(int3( _87, _520, 0)).rgb;
-	half3 _531 = ColorIn.Load(int3(_118, _520, 0)).rgb;
-	half3 _540 = ColorIn.Load(int3( _87, _539, 0)).rgb;
-	half3 _547 = ColorIn.Load(int3(_138, _507, 0)).rgb;
-	half3 _556 = ColorIn.Load(int3(_150, _520, 0)).rgb;
-	half3 _561 = ColorIn.Load(int3(_138, _520, 0)).rgb;
-	half3 _570 = ColorIn.Load(int3(_167, _520, 0)).rgb;
-	half3 _575 = ColorIn.Load(int3(_138, _539, 0)).rgb;
+	half3 _549 = half3(ColorIn.Load(int3( _89, _547, 0)).rgb);
+	half3 _562 = half3(ColorIn.Load(int3(_100, _561, 0)).rgb);
+	half3 _566 = half3(ColorIn.Load(int3( _89, _561, 0)).rgb);
+	half3 _574 = half3(ColorIn.Load(int3(_120, _561, 0)).rgb);
+	half3 _584 = half3(ColorIn.Load(int3( _89, _583, 0)).rgb);
+	half3 _592 = half3(ColorIn.Load(int3(_145, _547, 0)).rgb);
+	half3 _604 = half3(ColorIn.Load(int3(_157, _561, 0)).rgb);
+	half3 _612 = half3(ColorIn.Load(int3(_145, _561, 0)).rgb);
+	half3 _624 = half3(ColorIn.Load(int3(_180, _561, 0)).rgb);
+	half3 _632 = half3(ColorIn.Load(int3(_145, _583, 0)).rgb);
 
-	_509 = PrepareForProcessing(_509);
-	_547 = PrepareForProcessing(_547);
-	_521 = PrepareForProcessing(_521);
-	_556 = PrepareForProcessing(_556);
-	_524 = PrepareForProcessing(_524);
-	_561 = PrepareForProcessing(_561);
-	_531 = PrepareForProcessing(_531);
-	_570 = PrepareForProcessing(_570);
-	_540 = PrepareForProcessing(_540);
-	_575 = PrepareForProcessing(_575);
+	_549 = PrepareForProcessing(_549);
+	_562 = PrepareForProcessing(_562);
+	_566 = PrepareForProcessing(_566);
+	_574 = PrepareForProcessing(_574);
+	_584 = PrepareForProcessing(_584);
+	_592 = PrepareForProcessing(_592);
+	_604 = PrepareForProcessing(_604);
+	_612 = PrepareForProcessing(_612);
+	_624 = PrepareForProcessing(_624);
+	_632 = PrepareForProcessing(_632);
 
-	half _596 = _509.y;
-	half _597 = _547.y;
-	half _616 = _521.y;
-	half _617 = _556.y;
-	half _636 = _524.y;
-	half _637 = _561.y;
-	half _656 = _531.y;
-	half _657 = _570.y;
-	half _676 = _540.y;
-	half _677 = _575.y;
+	half _657 = _549.y;
+	half _658 = _592.y;
+	half _677 = _562.y;
+	half _678 = _604.y;
+	half _697 = _566.y;
+	half _698 = _612.y;
+	half _717 = _574.y;
+	half _718 = _624.y;
+	half _737 = _584.y;
+	half _738 = _632.y;
 
-	half _683 = min(_596, _616);
-	half _684 = min(_597, _617);
-	half _685 = min(_683, _636);
-	half _686 = min(_684, _637);
-	half _687 = min(_656, _676);
-	half _688 = min(_657, _677);
-	half _689 = min(_687, _685);
-	half _690 = min(_688, _686);
+	half _758 = max(max(_717, _737), max(max(_657, _677), _697));
+	half _759 = max(max(_718, _738), max(max(_658, _678), _698));
 
-	half _691 = max(_596, _616);
-	half _692 = max(_597, _617);
-	half _693 = max(_691, _636);
-	half _694 = max(_692, _637);
-	half _695 = max(_656, _676);
-	half _696 = max(_657, _677);
-	half _697 = max(_695, _693);
-	half _698 = max(_696, _694);
+	half _772 = hSharp * sqrt(saturate(min(min(min(_717, _737), min(min(_657, _677), _697)), 1.h - _758) * (1.h / _758)));
+	half _773 = hSharp * sqrt(saturate(min(min(min(_718, _738), min(min(_658, _678), _698)), 1.h - _759) * (1.h / _759)));
 
-	half _701 = 1.h - _697;
-	half _702 = 1.h - _698;
+	half _778 = 1.h / ((_772 * 4.h) + 1.h);
+	half _779 = 1.h / ((_773 * 4.h) + 1.h);
 
-	half _705 = 1.h / _697;
-	half _706 = 1.h / _698;
-
-	_705 *= min(_689, _701);
-	_706 *= min(_690, _702);
-
-	half _1194 = saturate(_705);
-	half _1205 = saturate(_706);
-
-	half _711 = sqrt(_1194);
-	half _712 = sqrt(_1205);
-
-	_711 *= hSharp;
-	_712 *= hSharp;
-
-	half2 _716 = half2(_711, _712);
-
-	_716 *= 4.h;
-
-	_716 += 1.h;
-
-	_716 = 1.h / _716;
-
-	half3 _724 = (((_556 + _547 + _570 + _575) * _712) + _561) * _716.y;
-	half3 colorOut4 = saturate(_724);
-
-	colorOut4 = PrepareForOutput(colorOut4);
-
-	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	if ((_58 <= _55.z) && (_529 <= _55.w))
 	{
-		half3 _783 = (((_521 + _509 + _531 + _540) * _711) + _524) * _716.x;
-		half3 colorOut3 = saturate(_783);
+		half3 colorOut = (((_562 + _549 + _574 + _584) * _772) + _566) * _778;
 
-		colorOut3 = PrepareForOutput(colorOut3);
+		colorOut = saturate(colorOut);
+		colorOut = PrepareForOutput(colorOut);
 
-		ColorOut[uint2(_58, pp.y)] = float4(colorOut3, 1.f);
+		ColorOut[uint2(_58, _529)] = float4(float3(colorOut), 1.f);
 	}
 
-	if ((pp.x <= _55.z) && (pp.y <= _55.w))
+	if ((_495 <= _55.z) && (_529 <= _55.w))
 	{
-		ColorOut[pp] = float4(colorOut4, 1.f);
+		half3 colorOut = (((_604 + _592 + _624 + _632) * _773) + _612) * _779;
+
+		colorOut = saturate(colorOut);
+		colorOut = PrepareForOutput(colorOut);
+
+		ColorOut[uint2(_495, _529)] = float4(float3(colorOut), 1.f);
 	}
 
 #endif
