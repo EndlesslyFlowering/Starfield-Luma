@@ -45,6 +45,9 @@
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
 
+#define ACES_WHITE_POINT 100.f
+#define HABLE_2_ACES_RATIO 3.5f
+
 cbuffer CSharedFrameData : register(b0, space6)
 {
 	FrameData SharedFrameData : packoffset(c0);
@@ -1127,8 +1130,7 @@ PSOutput PS(PSInput psInput)
 
 	float3 acesRrt;
 	float acesRrtMin;
-	float acesMidgray = 1.f;
-	float acesHighlightsScaling = (2.f * HdrDllPluginConstants.ToneMapperHighlights);
+	float acesHighlightsScaling = exp2(lerp(-2.f, 2.f, HdrDllPluginConstants.ToneMapperHighlights));
 
 	float acesParam_modE;
 	float acesParam_modA;
@@ -1168,30 +1170,30 @@ PSOutput PS(PSInput psInput)
 
 		case 4:
 		{
+			float acesInputScaling = 1.f;
 			float sdrHighlightScaling = acesHighlightsScaling;
 			if (PcwHdrComposite.Tmo == 1) {
 				// Menu or some interior (Robotics Science Facilities)
-				acesMidgray *= 3.5f; // HABLE_2_ACES_RATIO
+				acesInputScaling *= HABLE_2_ACES_RATIO;
 			} else {
 				// Titan Science Facility
 				float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
 				float toeStrength      =       saturate(PerSceneConstants[3266u].z);
 				if (toeStrength == 0 || toeLength == 0 ) {
-					acesMidgray *= 3.5f; // HABLE_2_ACES_RATIO
+					acesInputScaling *= HABLE_2_ACES_RATIO;
 				}
 			}
 			if (HdrDllPluginConstants.DisplayMode > 0) {
-				acesMidgray *= HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f;
 				sdrHighlightScaling = min(sdrHighlightScaling, 1.f); // Only reduce when in SDR
 			}
 			acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.50f
 				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
 				: 2.f * pow(10.0f, lerp(20.f, -24.f, HdrDllPluginConstants.ToneMapperShadows));
-			acesRrt = aces_rrt(inputColor * acesMidgray);
+			acesRrt = aces_rrt(inputColor * acesInputScaling);
 			tonemappedColor = aces_odt(
 				acesRrt,
 				acesRrtMin,
-				(100.f * 1.f / sdrHighlightScaling),
+				ACES_WHITE_POINT * (1.f / sdrHighlightScaling),
 				log2(1.f / sdrHighlightScaling),
 				true
 			);
@@ -1275,6 +1277,8 @@ PSOutput PS(PSInput psInput)
 	if (HdrDllPluginConstants.DisplayMode > 0) // HDR
 	{
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
+		const float maxOutputPaperWhiteRatio = HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits;
 		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
 		const float midGrayIn = MidGray;
@@ -1351,17 +1355,15 @@ PSOutput PS(PSInput psInput)
 				float3 acesHDR = aces_odt(
 					acesRrt,
 					acesRrtMin,
-					HdrDllPluginConstants.HDRPeakBrightnessNits * (1.f / acesHighlightsScaling),
+					maxOutputPaperWhiteRatio * ACES_WHITE_POINT * (1.f / acesHighlightsScaling),
 					log2(1.f / acesHighlightsScaling)
 				);
-				acesHDR *= acesHighlightsScaling // Scale black level
-					* (HdrDllPluginConstants.HDRPeakBrightnessNits / 100.f) // Scale by how much peak white over SDR target
-					* (203.f / 80.f); // Scale to 1.f in SDR (to match luminance)
+				acesHDR *= acesHighlightsScaling * maxOutputLuminance;
 				float acesHDRY = Luminance(max(0, acesHDR));
-				float acesSDRY = Luminance(max(0, tonemappedColor * 203.f / 80.f));
+				float acesSDRY = Luminance(max(0, tonemappedColor * paperWhite));
 				float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
 				float acesYScale = max(1.f, hdrYDelta);
-				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * 203.f / 80.f * acesYScale);
+				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * paperWhite * acesYScale);
 				inverseTonemappedPostProcessedColor = acesHDRGraded;
 			}
 
@@ -1455,7 +1457,6 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedPostProcessedColor *= paperWhite;
 		minHighlightsColorOut *= paperWhite;
 
-		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
 #if 0 // Old method (looks more dim)
 		// The highlights shoulder (compression) curve should never start beyond 33.33% of the max output brightness (found empircally).
 		float highlightsShoulderStart = min(maxOutputLuminance * (1.f / 3.f), minHighlightsColorOut);
