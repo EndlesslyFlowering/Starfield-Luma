@@ -101,8 +101,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float3 originalLab = linear_srgb_to_oklab(originalLinear);
 	const float3 originalLCh = oklab_to_oklch(originalLab);
 
-	if (analysis.whiteY < analysis.blackY // If LUT is inversed (eg: photo negative) don't do anything
-		|| analysis.whiteY - analysis.blackY >= 1.f) // If LUT is full range already nothing to do
+	if (analysis.whiteY < analysis.blackY) // If LUT is inversed (eg: photo negative) don't do anything
 	{
 #if LUT_MAPPING_TYPE == 2
 		return originalLab;
