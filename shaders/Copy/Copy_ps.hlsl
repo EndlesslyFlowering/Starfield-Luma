@@ -1,4 +1,5 @@
 #include "../shared.hlsl"
+#include "../math.hlsl"
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
