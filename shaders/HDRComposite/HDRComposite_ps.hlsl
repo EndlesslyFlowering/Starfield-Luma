@@ -1105,7 +1105,7 @@ PSOutput PS(PSInput psInput)
 
 			// From 0.01 to Peak nits (in log)
 			const float xMin = log10(0.01 / 80.0f);
-			const float xMax = log10(HdrDllPluginConstants.HDRPeakBrightnessNits / 80.f);
+			const float xMax = log10(10000 / 80.f );
 			const float xRange = xMax - xMin;
 			valueX = (float(toneMapperX) / float(toneMapperBins)) * (xRange) + xMin;
 			valueX = pow(10.f, valueX);
@@ -1168,12 +1168,21 @@ PSOutput PS(PSInput psInput)
 
 		case 4:
 		{
+			float sdrHighlightScaling = acesHighlightsScaling;
+			if (PcwHdrComposite.Tmo == 1) {
+				// Menu or some interior (Robotics Science Facilities)
+				acesMidgray *= 3.5f; // HABLE_2_ACES_RATIO
+			} else {
+				// Titan Science Facility
+				float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
+				float toeStrength      =       saturate(PerSceneConstants[3266u].z);
+				if (toeStrength == 0 || toeLength == 0 ) {
+					acesMidgray *= 3.5f; // HABLE_2_ACES_RATIO
+				}
+			}
 			if (HdrDllPluginConstants.DisplayMode > 0) {
 				acesMidgray *= HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f;
-			}
-			if (PcwHdrComposite.Tmo == 1) {
-				acesMidgray *= 3.5f;
-				acesHighlightsScaling *= 2.f / 3.5f;
+				sdrHighlightScaling = min(sdrHighlightScaling, 1.f); // Only reduce when in SDR
 			}
 			acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.50f
 				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
@@ -1182,11 +1191,11 @@ PSOutput PS(PSInput psInput)
 			tonemappedColor = aces_odt(
 				acesRrt,
 				acesRrtMin,
-				100.f * acesHighlightsScaling,
-				0,
+				(100.f * 1.f / sdrHighlightScaling),
+				log2(1.f / sdrHighlightScaling),
 				true
 			);
-			tonemappedColor *= acesHighlightsScaling;
+			tonemappedColor *= sdrHighlightScaling;
 			tonemappedColorLuminance = Luminance(tonemappedColor);
 		} break;
 
@@ -1342,8 +1351,8 @@ PSOutput PS(PSInput psInput)
 				float3 acesHDR = aces_odt(
 					acesRrt,
 					acesRrtMin,
-					HdrDllPluginConstants.HDRPeakBrightnessNits * acesHighlightsScaling,
-					0
+					HdrDllPluginConstants.HDRPeakBrightnessNits * (1.f / acesHighlightsScaling),
+					log2(1.f / acesHighlightsScaling)
 				);
 				acesHDR *= acesHighlightsScaling // Scale black level
 					* (HdrDllPluginConstants.HDRPeakBrightnessNits / 100.f) // Scale by how much peak white over SDR target
@@ -1493,21 +1502,28 @@ PSOutput PS(PSInput psInput)
 	if (drawToneMapper) {
 		// From 0.01 to Peak nits (in log)
 		const float yMin = log10(0.01);
-		const float yMax = log10(HdrDllPluginConstants.HDRPeakBrightnessNits);
+		const float yMax = log10(10000.f);
 		const float yRange = yMax - yMin;
 		float valueY = (float(toneMapperY) / float(toneMapperBins)) * (yRange) + yMin;
+		float peakNits = HdrDllPluginConstants.DisplayMode > 0
+			? HdrDllPluginConstants.HDRPeakBrightnessNits
+			: 80.f;
 		valueY = pow(10.f, valueY);
 		valueY /= 80.f;
 		float outputY = Luminance(outputColor);
 		if (outputY > valueY ) {
 			if (outputY < 0.18f) {
 				outputColor = float3(0.3f,0,0.3f);
+			} else if (outputY > peakNits / 80.f) {
+				outputColor = float3(0, 0.3f, 0.3f);
 			} else {
 				outputColor = max(0.05f, valueY);
 			}
 		} else {
 			if (valueX < 0.18f) {
 				outputColor = float3(0,0.3f,0);
+			} else if (valueX >= peakNits / 80.f) {
+				outputColor = float3(0,0,0.3f);
 			} else {
 				outputColor = 0.05f;
 			}
