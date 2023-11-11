@@ -2,6 +2,19 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
+// clamp max brightness to 1.05x of the user chosen peak brightness when not developing
+// so it doesn't overshoot too much
+#if !DEVELOPMENT
+	#define PEAK_BRIGHTNESS_THRESHOLD       1.05f
+	#define PEAK_BRIGHTNESS_THRESHOLD_SCRGB (PEAK_BRIGHTNESS_THRESHOLD / WhiteNits_sRGB)
+	#define PEAK_BRIGHTNESS_THRESHOLD_HDR10 (PEAK_BRIGHTNESS_THRESHOLD / PQMaxNits)
+#else
+	#define PEAK_BRIGHTNESS_THRESHOLD       FLT_MAX
+	#define PEAK_BRIGHTNESS_THRESHOLD_SCRGB FLT_MAX
+	#define PEAK_BRIGHTNESS_THRESHOLD_HDR10 FLT_MAX
+#endif
+
+
 Texture2D<float4> inputTexture  : register(t0, space8);
 SamplerState inputSampler : register(s0, space8);
 
@@ -35,9 +48,7 @@ float4 PS(PSInputs inputs) : SV_Target
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
 			color.rgb = WBT2020_To_BT2020(color.rgb);
-#if !DEVELOPMENT
-			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB * 1.05f);
-#endif
+			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
 			color.rgb = BT2020_To_BT709(color.rgb);
 		}
 		else if (HdrDllPluginConstants.DisplayMode == -1) // SDR on scRGB HDR (gamma to linear space conversion)
@@ -62,9 +73,7 @@ float4 PS(PSInputs inputs) : SV_Target
 			color.rgb /= PQMaxWhitePoint;
 			color.rgb = WBT2020_To_BT2020(color.rgb);
 			// Linear_to_PQ does max(x, 0.f)
-#if !DEVELOPMENT
-			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * 0.000105f);
-#endif
+			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_HDR10);
 			color.rgb = Linear_to_PQ(color.rgb);
 		}
 #if SDR_LINEAR_INTERMEDIARY
