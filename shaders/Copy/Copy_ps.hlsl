@@ -35,7 +35,9 @@ float4 PS(PSInputs inputs) : SV_Target
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
 			color.rgb = WBT2020_To_BT2020(color.rgb);
+#if !DEVELOPMENT
 			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB * 1.05f);
+#endif
 			color.rgb = BT2020_To_BT709(color.rgb);
 		}
 		else if (HdrDllPluginConstants.DisplayMode == -1) // SDR on scRGB HDR (gamma to linear space conversion)
@@ -60,7 +62,9 @@ float4 PS(PSInputs inputs) : SV_Target
 			color.rgb /= PQMaxWhitePoint;
 			color.rgb = WBT2020_To_BT2020(color.rgb);
 			// Linear_to_PQ does max(x, 0.f)
-			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * 0.0105f);
+#if !DEVELOPMENT
+			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * 0.000105f);
+#endif
 			color.rgb = Linear_to_PQ(color.rgb);
 		}
 #if SDR_LINEAR_INTERMEDIARY
