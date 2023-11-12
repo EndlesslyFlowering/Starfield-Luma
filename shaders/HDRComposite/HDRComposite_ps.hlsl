@@ -1192,13 +1192,13 @@ PSOutput PS(PSInput psInput)
 			acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.5f
 				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
 				: 2.f * pow(10.0f, lerp(20.f, -24.f, HdrDllPluginConstants.ToneMapperShadows));
-			acesRrt = aces_rrt(inputColor * acesInputScaling);
-			tonemappedColor = aces_odt(
+			// Technically should go to AP1, but this is how Bethesda did it
+			acesRrt = (inputColor * acesInputScaling);
+			tonemappedColor = aces_odt_tone_map(
 				acesRrt,
 				acesRrtMin,
-				ACES_WHITE_POINT * (1.f / sdrHighlightScaling),
-				log2(1.f / sdrHighlightScaling),
-				true
+				ACES_WHITE_POINT * sdrHighlightScaling,
+				0
 			);
 			tonemappedColor *= sdrHighlightScaling;
 			tonemappedColorLuminance = Luminance(tonemappedColor); //TODO: ...
@@ -1358,8 +1358,8 @@ PSOutput PS(PSInput psInput)
 				float3 acesHDR = aces_odt(
 					acesRrt,
 					acesRrtMin,
-					maxOutputPaperWhiteRatio * ACES_WHITE_POINT * (1.f / acesHighlightsScaling),
-					log2(1.f / acesHighlightsScaling)
+					maxOutputPaperWhiteRatio * ACES_WHITE_POINT * acesHighlightsScaling,
+					0
 				);
 				acesHDR *= acesHighlightsScaling * maxOutputLuminance;
 				float acesHDRY = Luminance(max(0, acesHDR));
