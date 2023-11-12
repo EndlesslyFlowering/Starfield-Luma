@@ -1,15 +1,10 @@
 #define ACES_PI            3.14159265359f
 
-struct TsPoint {
-	float x;
-	float y;
-	float slope;
-};
 
-struct TsParams {
-	TsPoint Min;
-	TsPoint Mid;
-	TsPoint Max;
+struct AcesParams {
+	float3 Min;
+	float3 Mid;
+	float3 Max;
 	float coefsLow[6];
 	float coefsHigh[6];
 };
@@ -20,6 +15,35 @@ static const float3x3 sRGB_2_AP0 = {
 	0.4397010, 0.3829780, 0.1773350,
 	0.0897923, 0.8134230, 0.0967616,
 	0.0175440, 0.1115440, 0.8707040
+};
+
+static const float3x3 AP0_2_SRGB = {
+	2.5214008886, -1.1339957494, -0.3875618568,
+ -0.2762140616,  1.3725955663, -0.0962823557,
+ -0.0153202001, -0.1529925618,  1.1683871996
+};
+
+
+
+static const float3x3 SRGB_2_XYZ_MAT =
+{
+	0.4124564, 0.3575761, 0.1804375,
+	0.2126729, 0.7151522, 0.0721750,
+	0.0193339, 0.1191920, 0.9503041,
+};
+
+static const float3x3 XYZ_2_AP0_MAT =
+{
+	 1.0498110175, 0.0000000000,-0.0000974845,
+	-0.4959030231, 1.3733130458, 0.0982400361,
+	 0.0000000000, 0.0000000000, 0.9912520182,
+};
+
+static const float3x3 AP1_2_SRGB =
+{
+	 1.7048586763, -0.6217160219, -0.0832993717,
+	-0.1300768242,  1.1407357748, -0.0105598017,
+	-0.0239640729, -0.1289755083,  1.1530140189
 };
 
 // mul( AP0_2_XYZ_MAT, XYZ_2_AP1_MAT );
@@ -47,12 +71,42 @@ static const float3x3 D60_2_D65_CAT = {
 	 0.00307257, -0.00509595, 1.0816800
 };
 
+static const float3x3 D65_2_D60_CAT =
+{
+	 1.01303,    0.00610531, -0.014971,
+	 0.00769823, 0.998165,   -0.00503203,
+	-0.00284131, 0.00468516,  0.924507,
+};
+
 static const float3x3 XYZ_2_sRGB_MAT =
 {
 	 3.2409699419, -1.5373831776, -0.4986107603,
 	-0.9692436363,  1.8759675015,  0.0415550574,
 	 0.0556300797, -0.2039769589,  1.0569715142,
 };
+
+static const half3x3 AP1_2_AP0_MAT = {
+	0.6954522414, 0.1406786965, 0.1638690622,
+	0.0447945634, 0.8596711185, 0.0955343182,
+	-0.0055258826, 0.0040252103, 1.0015006723
+};
+
+static const float3x3 BlueCorrect =
+	{
+		0.9404372683, -0.0183068787, 0.0778696104,
+		0.0083786969,  0.8286599939, 0.1629613092,
+		0.0005471261, -0.0008833746, 1.0003362486
+	};
+static const float3x3 BlueCorrectInv =
+{
+	1.06318,     0.0233956, -0.0865726,
+	-0.0106337,   1.20632,   -0.19569,
+	-0.000590887, 0.00105248, 0.999538
+};
+
+static const float3x3 BlueCorrectAP1    = mul( AP0_2_AP1_MAT, mul( BlueCorrect, AP1_2_AP0_MAT ) );
+
+static const float3x3 BlueCorrectInvAP1 = mul( AP0_2_AP1_MAT, mul( BlueCorrectInv, AP1_2_AP0_MAT ) );
 
 static const half3x3 M = {
 	 0.5, -1.0, 0.5,
@@ -83,6 +137,26 @@ static const float MAX_LUM_SDR = 48.0;
 
 static const float MIN_LUM_RRT = 0.0001;
 static const float MAX_LUM_RRT = 10000.0;
+
+static const float2x2 MIN_LUM_TABLE = {
+	log10(MIN_LUM_RRT), MIN_STOP_RRT,
+	log10(MIN_LUM_SDR), MIN_STOP_SDR
+};
+
+static const float2x2 MAX_LUM_TABLE = {
+	log10(MAX_LUM_SDR), MAX_STOP_SDR,
+	log10(MAX_LUM_RRT), MAX_STOP_RRT
+};
+
+static const float2x2 BENDS_LOW_TABLE = { 
+	MIN_STOP_RRT, 0.18,
+	MIN_STOP_SDR, 0.35
+};
+
+static const float2x2 BENDS_HIGH_TABLE = {
+	MAX_STOP_SDR, 0.89,
+	MAX_STOP_RRT, 0.90
+};
 
 // Sigmoid function in the range 0 to 1 spanning -2 to +2.
 float sigmoid_shaper(float x) {
@@ -186,7 +260,9 @@ float3 xyY_2_XYZ( float3 xyY ) {
 }
 
 float interpolate1D(float2x2 table, float p) {
-	p = clamp(p, table[0].x, table[1].x);
+	if (p < table[0].x) return table[0].y;
+	if (p >= table[1].x) return table[1].y;
+	// p = clamp(p, table[0].x, table[1].x);
 	float s = (p - table[0].x) / (table[1].x - table[0].x);
 	return table[0].y * ( 1 - s ) + table[1].y * s;
 }
@@ -201,102 +277,80 @@ float3 linCV_2_Y( float3 linCV, float Ymax, float Ymin) {
 
 float lookup_ACESmin(float minLum)
 {
-	const float2x2 minTable = {
-		log10(MIN_LUM_RRT), MIN_STOP_RRT,
-		log10(MIN_LUM_SDR), MIN_STOP_SDR
-	};
-
-	return 0.18 * exp2(interpolate1D(minTable, log10(minLum)));
+	return 0.18 * exp2(interpolate1D(MIN_LUM_TABLE, log10(minLum)));
 }
 
 float lookup_ACESmax( float maxLum )
 {
-	const float2x2 maxTable = {
-		log10(MAX_LUM_SDR), MAX_STOP_SDR,
-		log10(MAX_LUM_RRT), MAX_STOP_RRT
-	};
-
-	return 0.18 *exp2(interpolate1D( maxTable, log10( maxLum)));
-}
-
-void init_coefsLow(
-	TsPoint TsPointLow,
-	TsPoint TsPointMid,
-	out float coefsLow[5]
-)
-{
-	float knotIncLow = (log10(TsPointMid.x) - log10(TsPointLow.x)) / 3.;
-	// float halfKnotInc = (log10(TsPointMid.x) - log10(TsPointLow.x)) / 6.;
-
-	// Determine two lowest coefficients (straddling minPt)
-	// coefsLow[0] = (TsPointLow.slope * (log10(TsPointLow.x)- 0.5 * knotIncLow)) + ( log10(TsPointLow.y) - TsPointLow.slope * log10(TsPointLow.x));
-	// coefsLow[1] = (TsPointLow.slope * (log10(TsPointLow.x)+ 0.5 * knotIncLow)) + ( log10(TsPointLow.y) - TsPointLow.slope * log10(TsPointLow.x));
-	// NOTE: if slope=0, then the above becomes just
-		coefsLow[0] = log10(TsPointLow.y);
-		coefsLow[1] = coefsLow[0];
-	// leaving it as a variable for now in case we decide we need non-zero slope extensions
-
-	// Determine two highest coefficients (straddling midPt)
-	coefsLow[3] = (TsPointMid.slope * (log10(TsPointMid.x)-0.5*knotIncLow)) + ( log10(TsPointMid.y) - TsPointMid.slope * log10(TsPointMid.x));
-	coefsLow[4] = (TsPointMid.slope * (log10(TsPointMid.x)+0.5*knotIncLow)) + ( log10(TsPointMid.y) - TsPointMid.slope * log10(TsPointMid.x));
-
-	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
-	float2x2 bendsLow = { 
-		MIN_STOP_RRT, 0.18,
-		MIN_STOP_SDR, 0.35
-	};
-	float pctLow = interpolate1D( bendsLow, log2(TsPointLow.x/0.18));
-	coefsLow[2] = log10(TsPointLow.y) + pctLow*(log10(TsPointMid.y)-log10(TsPointLow.y));
-}
-
-void init_coefsHigh(TsPoint TsPointMid, TsPoint TsPointMax, out float coefsHigh[5]) {
-	float knotIncHigh = (log10(TsPointMax.x) - log10(TsPointMid.x)) / 3.0f;
-	// float halfKnotInc = (log10(TsPointMax.x) - log10(TsPointMid.x)) / 6.;
-
-	// Determine two lowest coefficients (straddling midPt)
-	coefsHigh[0] = (TsPointMid.slope * (log10(TsPointMid.x)-0.5*knotIncHigh)) + ( log10(TsPointMid.y) - TsPointMid.slope * log10(TsPointMid.x));
-	coefsHigh[1] = (TsPointMid.slope * (log10(TsPointMid.x)+0.5*knotIncHigh)) + ( log10(TsPointMid.y) - TsPointMid.slope * log10(TsPointMid.x));
-
-	// Determine two highest coefficients (straddling maxPt)
-	// coefsHigh[3] = (TsPointMax.slope * (log10(TsPointMax.x)-0.5*knotIncHigh)) + ( log10(TsPointMax.y) - TsPointMax.slope * log10(TsPointMax.x));
-	// coefsHigh[4] = (TsPointMax.slope * (log10(TsPointMax.x)+0.5*knotIncHigh)) + ( log10(TsPointMax.y) - TsPointMax.slope * log10(TsPointMax.x));
-	// NOTE: if slope=0, then the above becomes just
-		coefsHigh[3] = log10(TsPointMax.y);
-		coefsHigh[4] = coefsHigh[3];
-	// leaving it as a variable for now in case we decide we need non-zero slope extensions
-
-	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
-	float2x2 bendsHigh = {
-		MAX_STOP_SDR, 0.89,
-		MAX_STOP_RRT, 0.90
-	};
-	float pctHigh = interpolate1D( bendsHigh, log2(TsPointMax.x/0.18));
-	coefsHigh[2] = log10(TsPointMid.y) + pctHigh*(log10(TsPointMax.y)-log10(TsPointMid.y));
+	return 0.18 * exp2(interpolate1D( MAX_LUM_TABLE, log10(maxLum)));
 }
 
 float shift(float input, float expShift) {
 	return exp2(log2(input) - expShift);
 }
 
-TsParams init_TsParams(float minLum, float maxLum, float expShift = 0)
-{
-	TsPoint MIN_PT = { lookup_ACESmin(minLum), minLum, 0.0};
-	TsPoint MID_PT = { 0.18, 4.8, 1.55};
-	TsPoint MAX_PT = { lookup_ACESmax(maxLum), maxLum, 0.0};
-	float cLow[5];
-	float cHigh[5];
-	init_coefsLow( MIN_PT, MID_PT, cLow);
-	init_coefsHigh( MID_PT, MAX_PT, cHigh);
-	MIN_PT.x = shift(lookup_ACESmin(minLum),expShift);
-	MID_PT.x = shift(0.18,expShift);
-	MAX_PT.x = shift(lookup_ACESmax(maxLum),expShift);
+AcesParams init_aces_params(float minLum, float maxLum, float expShift = 0) {
+	float3 MIN_PT = float3(lookup_ACESmin(minLum), minLum, 0.0);
+	float3 MID_PT = float3(0.18, 4.8, 1.55);
+	float3 MAX_PT = float3(lookup_ACESmax(maxLum), maxLum, 0.0);
+	float coefsLow[5];
+	float coefsHigh[5];
 
-	TsParams P = {
-		{MIN_PT.x, MIN_PT.y, MIN_PT.slope},
-		{MID_PT.x, MID_PT.y, MID_PT.slope},
-		{MAX_PT.x, MAX_PT.y, MAX_PT.slope},
-		{cLow[0], cLow[1], cLow[2], cLow[3], cLow[4], cLow[4]},
-		{cHigh[0], cHigh[1], cHigh[2], cHigh[3], cHigh[4], cHigh[4]}
+	float2 logMin = log10(MIN_PT.xy);
+	float2 logMid = log10(MID_PT.xy);
+	float2 logMax = log10(MAX_PT.xy);
+	
+	float knotIncLow = (logMid.x - logMin.x) / 3.;
+	// float halfKnotInc = (logMid.x - logMin.x) / 6.;
+
+	// Determine two lowest coefficients (straddling minPt)
+	// coefsLow[0] = (MIN_PT.z * (logMin.x- 0.5 * knotIncLow)) + ( logMin.y - MIN_PT.z * logMin.x);
+	// coefsLow[1] = (MIN_PT.z * (logMin.x+ 0.5 * knotIncLow)) + ( logMin.y - MIN_PT.z * logMin.x);
+	// NOTE: if slope=0, then the above becomes just
+	coefsLow[0] = logMin.y;
+	coefsLow[1] = coefsLow[0];
+	// leaving it as a variable for now in case we decide we need non-zero slope extensions
+
+	// Determine two highest coefficients (straddling midPt)
+	float minMidCoef = ( logMid.y - MID_PT.z * logMid.x);
+	coefsLow[3] = (MID_PT.z * (logMid.x-0.5*knotIncLow)) + minMidCoef;
+	coefsLow[4] = (MID_PT.z * (logMid.x+0.5*knotIncLow)) + minMidCoef;
+
+	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
+	float pctLow = interpolate1D( BENDS_LOW_TABLE, log2(MIN_PT.x/0.18));
+	coefsLow[2] = logMin.y + pctLow*(logMid.y-logMin.y);
+	
+	float knotIncHigh = (logMax.x - logMid.x) / 3.0f;
+	// float halfKnotInc = (logMax.x - logMid.x) / 6.;
+
+	// Determine two lowest coefficients (straddling midPt)
+	float minCoef = ( logMid.y - MID_PT.z * logMid.x);
+	coefsHigh[0] = (MID_PT.z * (logMid.x-0.5*knotIncHigh)) + minCoef;
+	coefsHigh[1] = (MID_PT.z * (logMid.x+0.5*knotIncHigh)) + minCoef;
+
+	// Determine two highest coefficients (straddling maxPt)
+	// coefsHigh[3] = (MAX_PT.z * (logMax.x-0.5*knotIncHigh)) + ( logMax.y - MAX_PT.z * logMax.x);
+	// coefsHigh[4] = (MAX_PT.z * (logMax.x+0.5*knotIncHigh)) + ( logMax.y - MAX_PT.z * logMax.x);
+	// NOTE: if slope=0, then the above becomes just
+		coefsHigh[3] = logMax.y;
+		coefsHigh[4] = coefsHigh[3];
+	// leaving it as a variable for now in case we decide we need non-zero slope extensions
+
+	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
+
+	float pctHigh = interpolate1D( BENDS_HIGH_TABLE, log2(MAX_PT.x/0.18));
+	coefsHigh[2] = logMid.y + pctHigh*(logMax.y-logMid.y);
+
+	MIN_PT.x = shift(MIN_PT.x, expShift);
+	MID_PT.x = shift(0.18, expShift);
+	MAX_PT.x = shift(MAX_PT.x ,expShift);
+
+	AcesParams P = {
+		float3(log10(MIN_PT.x), log10(MIN_PT.y), MIN_PT.z),
+		float3(log10(MID_PT.x), log10(MID_PT.y), MID_PT.z),
+		float3(log10(MAX_PT.x), log10(MAX_PT.y), MAX_PT.z),
+		{coefsLow[0], coefsLow[1], coefsLow[2], coefsLow[3], coefsLow[4], coefsLow[4]},
+		{coefsHigh[0], coefsHigh[1], coefsHigh[2], coefsHigh[3], coefsHigh[4], coefsHigh[4]}
 	};
 
 	return P;
@@ -308,7 +362,7 @@ float computeGraphY(float m, float x, float b) {
 	return m * x + b;
 }
 
-float SSTS(float x, TsParams C) {
+float SSTS(float x, AcesParams C) {
 	const int N_KNOTS_LOW = 4;
 	const int N_KNOTS_HIGH = 4;
 
@@ -318,41 +372,94 @@ float SSTS(float x, TsParams C) {
 
 	float logy;
 
-	if (logx > log10(C.Max.x)) {
+	if (logx > C.Max.x) {
 		// Above max breakpoint (overshoot)
 		// If MAX_PT slope is 0, this is just a straight line and always returns
 		// maxLum
 		// y = mx+b
-		// logy = computeGraphY(C.Max.slope, logx, log10(C.Max.y) - (C.Max.slope * log10(C.Max.x)));
-		logy = log10(C.Max.y);
-	} else if (logx >= log10(C.Mid.x)) {
+		// logy = computeGraphY(C.Max.z, logx, (C.Max.y) - (C.Max.z * (C.Max.x)));
+		logy = C.Max.y;
+	} else if (logx >= C.Mid.x) {
 		// Part of Midtones area (Must have slope)
-		float knot_coord = (N_KNOTS_HIGH-1) * (logx-log10(C.Mid.x))/(log10(C.Max.x)-log10(C.Mid.x));
+		float knot_coord = (N_KNOTS_HIGH-1) * (logx-C.Mid.x)/(C.Max.x-C.Mid.x);
 		int j = knot_coord;
 		float t = knot_coord - j;
 
-		float3 cf = { C.coefsHigh[j], C.coefsHigh[j + 1], C.coefsHigh[j + 2]};
+		float3 cf = float3(C.coefsHigh[j], C.coefsHigh[j + 1], C.coefsHigh[j + 2]);
 
-		float3 monomials = { t * t, t, 1.0 };
-		logy = dot( monomials, mul(M, cf));
-	} else if (logx > log10(C.Min.x)) {
-		float knot_coord = (N_KNOTS_LOW-1) * (logx-log10(C.Min.x))/(log10(C.Mid.x)-log10(C.Min.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = {C.coefsLow[ j], C.coefsLow[j + 1], C.coefsLow[ j + 2]};
-
-		float3 monomials = { t * t, t, 1.0 };
+		float3 monomials = float3(t * t, t, 1.0);
 		logy = dot(monomials, mul(M, cf));
-	} else { //(logx <= log10(C.Min.x))
+	} else if (logx > C.Min.x) {
+		float knot_coord = (N_KNOTS_LOW-1) * (logx-C.Min.x)/(C.Mid.x-C.Min.x);
+		int j = knot_coord;
+		float t = knot_coord - j;
+
+		float3 cf = float3(C.coefsLow[j], C.coefsLow[j + 1], C.coefsLow[j + 2]);
+
+		float3 monomials = float3(t * t, t, 1.0);
+		logy = dot(monomials, mul(M, cf));
+	} else { //(logx <= (C.Min.x))
 		// Below min breakpoint (undershoot)
-		// logy = computeGraphY(C.Min.slope, logx, (log10(C.Min.y) - C.Min.slope * log10(C.Min.x)));
-		logy = log10(C.Min.y);
+		// logy = computeGraphY(C.Min.z, logx, ((C.Min.y) - C.Min.z * (C.Min.x)));
+		logy = C.Min.y;
 	}
 
 	return pow(10.0, logy);
 }
 
+static float LIM_CYAN =  1.147f;
+static float LIM_MAGENTA = 1.264f;
+static float LIM_YELLOW = 1.312f;
+static float THR_CYAN = 0.815f;
+static float THR_MAGENTA = 0.803f;
+static float THR_YELLOW = 0.880f;
+static float PWR = 1.2f;
+
+float aces_gamut_compress_channel(float dist, float lim, float thr, float pwr)
+{
+    float comprDist;
+    float scl;
+    float nd;
+    float p;
+
+    if (dist < thr) {
+        comprDist = dist; // No compression below threshold
+    }
+    else {
+        // Calculate scale factor for y = 1 intersect
+        scl = (lim - thr) / pow(pow((1.0 - thr) / (lim - thr), -pwr) - 1.0, 1.0 / pwr);
+
+        // Normalize distance outside threshold by scale factor
+        nd = (dist - thr) / scl;
+        p = pow(nd, pwr);
+
+        comprDist = thr + scl * nd / (pow(1.0 + p, 1.0 / pwr)); // Compress
+    }
+
+    return comprDist;
+}
+
+float3 aces_gamut_compress(float3 linAP1)
+{
+	
+    // Achromatic axis
+    float ach = max(linAP1.r, max(linAP1.g, linAP1.b));
+		float absAch = abs(ach);
+    // Distance from the achromatic axis for each color component aka inverse RGB ratios
+    float3 dist = ach ? (ach - linAP1) / absAch : 0;
+
+    // Compress distance with parameterized shaper function
+    float3 comprDist = float3(
+        aces_gamut_compress_channel(dist.r, LIM_CYAN, THR_CYAN, PWR),
+        aces_gamut_compress_channel(dist.g, LIM_MAGENTA, THR_MAGENTA, PWR),
+        aces_gamut_compress_channel(dist.b, LIM_YELLOW, THR_YELLOW, PWR)
+		);
+
+    // Recalculate RGB from compressed distance and achromatic
+    float3 comprLinAP1 = ach - comprDist * absAch;
+
+    return comprLinAP1;
+}
 
 
 float3 aces_rrt(float3 rgb) {
@@ -365,7 +472,7 @@ float3 aces_rrt(float3 rgb) {
 	float ycIn = rgb_2_yc( aces);
 	float s = sigmoid_shaper( (saturation - 0.4) / 0.2);
 	float addedGlow = 1.0 + glow_fwd( ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
-	aces *= addedGlow;
+	// aces *= addedGlow;
 
 	// --- Red modifier --- //
 	// Red modifier constants
@@ -382,7 +489,7 @@ float3 aces_rrt(float3 rgb) {
 		hueWeight *= hueWeight;
 	}
 
-	aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
+	// aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
 
 	// --- ACES to RGB rendering space --- //
 	aces = clamp(aces, 0,  65504.0);
@@ -391,21 +498,31 @@ float3 aces_rrt(float3 rgb) {
 
 	// --- Global desaturation --- //
 	rgbPre = mul( RRT_SAT_MAT, rgbPre);
+
+	rgbPre = lerp( rgbPre, mul( BlueCorrectAP1, rgbPre ), 0.6f );
+	rgbPre = aces_gamut_compress(rgbPre);
 	
 	return rgbPre;
 }
 
-float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool darkToDim = false) {
-
+float3 aces_odt_tone_map(float3 rgbPre, float minY, float maxY, float expShift = 0) {
 	float3 rgbPost;
 	// Aces-dev has more expensive version
-	TsParams PARAMS = init_TsParams(minY, maxY, expShift);
+	AcesParams PARAMS = init_aces_params(minY, maxY, expShift);
 	rgbPost.x = SSTS(rgbPre.x, PARAMS);
 	rgbPost.y = SSTS(rgbPre.y, PARAMS);
 	rgbPost.z = SSTS(rgbPre.z, PARAMS);
 
-	float3 scaled = Y_2_linCV( rgbPost, maxY, minY);
+	// Not clamping may produce pink dots
+	return max(0, Y_2_linCV( rgbPost, maxY, minY));
+}
 
+float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool darkToDim = false) {
+
+	float3 scaled = aces_odt_tone_map(rgbPre, minY, maxY, expShift);
+	
+	scaled = lerp( scaled, mul( BlueCorrectInvAP1, scaled ), 0.6f );
+	
 	float3 XYZ = mul( AP1_2_XYZ_MAT, scaled );
 	XYZ = mul( D60_2_D65_CAT, XYZ );
 
