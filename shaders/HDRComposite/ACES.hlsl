@@ -472,7 +472,7 @@ float3 aces_rrt(float3 rgb) {
 	float ycIn = rgb_2_yc( aces);
 	float s = sigmoid_shaper( (saturation - 0.4) / 0.2);
 	float addedGlow = 1.0 + glow_fwd( ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
-	// aces *= addedGlow;
+	aces *= addedGlow;
 
 	// --- Red modifier --- //
 	// Red modifier constants
@@ -489,7 +489,7 @@ float3 aces_rrt(float3 rgb) {
 		hueWeight *= hueWeight;
 	}
 
-	// aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
+	aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
 
 	// --- ACES to RGB rendering space --- //
 	aces = clamp(aces, 0,  65504.0);
