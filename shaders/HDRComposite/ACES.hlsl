@@ -387,7 +387,7 @@ float3 aces_rrt(float3 rgb) {
 	// --- ACES to RGB rendering space --- //
 	aces = clamp(aces, 0,  65504.0);
 	float3 rgbPre = mul(AP0_2_AP1_MAT, aces);
-	rgbPre = clamp( rgbPre, 0,  65504.0);
+	rgbPre = clamp(rgbPre, 0, 65504.0);
 
 	// --- Global desaturation --- //
 	rgbPre = mul( RRT_SAT_MAT, rgbPre);

@@ -57,9 +57,9 @@ Issues and limitations:
 -You can not take screenshots directly from Starfield in photo mode
 
 Comparison with other "HDR" methods:
--Starfield PC HDR: Starfield on PC does some minor LUT correction to stretch the black floor and peak white, but the output is still 8bit SDR.
--Starfield Xbox HDR: Starfield on Xbox uses an internal version of AutoHDR, the output image in HDR is extracted from an SDR one, thus its visual quality is still bottlenecked by that.
--Windows 11 AutoHDR: Windows 11 can apply fake HDR as post process filter, but this is still limited by 8bits output (causing banding), interprets games as gamma sRGB instead of 2.2, and doesn't go anywhere beyond 1000 nits. Additionally, it makes the game UI too bright.
+-Starfield "official" HDR: Starfield does not official support HDR, both the Xbox Series and Windows 11 versions rely on the OS AutoHDR, meaning that the game still outputs 8bit SDR, and its visual quality is still bottlenecked by that (no proper highlights, no BT.2020 colors, banding).
+ To clarify, Windows AutoHDR is a simple post process filter that generates an HDR image out of an SDR one, but it interprets games using the wrong gamma (sRGB instead of 2.2), and doesn't go anywhere beyond 1000 nits. Additionally, it can make the game UI too bright (Starfield works around this by dimming it).
+ The game allows some basic LUT correction to stretch the black floor and peak white in HDR, but it's very lightweight compared to the adjustmenets that Luma is capable of making.
 -SpecialK HDR Retrofit: It can upgrade all buffers to 16bit but the game tonemapping remains SDR, and highlights gets mushed together and clipped.
 -Pumbo's Advanced Auto HDR + DXVK: Same problems as SpecialK HDR.
 
