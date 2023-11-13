@@ -275,30 +275,30 @@ float3 linCV_2_Y( float3 linCV, float Ymax, float Ymin) {
   return linCV * (Ymax - Ymin) + Ymin;
 }
 
-float lookup_ACESmin(float minLum)
+float lookup_ACESmin(float minLumLog10)
 {
-	return 0.18 * exp2(interpolate1D(MIN_LUM_TABLE, log10(minLum)));
+	return 0.18 * exp2(interpolate1D(MIN_LUM_TABLE, minLumLog10));
 }
 
-float lookup_ACESmax( float maxLum )
+float lookup_ACESmax( float maxLumLog10 )
 {
-	return 0.18 * exp2(interpolate1D( MAX_LUM_TABLE, log10(maxLum)));
+	return 0.18 * exp2(interpolate1D( MAX_LUM_TABLE, maxLumLog10));
 }
 
-float shift(float input, float expShift) {
-	return exp2(log2(input) - expShift);
-}
-
-AcesParams init_aces_params(float minLum, float maxLum, float expShift = 0) {
-	float3 MIN_PT = float3(lookup_ACESmin(minLum), minLum, 0.0);
+AcesParams init_aces_params(float minLum, float maxLum) {
+	float minLumLog10 = log10(minLum);
+	float maxLumLog10 = log10(maxLum);
+	float acesMin = lookup_ACESmin(minLumLog10);
+	float acesMax = lookup_ACESmax(maxLumLog10);
+	// float3 MIN_PT = float3(lookup_ACESmin(minLum), minLum, 0.0);
 	float3 MID_PT = float3(0.18, 4.8, 1.55);
-	float3 MAX_PT = float3(lookup_ACESmax(maxLum), maxLum, 0.0);
+	// float3 MAX_PT = float3(lookup_ACESmax(maxLum), maxLum, 0.0);
 	float coefsLow[5];
 	float coefsHigh[5];
 
-	float2 logMin = log10(MIN_PT.xy);
-	float2 logMid = log10(MID_PT.xy);
-	float2 logMax = log10(MAX_PT.xy);
+	float2 logMin = float2(log10(acesMin), minLumLog10);
+	float2 logMid = float2(log10(MID_PT.xy));
+	float2 logMax = float2(log10(acesMax), maxLumLog10);
 	
 	float knotIncLow = (logMid.x - logMin.x) / 3.;
 	// float halfKnotInc = (logMid.x - logMin.x) / 6.;
@@ -312,19 +312,19 @@ AcesParams init_aces_params(float minLum, float maxLum, float expShift = 0) {
 	// leaving it as a variable for now in case we decide we need non-zero slope extensions
 
 	// Determine two highest coefficients (straddling midPt)
-	float minMidCoef = ( logMid.y - MID_PT.z * logMid.x);
-	coefsLow[3] = (MID_PT.z * (logMid.x-0.5*knotIncLow)) + minMidCoef;
-	coefsLow[4] = (MID_PT.z * (logMid.x+0.5*knotIncLow)) + minMidCoef;
+	float minCoef = (logMid.y - MID_PT.z * logMid.x);
+	coefsLow[3] = (MID_PT.z * (logMid.x-0.5*knotIncLow)) + (logMid.y - MID_PT.z * logMid.x);
+	coefsLow[4] = (MID_PT.z * (logMid.x+0.5*knotIncLow)) + (logMid.y - MID_PT.z * logMid.x);
 
 	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
-	float pctLow = interpolate1D( BENDS_LOW_TABLE, log2(MIN_PT.x/0.18));
+	float pctLow = interpolate1D( BENDS_LOW_TABLE, log2(acesMin/0.18));
 	coefsLow[2] = logMin.y + pctLow*(logMid.y-logMin.y);
 	
 	float knotIncHigh = (logMax.x - logMid.x) / 3.0f;
 	// float halfKnotInc = (logMax.x - logMid.x) / 6.;
 
 	// Determine two lowest coefficients (straddling midPt)
-	float minCoef = ( logMid.y - MID_PT.z * logMid.x);
+	// float minCoef = ( logMid.y - MID_PT.z * logMid.x);
 	coefsHigh[0] = (MID_PT.z * (logMid.x-0.5*knotIncHigh)) + minCoef;
 	coefsHigh[1] = (MID_PT.z * (logMid.x+0.5*knotIncHigh)) + minCoef;
 
@@ -338,17 +338,14 @@ AcesParams init_aces_params(float minLum, float maxLum, float expShift = 0) {
 
 	// Middle coefficient (which defines the "sharpness of the bend") is linearly interpolated
 
-	float pctHigh = interpolate1D( BENDS_HIGH_TABLE, log2(MAX_PT.x/0.18));
+	float pctHigh = interpolate1D( BENDS_HIGH_TABLE, log2(acesMax/0.18));
 	coefsHigh[2] = logMid.y + pctHigh*(logMax.y-logMid.y);
 
-	MIN_PT.x = shift(MIN_PT.x, expShift);
-	MID_PT.x = shift(0.18, expShift);
-	MAX_PT.x = shift(MAX_PT.x ,expShift);
 
 	AcesParams P = {
-		float3(log10(MIN_PT.x), log10(MIN_PT.y), MIN_PT.z),
-		float3(log10(MID_PT.x), log10(MID_PT.y), MID_PT.z),
-		float3(log10(MAX_PT.x), log10(MAX_PT.y), MAX_PT.z),
+		float3(logMin.x, logMin.y, 0),
+		float3(logMid.x, logMid.y, MID_PT.z),
+		float3(logMax.x, logMax.y, 0),
 		{coefsLow[0], coefsLow[1], coefsLow[2], coefsLow[3], coefsLow[4], coefsLow[4]},
 		{coefsHigh[0], coefsHigh[1], coefsHigh[2], coefsHigh[3], coefsHigh[4], coefsHigh[4]}
 	};
@@ -505,10 +502,10 @@ float3 aces_rrt(float3 rgb) {
 	return rgbPre;
 }
 
-float3 aces_odt_tone_map(float3 rgbPre, float minY, float maxY, float expShift = 0) {
+float3 aces_odt_tone_map(float3 rgbPre, float minY, float maxY) {
 	float3 rgbPost;
 	// Aces-dev has more expensive version
-	AcesParams PARAMS = init_aces_params(minY, maxY, expShift);
+	AcesParams PARAMS = init_aces_params(minY, maxY);
 	rgbPost.x = SSTS(rgbPre.x, PARAMS);
 	rgbPost.y = SSTS(rgbPre.y, PARAMS);
 	rgbPost.z = SSTS(rgbPre.z, PARAMS);
@@ -517,9 +514,9 @@ float3 aces_odt_tone_map(float3 rgbPre, float minY, float maxY, float expShift =
 	return max(0, Y_2_linCV( rgbPost, maxY, minY));
 }
 
-float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool darkToDim = false) {
+float3 aces_odt(float3 rgbPre, float minY, float maxY, bool darkToDim = false) {
 
-	float3 scaled = aces_odt_tone_map(rgbPre, minY, maxY, expShift);
+	float3 scaled = aces_odt_tone_map(rgbPre, minY, maxY);
 	
 	scaled = lerp( scaled, mul( BlueCorrectInvAP1, scaled ), 0.6f );
 	
@@ -540,3 +537,12 @@ float3 aces_odt(float3 rgbPre, float minY, float maxY, float expShift = 0, bool 
 	return linearCV;
 }
 
+
+float3 aces_rrt_odt(float3 srgb, float minY, float maxY, bool darkToDim = false) {
+	return aces_odt(
+		aces_rrt(srgb),
+		minY,
+		maxY,
+		darkToDim
+	);
+}

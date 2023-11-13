@@ -1202,8 +1202,7 @@ PSOutput PS(PSInput psInput)
 			tonemappedColor = aces_odt_tone_map(
 				acesRrt,
 				acesRrtMin,
-				ACES_WHITE_POINT * sdrHighlightScaling,
-				0
+				ACES_WHITE_POINT * sdrHighlightScaling
 			);
 			tonemappedColor *= sdrHighlightScaling;
 			tonemappedColorLuminance = Luminance(tonemappedColor); //TODO: ...
@@ -1362,11 +1361,10 @@ PSOutput PS(PSInput psInput)
 #if SUPPORT_ACES_HDR
 			case 4:
 			{
-				float3 acesHDR = aces_odt(
+				float3 acesHDR = aces_odt_tone_map(
 					acesRrt,
 					acesRrtMin,
-					maxOutputPaperWhiteRatio * ACES_WHITE_POINT * acesHighlightsScaling,
-					0
+					maxOutputPaperWhiteRatio * ACES_WHITE_POINT * acesHighlightsScaling
 				);
 				acesHDR *= acesHighlightsScaling * maxOutputLuminance;
 				float acesHDRY = Luminance(max(0, acesHDR));
@@ -1526,12 +1524,15 @@ PSOutput PS(PSInput psInput)
 		const float yMax = log10(10000.f);
 		const float yRange = yMax - yMin;
 		float valueY = (float(toneMapperY) / float(toneMapperBins)) * (yRange) + yMin;
-		float peakNits = HdrDllPluginConstants.DisplayMode > 0
+		float peakNits = HdrDllPluginConstants.DisplayMode != 0
 			? HdrDllPluginConstants.HDRPeakBrightnessNits
 			: 80.f;
 		valueY = pow(10.f, valueY);
 		valueY /= 80.f;
 		float outputY = Luminance(outputColor);
+		if (HdrDllPluginConstants.DisplayMode > 0) {
+			outputY *= 80.f / 203.f;
+		}
 		if (outputY > valueY ) {
 			if (outputY < 0.18f) {
 				outputColor = float3(0.3f,0,0.3f);
