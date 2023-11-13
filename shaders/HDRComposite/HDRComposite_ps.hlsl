@@ -45,6 +45,7 @@
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
 
+#define SUPPORT_ACES_HDR 1
 #define ACES_WHITE_POINT 100.f
 #define HABLE_2_ACES_RATIO 3.5f
 
@@ -263,7 +264,8 @@ float3 Hable(
 	const float shoulderStrength =            max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
 	const float shoulderAngle    =       saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
-	toeStrength *= lerp(0.f, 2.f, HdrDllPluginConstants.ToneMapperShadows);
+ 	//TODO: expose 0-2.5 range? And implement in SDR ACES og versions
+	toeStrength *= lerp(0.f, 2.5f, HdrDllPluginConstants.ToneMapperShadows);
 
 	//dstParams
 	float dstParams_x0 = toeLength * 0.5f;
@@ -1143,10 +1145,12 @@ PSOutput PS(PSInput psInput)
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
 
+#if SUPPORT_ACES_HDR
 	// If "Hable" or "Aces SDR" is running (which is the default gameplay tonemapper), replace it with Aces HDR
 	if ((tonemapperIndex == 1 || tonemapperIndex == 3) && HdrDllPluginConstants.ToneMapperType == 1) {
 		tonemapperIndex = 4;
 	}
+#endif
 
 	const float untonemappedColorLuminance = Luminance(inputColor);
 	float tonemappedColorLuminance;
@@ -1171,6 +1175,7 @@ PSOutput PS(PSInput psInput)
 			tonemappedColorLuminance = Hable(untonemappedColorLuminance.xxx, hableParams).x; //TODO: make hable templatable
 		} break;
 
+#if SUPPORT_ACES_HDR
 		case 4:
 		{
 			float acesInputScaling = 1.f;
@@ -1203,6 +1208,7 @@ PSOutput PS(PSInput psInput)
 			tonemappedColor *= sdrHighlightScaling;
 			tonemappedColorLuminance = Luminance(tonemappedColor); //TODO: ...
 		} break;
+#endif // SUPPORT_ACES_HDR
 
 		default:
 		{
@@ -1353,6 +1359,7 @@ PSOutput PS(PSInput psInput)
 #endif
 			} break;
 
+#if SUPPORT_ACES_HDR
 			case 4:
 			{
 				float3 acesHDR = aces_odt(
@@ -1370,6 +1377,7 @@ PSOutput PS(PSInput psInput)
 				inverseTonemappedPostProcessedColor = acesHDRGraded;
 				//TODO: minHighlightsColorOut etc
 			}
+#endif
 
 			default:
 				break;
@@ -1386,7 +1394,10 @@ PSOutput PS(PSInput psInput)
 			PostInverseTonemapByChannel(inputColor.g, tonemappedColor.g, inverseTonemappedColor.g, sPP);
 			PostInverseTonemapByChannel(inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
 		}
-		else if (tonemapperIndex != 4) 
+		else
+#if SUPPORT_ACES_HDR		
+		if (tonemapperIndex != 4)
+#endif
 		{
 #if 1
 			const bool isHighlight = untonemappedColorLuminance >= minHighlightsColorOut;
@@ -1422,7 +1433,12 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedColor /= midGrayScale;
 		minHighlightsColorOut  /= midGrayScale;
 
-		if (tonemapperIndex != 4) {
+#if SUPPORT_ACES_HDR		
+		if (tonemapperIndex == 4) {
+			inverseTonemappedPostProcessedColor /= paperWhite;
+		} else
+#endif
+		{
 			inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 		}
 
@@ -1455,9 +1471,12 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
 #endif
 
+#if SUPPORT_ACES_HDR
 		if (tonemapperIndex == 4) {
-			outputColor = inverseTonemappedPostProcessedColor;
-		} else {
+			outputColor = inverseTonemappedPostProcessedColor * paperWhite;
+		} else
+#endif // SUPPORT_ACES_HDR
+ 		{
 			inverseTonemappedPostProcessedColor *= paperWhite;
 			minHighlightsColorOut *= paperWhite;
 
