@@ -861,13 +861,7 @@ float3 GradingLUT(float3 color, float2 uv)
 	float3 LUTColor = LUTTexture.Sample(Sampler0, (LUTCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 
-#if LUT_MAPPING_TYPE == 2
-	LUTColor = oklab_to_linear_srgb(LUTColor);
-	if (HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS)
-	{
-		LUTColor = saturate(LUTColor);
-	}
-#elif LUT_MAPPING_TYPE == 0
+#if LUT_MAPPING_TYPE == 0
 	// We always work in linear space so convert to it.
 	// We never acknowledge the original wrong gamma function here (we don't really care).
 	LUTColor = gamma_sRGB_to_linear(LUTColor);
