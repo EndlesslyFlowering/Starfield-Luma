@@ -1126,9 +1126,7 @@ PSOutput PS(PSInput psInput)
 	float3 tonemappedPostProcessedColor = tonemappedColor;
 #else
 
-	float3 acesRrt;
-	float acesRrtMin;
-	float acesHighlightsScaling = exp2(lerp(-2.f, 2.f, HdrDllPluginConstants.ToneMapperHighlights));
+	float3 acesOutput;
 
 	float acesParam_modE;
 	float acesParam_modA;
@@ -1172,8 +1170,15 @@ PSOutput PS(PSInput psInput)
 #if SUPPORT_ACES_HDR
 		case 4:
 		{
+			float acesHighlightsScaling = exp2(lerp(-2.f, 2.f, HdrDllPluginConstants.ToneMapperHighlights));
+
 			float acesInputScaling = 1.f;
-			float sdrHighlightScaling = acesHighlightsScaling;
+			float inputStrength = HdrDllPluginConstants.DisplayMode > 0
+				? HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits
+				: 1.f;
+			float outputStrength = HdrDllPluginConstants.DisplayMode > 0
+				? HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB
+				: 1.f;
 			if (PcwHdrComposite.Tmo == 1) {
 				// Menu or some interior (Robotics Science Facilities)
 				acesInputScaling *= HABLE_2_ACES_RATIO;
@@ -1185,20 +1190,25 @@ PSOutput PS(PSInput psInput)
 					acesInputScaling *= HABLE_2_ACES_RATIO;
 				}
 			}
-			if (HdrDllPluginConstants.DisplayMode > 0) {
-				sdrHighlightScaling = min(sdrHighlightScaling, 1.f); // Only reduce when in SDR
-			}
-			acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.5f
+			float acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.5f
 				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
 				: 2.f * pow(10.0f, lerp(20.f, -24.f, HdrDllPluginConstants.ToneMapperShadows));
 			// Technically should go to AP1, but this is how Bethesda did it
-			acesRrt = (inputColor * acesInputScaling);
 			tonemappedColor = aces_odt_tone_map(
-				acesRrt,
+				(inputColor * acesInputScaling),
 				acesRrtMin,
-				ACES_WHITE_POINT * sdrHighlightScaling
+				ACES_WHITE_POINT * acesHighlightsScaling * inputStrength
 			);
-			tonemappedColor *= sdrHighlightScaling;
+			tonemappedColor *= acesHighlightsScaling * outputStrength;
+			acesOutput = tonemappedColor; // Used later for comparison
+			if (HdrDllPluginConstants.DisplayMode > 0) {
+				tonemappedColor = bt2446_hdr_to_sdr(
+					tonemappedColor,
+					HdrDllPluginConstants.HDRPeakBrightnessNits,
+					ReferenceWhiteNits_BT2408
+				);
+				tonemappedColor *= WhiteNits_sRGB / ReferenceWhiteNits_BT2408;
+			}
 			tonemappedColorLuminance = Luminance(tonemappedColor); //TODO: ...
 		} break;
 #endif // SUPPORT_ACES_HDR
@@ -1355,22 +1365,15 @@ PSOutput PS(PSInput psInput)
 #if SUPPORT_ACES_HDR
 			case 4:
 			{
-				float3 acesHDR = aces_odt_tone_map(
-					acesRrt,
-					acesRrtMin,
-					maxOutputPaperWhiteRatio * ACES_WHITE_POINT * acesHighlightsScaling
-				);
-				acesHDR *= acesHighlightsScaling * maxOutputLuminance;
-				float acesHDRY = Luminance(max(0, acesHDR));
-				float acesSDRY = Luminance(max(0, tonemappedColor * paperWhite));
+				float acesHDRY = Luminance(max(0, acesOutput)); // Y if run without LUTs at target
+				float acesSDRY = Luminance(max(0, tonemappedColor * paperWhite)); // Y if run in SDR
 				float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
-				float acesYScale = max(1.f, hdrYDelta);
+				float acesYScale = hdrYDelta;
 				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * paperWhite * acesYScale);
 				inverseTonemappedPostProcessedColor = acesHDRGraded;
 				//TODO: minHighlightsColorOut etc
 			}
 #endif
-
 			default:
 				break;
 		}

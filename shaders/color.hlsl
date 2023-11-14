@@ -392,3 +392,32 @@ float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
 	Color = mul(AP1D65_2_BT709, ColorAP1);
 	return Color;
 }
+
+float3 bt2446_hdr_to_sdr(float3 linRGB, float lHDR, float lSDR) {
+	const float3 rgb = pow(linRGB, 1.f/2.4f);
+
+	const float pHDR = 1.f + (32.f * pow(lHDR / 10000.0f, 1.f / 2.4f));
+	const float Y = Luminance(rgb); // Luma
+	
+	const float Yp = log(1.f + (pHDR - 1.0) * Y) / log(pHDR);
+
+	const float Yc = (Yp < 0.7399f) ? 1.0770f * max(0, Yp)
+		: (Yp < 0.9909f) ? (-1.1510 * Yp * Yp) + (2.7811f * Yp) - 0.6302f
+		: 0.5000f * min(Yp, 1.f) + 0.5000f;
+
+	const float pSDR = 1.f + (32.f * pow(lSDR / 10000.0f, 1.f / 2.4f));
+	const float Ysdr = (pow(pSDR, Yc) - 1.f) / (pSDR - 1.f);
+
+	const float fYsdr = Ysdr / (1.1f * Y);
+	const float Cbtmo = fYsdr * ((rgb.b - Y) / 1.8556);
+	const float Crtmo = fYsdr * ((rgb.r - Y) / 1.5748);
+	const float Ytmo = Ysdr - max(0.1f * Crtmo, 0);
+
+	float3 outRGB = float3(
+			Ytmo + (1.5748f * Crtmo),
+			Ytmo - (0.2126f * 1.5748f / 0.7152f) * Crtmo - (0.0722f * 1.8556f / 1.5748f) * Cbtmo,
+			Ytmo + (1.8556 * Cbtmo)
+	);
+	float3 outLinRgb = pow(max(0, outRGB), 2.4f);
+	return outLinRgb;
+}

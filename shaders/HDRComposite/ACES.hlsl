@@ -1,3 +1,5 @@
+#include "../math.hlsl"
+
 #define ACES_PI            3.14159265359f
 
 
@@ -8,8 +10,6 @@ struct AcesParams {
 	float coefsLow[6];
 	float coefsHigh[6];
 };
-
-#define HALF_MIN 6.10352e-5f
 
 static const float3x3 sRGB_2_AP0 = {
 	0.4397010, 0.3829780, 0.1773350,
@@ -365,7 +365,7 @@ float SSTS(float x, AcesParams C) {
 
 	// Check for negatives or zero before taking the log. If negative or zero,
 	// set to HALF_MIN.
-	float logx = log10( max(x, HALF_MIN));
+	float logx = log10( max(x, FLT_MIN));
 
 	float logy;
 
