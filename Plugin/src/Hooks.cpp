@@ -122,7 +122,8 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
-		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
+		CreateStepperSetting(a_settingList, settings->ToneMapperType, settings->IsToneMapperTypeACESHDR());
+		CreateStepperSetting(a_settingList, settings->ToneMapperColorSpace, true);
 		CreateSliderSetting(a_settingList, settings->Highlights, true);
 		CreateSliderSetting(a_settingList, settings->Shadows, true);
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
@@ -480,6 +481,12 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kToneMapperType):
 			HandleSetting(settings->ToneMapperType);
+			if (const auto toneMapperColorSpace = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperColorSpace))) {
+				toneMapperColorSpace->m_Enabled.SetValue(settings->IsToneMapperTypeACESHDR());
+			}
+			break;
+		case static_cast<int>(Settings::SettingID::kToneMapperColorSpace):
+			HandleSetting(settings->ToneMapperColorSpace);
 			break;
 		case static_cast<int>(Settings::SettingID::kFilmGrainType):
 			HandleSetting(settings->FilmGrainType);

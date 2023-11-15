@@ -52,6 +52,7 @@ struct StructHdrDllPluginConstants
 	float HDRSecondaryContrast; // 0-2. 1 is neutral
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 	uint ToneMapperType; // Overrides tonemapper type. 0 is default (not overridden)
+	uint ToneMapperColorSpace; // Overrides tonemapper type. 0 is default (not overridden)
 	float ToneMapperHighlights; // 0-1 0.5 is neutral
 	float ToneMapperShadows; // 0-1 0.5 is neutral
 	float ToneMapperBloom; // 0-1 0.5 is neutral
@@ -70,6 +71,6 @@ struct StructHdrDllPluginConstants
 	float DevSetting05; // 0-1 variable for development. Default 0.5
 };
 
-#define HDR_PLUGIN_CONSTANTS_SIZE "25"
+#define HDR_PLUGIN_CONSTANTS_SIZE "26"
 
 ConstantBuffer<StructHdrDllPluginConstants> HdrDllPluginConstants : register(b3, space0);
