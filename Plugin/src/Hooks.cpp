@@ -122,8 +122,8 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
-		CreateStepperSetting(a_settingList, settings->ToneMapperType, settings->IsToneMapperTypeACESHDR());
-		CreateStepperSetting(a_settingList, settings->ToneMapperColorSpace, true);
+		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
+		CreateStepperSetting(a_settingList, settings->ToneMapperColorSpace, settings->IsToneMapperTypeACESHDR());
 		CreateSliderSetting(a_settingList, settings->Highlights, true);
 		CreateSliderSetting(a_settingList, settings->Shadows, true);
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
