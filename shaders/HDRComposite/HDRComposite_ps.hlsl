@@ -45,9 +45,10 @@
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
 
-#define SUPPORT_ACES_HDR 1
-#define ACES_WHITE_POINT 100.f
-#define HABLE_2_ACES_RATIO 3.5f
+#define ACES_HDR_ON 1
+#define ACES_HDR_AP1 1
+#define ACES_HDR_SDR_NITS 100.f
+#define ACES_HDR_HABLE_RATIO 3.5f
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -118,7 +119,7 @@ struct PSOutput
 
 static const float SDRTonemapHDRStrength = 1.f;
 static const float PostProcessStrength = 1.f;
-// 0 Ignored, 1 ACES Reference, 2 ACES Custom, 3 Hable/Custom, 4 CustomACES, 5+ Disable tonemapper
+// 0 Ignored, 1 ACES Reference, 2 ACES Parametric, 3 Hable, 4+ Disable tonemapper
 static const uint ForceTonemapper = 0;
 // 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
 // Exposure to the user for more customization.
@@ -947,9 +948,7 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 	{
 		DrawnLUT = true;
 		float3 loadedColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
-#if LUT_MAPPING_TYPE == 2
-		loadedColor = oklab_to_linear_srgb(loadedColor);
-#elif LUT_MAPPING_TYPE == 0
+#if LUT_MAPPING_TYPE == 0
 		loadedColor = gamma_sRGB_to_linear(loadedColor);
 #endif // LUT_MAPPING_TYPE
 		const float3 neutralLUT = gamma_sRGB_to_linear(LUTPixelPosition3D / float(LUT_MAX_UINT)); // NOTE: this ignores "GAMMA_CORRECTION_IN_LUTS" and "SDR_USE_GAMMA_2_2"
@@ -1004,9 +1003,7 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 		else if (yPoint == row++) xyz = uint3(coord  , coord  , inverse); // Blue to Yellow
 
 		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb, 0)).rgb;
-#if LUT_MAPPING_TYPE == 2
-		loadedColor = oklab_to_linear_srgb(loadedColor);
-#elif LUT_MAPPING_TYPE == 0
+#if LUT_MAPPING_TYPE == 0
 		loadedColor = gamma_sRGB_to_linear(loadedColor);
 #endif // LUT_MAPPING_TYPE
 		const float3 neutralLUT = gamma_sRGB_to_linear(xyz.rgb / float(LUT_MAX_UINT)); // NOTE: this ignores "GAMMA_CORRECTION_IN_LUTS" and "SDR_USE_GAMMA_2_2"
@@ -1016,6 +1013,154 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 	return 0;
 }
 #endif // APPLY_MERGED_COLOR_GRADING_LUT && DRAW_LUT
+
+float3 apply_user_hdr_postprocess(float3 inputColor) {
+	float3 outputColor = inputColor;
+#if ALLOW_EXPAND_GAMUT
+		// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
+		// also they'd end up messing up the application of LUTs too badly.
+		if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
+		{
+			// Pow by 2 to make the 0-1 setting slider more perceptually linear
+			outputColor = ExtendGamut(outputColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
+		}
+#endif
+
+		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
+		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
+		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
+#endif
+		outputColor = Saturation(outputColor, saturation);
+
+		// Secondary user driven contrast
+const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
+#if 0 // By luminance (no hue shift) (looks off)
+		float outputColorLuminance = Luminance(outputColor);
+		outputColor *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
+#else // By channel (also increases saturation)
+		outputColor = pow(abs(outputColor) / MidGray, secondaryContrast) * MidGray * sign(outputColor);
+#endif
+	return outputColor;
+}
+
+#if ACES_HDR_ON
+PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
+	float highlightsScaling = exp2(lerp(-2.f, 2.f, HdrDllPluginConstants.ToneMapperHighlights));
+	float inputScaling = 1.f;
+	
+	if (PcwHdrComposite.Tmo == 1) {
+		// Menu or some interior (Robotics Science Facilities)
+		inputScaling *= ACES_HDR_HABLE_RATIO;
+	} else {
+		// Titan Science Facility
+		float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
+		float toeStrength      =       saturate(PerSceneConstants[3266u].z);
+		if (toeStrength == 0 || toeLength == 0 ) {
+			inputScaling *= ACES_HDR_HABLE_RATIO;
+		}
+	}
+	float yMin = pow(10.0f, lerp(0.f, -12.f, HdrDllPluginConstants.ToneMapperShadows));
+	float yMax = ACES_HDR_SDR_NITS
+		* highlightsScaling
+		* (HdrDllPluginConstants.DisplayMode > 0
+				? HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits
+				: 1.f)
+		;
+
+	float3 toneMapperInput = inputColor * inputScaling;
+	float3 toneMappedColor = (HdrDllPluginConstants.ToneMapperColorSpace == 0)
+		?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
+		: aces_rrt_odt(toneMapperInput, yMin, yMax);
+
+	float outputStrength = HdrDllPluginConstants.DisplayMode > 0
+		? HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB
+		: 1.f;
+
+	// Should be in [0-Peak/80] range
+	const float3 hdrOutputColor = toneMappedColor * highlightsScaling * outputStrength;
+
+	// Should be in [0-1] range
+	const float3 sdrOutputColor = (HdrDllPluginConstants.DisplayMode > 0)
+		? saturate(
+				bt2446_hdr_to_sdr(
+					clamp(hdrOutputColor, 0, 1000.f / 80.f),
+					max(min(1000.f, HdrDllPluginConstants.HDRPeakBrightnessNits), 203.f),
+					ReferenceWhiteNits_BT2408
+				) * (WhiteNits_sRGB / ReferenceWhiteNits_BT2408)
+			)
+			 // Clamp for SDR
+		: hdrOutputColor;
+
+	float prePostProcessColorLuminance;
+	float3 postProcessedColor = 
+	#if defined(APPLY_CINEMATICS)
+		// Params are meant for Hable, but should be okay for desaturation
+		lerp(sdrOutputColor, PostProcess(sdrOutputColor, prePostProcessColorLuminance), PostProcessStrength);
+	#else
+		sdrOutputColor;
+	#endif
+	
+	float3 colorGradedColor =
+	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
+		max(0, GradingLUT(postProcessedColor, psInput.TEXCOORD));
+	#else
+		postProcessedColor;
+	#endif
+
+	float3 gammaCorrectedColor = colorGradedColor;
+	#if SDR_USE_GAMMA_2_2
+		gammaCorrectedColor = lerp(
+				gammaCorrectedColor,
+				pow(gamma_linear_to_sRGB(gammaCorrectedColor), 2.2f),
+				HdrDllPluginConstants.GammaCorrection
+				#if (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
+					* (1.f - HdrDllPluginConstants.ColorGradingStrength)
+				#endif
+		);
+	#endif
+
+	float3 outputColor = gammaCorrectedColor;
+	if (HdrDllPluginConstants.DisplayMode > 0) {
+		float hdrY = Luminance(max(0, hdrOutputColor ));
+		float sdrY = Luminance(max(0, sdrOutputColor * HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB ));
+		float hdrYDelta = sdrY ? hdrY / sdrY : 0.f;
+		outputColor *= hdrYDelta;
+		outputColor = apply_user_hdr_postprocess(outputColor);
+
+		// Scaled up by paperwhite when in HDR
+		outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
+		outputColor = max(0, BT709_To_WBT2020(outputColor));
+	} else {
+		// TODO: Extract into shared function
+		if (HdrDllPluginConstants.SDRSecondaryBrightness != 1.f) {
+			float3 oklabColor = linear_srgb_to_oklab(outputColor);
+			oklabColor[0] = pow(oklabColor[0], linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 1.25f, 0.75f));
+			outputColor = oklab_to_linear_srgb(oklabColor);
+		}
+
+		#if !SDR_LINEAR_INTERMEDIARY
+			outputColor = 
+				// Note that gamma was never applied if LUTs were disabled, but we don't care about that as the affected shaders permutations were never used
+			#if SDR_USE_GAMMA_2_2
+				pow(outputColor, 1.f / 2.2f);
+			#else
+				// Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
+				gamma_linear_to_sRGB(outputColor);
+			#endif
+		#endif
+
+		#if CLAMP_INPUT_OUTPUT
+			outputColor = saturate(outputColor);
+		#endif
+	}
+
+	PSOutput psOutput;
+	psOutput.SV_Target.rgb = outputColor;
+	psOutput.SV_Target.a = 1.f;
+	return psOutput;
+}
+#endif // ACES_HDR_ON
 
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
@@ -1126,8 +1271,6 @@ PSOutput PS(PSInput psInput)
 	float3 tonemappedPostProcessedColor = tonemappedColor;
 #else
 
-	float3 acesOutput;
-
 	float acesParam_modE;
 	float acesParam_modA;
 
@@ -1137,11 +1280,13 @@ PSOutput PS(PSInput psInput)
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
 
-#if SUPPORT_ACES_HDR
+#if ACES_HDR_ON
+	// ACES HDR has HDR=>SDR path that is sequenced differently than SDR=>HDR
 	// If "Hable" or "Aces SDR" is running (which is the default gameplay tonemapper), replace it with Aces HDR
 	if ((tonemapperIndex == 1 || tonemapperIndex == 3) && HdrDllPluginConstants.ToneMapperType == 1) {
-		tonemapperIndex = 4;
+		return composite_aces_hdr(psInput, inputColor);
 	}
+	// TODO: Fix DRAW_TONEMAPPER
 #endif
 
 	const float untonemappedColorLuminance = Luminance(inputColor);
@@ -1167,51 +1312,6 @@ PSOutput PS(PSInput psInput)
 			tonemappedColorLuminance = Hable(untonemappedColorLuminance.xxx, hableParams).x; //TODO: make hable templatable
 		} break;
 
-#if SUPPORT_ACES_HDR
-		case 4:
-		{
-			float acesHighlightsScaling = exp2(lerp(-2.f, 2.f, HdrDllPluginConstants.ToneMapperHighlights));
-
-			float acesInputScaling = 1.f;
-			float inputStrength = HdrDllPluginConstants.DisplayMode > 0
-				? HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits
-				: 1.f;
-			float outputStrength = HdrDllPluginConstants.DisplayMode > 0
-				? HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB
-				: 1.f;
-			if (PcwHdrComposite.Tmo == 1) {
-				// Menu or some interior (Robotics Science Facilities)
-				acesInputScaling *= HABLE_2_ACES_RATIO;
-			} else {
-				// Titan Science Facility
-				float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
-				float toeStrength      =       saturate(PerSceneConstants[3266u].z);
-				if (toeStrength == 0 || toeLength == 0 ) {
-					acesInputScaling *= HABLE_2_ACES_RATIO;
-				}
-			}
-			float acesRrtMin = HdrDllPluginConstants.ToneMapperShadows < 0.5f
-				? exp2(lerp(0, 2.f * log2(0.02), HdrDllPluginConstants.ToneMapperShadows))
-				: 2.f * pow(10.0f, lerp(20.f, -24.f, HdrDllPluginConstants.ToneMapperShadows));
-			// Technically should go to AP1, but this is how Bethesda did it
-			tonemappedColor = aces_odt_tone_map(
-				(inputColor * acesInputScaling),
-				acesRrtMin,
-				ACES_WHITE_POINT * acesHighlightsScaling * inputStrength
-			);
-			tonemappedColor *= acesHighlightsScaling * outputStrength;
-			acesOutput = tonemappedColor; // Used later for comparison
-			if (HdrDllPluginConstants.DisplayMode > 0) {
-				tonemappedColor = bt2446_hdr_to_sdr(
-					tonemappedColor,
-					HdrDllPluginConstants.HDRPeakBrightnessNits,
-					ReferenceWhiteNits_BT2408
-				);
-				tonemappedColor *= WhiteNits_sRGB / ReferenceWhiteNits_BT2408;
-			}
-			tonemappedColorLuminance = Luminance(tonemappedColor); //TODO: ...
-		} break;
-#endif // SUPPORT_ACES_HDR
 
 		default:
 		{
@@ -1289,8 +1389,6 @@ PSOutput PS(PSInput psInput)
 	if (HdrDllPluginConstants.DisplayMode > 0) // HDR
 	{
 #if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
-		const float maxOutputPaperWhiteRatio = HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits;
 		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
 		const float midGrayIn = MidGray;
@@ -1362,18 +1460,6 @@ PSOutput PS(PSInput psInput)
 #endif
 			} break;
 
-#if SUPPORT_ACES_HDR
-			case 4:
-			{
-				float acesHDRY = Luminance(max(0, acesOutput)); // Y if run without LUTs at target
-				float acesSDRY = Luminance(max(0, tonemappedColor * paperWhite)); // Y if run in SDR
-				float hdrYDelta = acesSDRY ? acesHDRY / acesSDRY : 0.f;
-				float acesYScale = hdrYDelta;
-				float3 acesHDRGraded = max(0, tonemappedPostProcessedGradedColor * paperWhite * acesYScale);
-				inverseTonemappedPostProcessedColor = acesHDRGraded;
-				//TODO: minHighlightsColorOut etc
-			}
-#endif
 			default:
 				break;
 		}
@@ -1390,9 +1476,6 @@ PSOutput PS(PSInput psInput)
 			PostInverseTonemapByChannel(inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
 		}
 		else
-#if SUPPORT_ACES_HDR		
-		if (tonemapperIndex != 4)
-#endif
 		{
 #if 1
 			const bool isHighlight = untonemappedColorLuminance >= minHighlightsColorOut;
@@ -1428,62 +1511,25 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedColor /= midGrayScale;
 		minHighlightsColorOut  /= midGrayScale;
 
-#if SUPPORT_ACES_HDR		
-		if (tonemapperIndex == 4) {
-			inverseTonemappedPostProcessedColor /= paperWhite;
-		} else
-#endif
-		{
-			inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
-		}
+		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 
 #if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
 #endif
-#if ALLOW_EXPAND_GAMUT
-		// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
-		// also they'd end up messing up the application of LUTs too badly.
-		if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
-		{
-			// Pow by 2 to make the 0-1 setting slider more perceptually linear
-			inverseTonemappedPostProcessedColor = ExtendGamut(inverseTonemappedPostProcessedColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
-		}
-#endif
 
-		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
-		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
-		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
-#endif
-		inverseTonemappedPostProcessedColor = Saturation(inverseTonemappedPostProcessedColor, saturation);
+		inverseTonemappedPostProcessedColor = apply_user_hdr_postprocess(inverseTonemappedPostProcessedColor);
 
-		// Secondary user driven contrast
-		const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
-#if 0 // By luminance (no hue shift) (looks off)
-		float inverseTonemappedPostProcessedColorLuminance = Luminance(inverseTonemappedPostProcessedColor);
-		inverseTonemappedPostProcessedColor *= safeDivision(pow(inverseTonemappedPostProcessedColorLuminance / MidGray, secondaryContrast) * MidGray, inverseTonemappedPostProcessedColorLuminance);
-#else // By channel (also increases saturation)
-		inverseTonemappedPostProcessedColor = pow(abs(inverseTonemappedPostProcessedColor) / MidGray, secondaryContrast) * MidGray * sign(inverseTonemappedPostProcessedColor);
-#endif
+		inverseTonemappedPostProcessedColor *= paperWhite;
+		minHighlightsColorOut *= paperWhite;
 
-#if SUPPORT_ACES_HDR
-		if (tonemapperIndex == 4) {
-			outputColor = inverseTonemappedPostProcessedColor * paperWhite;
-		} else
-#endif // SUPPORT_ACES_HDR
- 		{
-			inverseTonemappedPostProcessedColor *= paperWhite;
-			minHighlightsColorOut *= paperWhite;
+		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
+		// Never compress highlights before the top ~half of the image (the actual ratio is based on a user param), even if it means we have two separate mid tones sections,
+		// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
+		//TODO: rename the "HdrDllPluginConstants.ToneMapperHighlights" description because here it just drivers the highlights shoulder starting point, not their "strenght"
+		float highlightsShoulderStart = max(maxOutputLuminance * HdrDllPluginConstants.ToneMapperHighlights, minHighlightsColorOut);
+		highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
 
-			const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
-			// Never compress highlights before the top ~half of the image (the actual ratio is based on a user param), even if it means we have two separate mid tones sections,
-			// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
-			//TODO: rename the "HdrDllPluginConstants.ToneMapperHighlights" description because here it just drivers the highlights shoulder starting point, not their "strenght"
-			float highlightsShoulderStart = max(maxOutputLuminance * HdrDllPluginConstants.ToneMapperHighlights, minHighlightsColorOut);
-			highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
-
-			outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
-		}
+		outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
 #else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 		outputColor = finalOriginalColor * (HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408); // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image

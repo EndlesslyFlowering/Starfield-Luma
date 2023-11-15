@@ -30,6 +30,7 @@ namespace Settings
 		kHDR_Contrast,
 		kSecondaryBrightness,
 		kToneMapperType,
+		kToneMapperColorSpace,
 		kToneMapperHighlights,
 		kToneMapperShadows,
 		kToneMapperBloom,
@@ -137,6 +138,7 @@ namespace Settings
 		float    Contrast;
 		float    SDRSecondaryBrightness;
 		uint32_t ToneMapperType;
+		uint32_t ToneMapperColorSpace;
 		float    Highlights;
 		float    Shadows;
 		float    Bloom;
@@ -154,7 +156,7 @@ namespace Settings
 		float    DevSetting04;
 		float    DevSetting05;
 	};
-	static inline uint32_t shaderConstantsSize = 25;
+	static inline uint32_t shaderConstantsSize = 26;
 
     class Main : public DKUtil::model::Singleton<Main>
     {
@@ -247,10 +249,18 @@ namespace Settings
 		EnumStepper ToneMapperType{
 			SettingID::kToneMapperType,
 			"Tone Mapper Type",
-			"Sets the tone mapper type.\n\nLuma offers an improved filmic tone mapper based on ACES 1.3.",
+			"Sets the tone mapper type.\n\nLuma offers an HDR-first filmic tone mapper based on ACES 1.3.",
 			"ToneMapperType", "ToneMapper",
 			0,
-			{ "Vanilla", "Improved" }
+			{ "Vanilla", "ACES HDR" }
+		};
+		EnumStepper ToneMapperColorSpace{
+			SettingID::kToneMapperColorSpace,
+			"Tone Mapper Color Space",
+			"Sets the working color space for the tone mapper. \n\nACES AP1 may improve color accuracy in some areas, though may also deviate from the original creative intent.",
+			"ToneMapperColorSpace", "ToneMapper",
+			0,
+			{ "Vanilla", "ACES AP1" }
 		};
 		Slider Highlights{
 			SettingID::kToneMapperHighlights,
@@ -362,6 +372,7 @@ namespace Settings
 		bool IsDisplayModeSetToHDR() const;
 		bool IsGameRenderingSetToHDR() const;
 		bool IsFilmGrainTypeImproved() const;
+		bool IsToneMapperTypeACESHDR() const;
 
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
