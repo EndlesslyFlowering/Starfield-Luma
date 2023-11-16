@@ -44,7 +44,6 @@
 #define DRAW_TONEMAPPER 0
 
 #define ACES_HDR_ENABLED 1
-#define ACES_HDR_AP1 1
 #define ACES_HDR_SDR_NITS 100.f
 #define ACES_HDR_HABLE_RATIO 3.5f
 
@@ -1094,7 +1093,6 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		* inputScaling
 		* exposure
 		+ userBloom;
-		
 	float3 toneMappedColor = (HdrDllPluginConstants.ToneMapperColorSpace == 0)
 		?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
 		: aces_rrt_odt(toneMapperInput, yMin, yMax);
@@ -1110,12 +1108,11 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	const float3 sdrOutputColor = (HdrDllPluginConstants.DisplayMode > 0)
 		? saturate(
 				bt2446_hdr_to_sdr(
-					clamp(hdrOutputColor, 0, 1000.f / 80.f),
-					max(min(1000.f, HdrDllPluginConstants.HDRPeakBrightnessNits), 203.f),
+					hdrOutputColor * WhiteNits_sRGB / HdrDllPluginConstants.HDRPeakBrightnessNits,
+					HdrDllPluginConstants.HDRPeakBrightnessNits,
 					ReferenceWhiteNits_BT2408
-				) * (WhiteNits_sRGB / ReferenceWhiteNits_BT2408)
-			)
-			 // Clamp for SDR
+				)
+			) // Clamp if <1000nits peak
 		: hdrOutputColor;
 
 	float prePostProcessColorLuminance;
@@ -1134,16 +1131,18 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		postProcessedColor;
 	#endif
 
-	float3 gammaCorrectedColor = colorGradedColor;
+	float3 gammaCorrectedColor =
 	#if SDR_USE_GAMMA_2_2
-		gammaCorrectedColor = lerp(
-				gammaCorrectedColor,
-				pow(gamma_linear_to_sRGB(gammaCorrectedColor), 2.2f),
-				HdrDllPluginConstants.GammaCorrection
-				#if (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
-					* (1.f - HdrDllPluginConstants.ColorGradingStrength)
-				#endif
+		lerp(
+			colorGradedColor,
+			pow(gamma_linear_to_sRGB(colorGradedColor), 2.2f),
+			HdrDllPluginConstants.GammaCorrection
+			#if (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
+				* (1.f - HdrDllPluginConstants.ColorGradingStrength)
+			#endif
 		);
+	#else
+		colorGradedColor;
 	#endif
 
 	float3 outputColor = gammaCorrectedColor;
