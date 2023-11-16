@@ -14,11 +14,10 @@
 // This disables most other features (post processing/cinematics, LUTs, ...)
 #define ENABLE_TONEMAP 1
 // 0 disable contrast adjustment
-// 1 original (weak, generates values beyond 0-1 which then might get clipped)
+// 1 original (weak, generates values beyond 0-1)
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
 // 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
-//   (optimisation left if "contrastIntensity" doesn't go below 1)
-#define POST_PROCESS_CONTRAST_TYPE (FORCE_VANILLA_LOOK ? 1 : 3)
+#define POST_PROCESS_CONTRAST_TYPE (FORCE_VANILLA_LOOK ? 1 : 2)
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
@@ -574,6 +573,7 @@ float SigmoidalContrastAdjustment(
 		float signChannel = sign(Channel);
 		Channel = abs(Channel);
 
+		//TODO: fix this. It causes colors to suddenly change when passing from contrastIntensity 1 to contrastIntensity >1
 		// doing this for contrastIntensity below 1 greatly desaturates compared to not doing this
 		// look into if contrastIntensity ever goes below 1
 		// and remove this check if it does not
@@ -635,20 +635,23 @@ float3 PostProcess(
 
 #elif POST_PROCESS_CONTRAST_TYPE == 2
 
+	// Empirical value to match the original game constrast formula look more.
+	// This has been carefully researched and applies to both positive and negative contrast.
+	const float adjustedcontrastIntensity = pow(contrastIntensity, 2.f);
 	// Do abs() to avoid negative power, even if it doesn't make 100% sense, these formulas are fine as long as they look good
-	Color = pow(abs(Color) / contrastMidPoint, contrastIntensity) * contrastMidPoint * sign(Color);
+	Color = pow(abs(Color) / contrastMidPoint, adjustedcontrastIntensity) * contrastMidPoint * sign(Color);
 
 #elif POST_PROCESS_CONTRAST_TYPE == 3
 
 	if (contrastIntensity != 1.f) // worth to do performance wise
 	{
 		float cIn = contrastIntensity;
-		// adjustment to match native better and make the curve be an S curve (too low intensity makes it a double S curve)
+		// Emprical adjustment to match native better and make the curve be an S curve (too low intensity makes it a double S curve)
 		// only do them when contrastIntensity is above 1 because 1 is neutral (no adjustment)
 		// below 1 it matches native nicely (though idk if contrast is ever lowered)
 		if (contrastIntensity > 1.f)
 		{
-			cIn = contrastIntensity * (4.f / 3.f);
+			cIn = lerp(pow(contrastIntensity, 5.f), pow(contrastIntensity, 3.5f), saturate(contrastIntensity - 1.f));
 		}
 		float cMid = contrastMidPoint;
 
