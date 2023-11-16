@@ -711,21 +711,32 @@ float3 PostProcess_Inverse(
 
 // Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
 // Or simply, it takes any original color (before some post process is applied to it) and re-applies the same transformation the post process had applied to a different (but similar) color.
-float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColorRatio, float3 postProcessColorOffset, float3 tonemappedColor)
+float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 PostProcessedColor, bool ForceKeepHue = false)
 {
-	float3 postProcessedRatioColor = inverseTonemappedColor;
-	float3 postProcessedOffsetColor = inverseTonemappedColor;
-	postProcessedRatioColor *= postProcessColorRatio;
-	postProcessedOffsetColor += postProcessColorOffset;
+	const float3 postProcessColorRatio = safeDivision(PostProcessedColor, SourceColor);
+	const float3 postProcessColorOffset = PostProcessedColor - SourceColor;
+	const float3 postProcessedRatioColor = ColorToPostProcess * postProcessColorRatio;
+	const float3 postProcessedOffsetColor = ColorToPostProcess + postProcessColorOffset;
 // Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
 // for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
 // Note: in case "INVERT_TONEMAP_TYPE" was 0, we might want to test the "postProcessedOffsetColor" blend in range more carefully.
 // For the "INVERT_TONEMAP_TYPE" >0 case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
 #if 1
-	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
+	float3 newPostProcessedColor = lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(SourceColor / MaxShadowsColor));
 #else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE" > 1 (tonemap by luminance)
-	return select(tonemappedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
+	float3 newPostProcessedColor = select(PostProcessedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
 #endif
+
+	// Force keep the original post processed color hue
+	if (ForceKeepHue)
+	{
+		newPostProcessedColor = linear_srgb_to_oklch(newPostProcessedColor);
+		PostProcessedColor = linear_srgb_to_oklch(PostProcessedColor);
+		newPostProcessedColor[2] = PostProcessedColor[2];
+		return oklch_to_linear_srgb(newPostProcessedColor);
+	}
+
+	return newPostProcessedColor;
 }
 
 // Takes input coordinates. Returns output color in linear space (also works in sRGB but it's not ideal).
@@ -891,10 +902,9 @@ float3 GradingLUT(float3 color, float2 uv)
 
 #if ENABLE_LUT_EXTRAPOLATION
 	// Extrapolate colors beyond the 0-1 input coordinates by re-applying the same color offset ratio the LUT applied to the clamped color.
-	// NOTE: this might slightly shift the output hues from what the LUT dictacted depending on how far the input is from the 0-1 range.
-	const float3 postProcessColorRatio = safeDivision(LUTColor, saturate(color));
-	const float3 postProcessColorOffset = LUTColor - saturate(color);
-	LUTColor = RestorePostProcess(color, postProcessColorRatio, postProcessColorOffset, LUTColor);
+	// NOTE: this might slightly shift the output hues from what the LUT dictacted depending on how far the input is from the 0-1 range,
+	// though we generally don't care about it as the positives outweight the negatives (edge cases).
+	LUTColor = RestorePostProcess(color, saturate(color), LUTColor);
 #endif // ENABLE_LUT_EXTRAPOLATION
 
 	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
@@ -1404,8 +1414,6 @@ PSOutput PS(PSInput psInput)
 	}
 #endif
 
-	const float3 postProcessColorRatio = safeDivision(finalOriginalColor, tonemappedColor);
-	const float3 postProcessColorOffset = finalOriginalColor - tonemappedColor;
 #endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 
 	if (HdrDllPluginConstants.DisplayMode > 0) // HDR
@@ -1533,10 +1541,10 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedColor /= midGrayScale;
 		minHighlightsColorOut  /= midGrayScale;
 
-		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
+		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, tonemappedColor, finalOriginalColor, true);
 
-#if 0 // Enable this if you want the highlights should start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
-		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, postProcessColorRatio, postProcessColorOffset, tonemappedColor);
+#if 0 // Enable this if you want the highlights shoulder start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
+		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, tonemappedColor, finalOriginalColor); // NOTE: this is broken since refactoring the RestorePostProcess() logic
 #endif
 
 		inverseTonemappedPostProcessedColor = apply_user_hdr_postprocess(inverseTonemappedPostProcessedColor);
