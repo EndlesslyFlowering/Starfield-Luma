@@ -25,7 +25,7 @@
 // 0) sRGB gamma mapping (Vanilla): it makes any intermediary sampled value (that doesn't exactly fall in the center of LUT texel) affected by gamma, and that's not good.
 // 1) Linear mapping: Makes LUTs sampling work in linear space, which is mathematically correct. This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
 // 2) OKLAB mapping: Blend in OKLab colorspace before returning as Linear SRGB
-#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
+#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 #define LUT_MAX_UINT (uint)LUT_SIZE - 1u
