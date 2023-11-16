@@ -200,7 +200,7 @@ float rgb_2_hue( float3 rgb ) {
 		hue = hue + 360.0f;
 	}
 
-	return hue;
+	return clamp(hue, 0, 360.f);
 }
 
 float rgb_2_yc( float3 rgb, float ycRadiusWeight = 1.75) {
@@ -217,8 +217,8 @@ float rgb_2_yc( float3 rgb, float ycRadiusWeight = 1.75) {
 	// ycRadiusWeight = 2 -> YC for pure red, green, blue  == YC for  neutral of 
 	// same value.
 
-	float r = rgb[0]; 
-	float g = rgb[1]; 
+	float r = rgb[0];
+	float g = rgb[1];
 	float b = rgb[2];
 
 	float chroma = sqrt(b*(b-g)+g*(g-r)+r*(r-b));
@@ -489,12 +489,14 @@ float3 aces_rrt(float3 rgb) {
 	aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1. - RRT_RED_SCALE);
 
 	// --- ACES to RGB rendering space --- //
-	aces = clamp(aces, 0,  65504.0);
+	aces = clamp(aces, 0, 65535.0f);
 	float3 rgbPre = mul(AP0_2_AP1_MAT, aces);
-	rgbPre = clamp(rgbPre, 0, 65504.0);
+	rgbPre = clamp(rgbPre, 0, 65504.0f);
 
 	// --- Global desaturation --- //
-	rgbPre = mul( RRT_SAT_MAT, rgbPre);
+	// rgbPre = mul( RRT_SAT_MAT, rgbPre);
+	const float RRT_SAT_FACTOR = 0.96f;
+	rgbPre = lerp(dot(rgbPre, AP1_RGB2Y).xxx, rgbPre, RRT_SAT_FACTOR);
 
 	rgbPre = lerp( rgbPre, mul( BlueCorrectAP1, rgbPre ), 0.6f );
 	rgbPre = aces_gamut_compress(rgbPre);
@@ -511,7 +513,8 @@ float3 aces_odt_tone_map(float3 rgbPre, float minY, float maxY) {
 	rgbPost.z = SSTS(rgbPre.z, PARAMS);
 
 	// Not clamping may produce pink dots
-	return max(0, Y_2_linCV( rgbPost, maxY, minY));
+	float3 linearCV = Y_2_linCV( rgbPost, maxY, minY);
+	return clamp(linearCV, 0.0, 65535.0f);
 }
 
 float3 aces_odt(float3 rgbPre, float minY, float maxY, bool darkToDim = false) {
@@ -532,9 +535,11 @@ float3 aces_odt(float3 rgbPre, float minY, float maxY, bool darkToDim = false) {
 
 	float3 linearCV = mul( XYZ_2_sRGB_MAT, XYZ );
 
-	// This step is missing in ACES's OutputTransform but is present on ODTs
-	linearCV = mul(ODT_SAT_MAT, linearCV);
-	return linearCV;
+	linearCV = clamp(linearCV, 0.0, 65535.0f);
+	float3 outputCV = linCV_2_Y(linearCV, maxY, 0.0);
+	outputCV = clamp(outputCV, 0.0, 65535.0f);
+
+	return outputCV / maxY;
 }
 
 
