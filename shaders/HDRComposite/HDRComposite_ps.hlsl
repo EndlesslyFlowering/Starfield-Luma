@@ -45,7 +45,7 @@
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
 
-#define ACES_HDR_ON 1
+#define ACES_HDR_ENABLED 1
 #define ACES_HDR_AP1 1
 #define ACES_HDR_SDR_NITS 100.f
 #define ACES_HDR_HABLE_RATIO 3.5f
@@ -148,7 +148,7 @@ T ACES(
 // ACESFilm by Krzysztof Narkowicz (https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
 // (color * ((a * color) + b)) / (color * ((c * color) + d) + e)
 template<class T>
-T ACESReference(
+T ACESFitted(
 	T Color,
 	bool   Clamp)
 {
@@ -197,7 +197,7 @@ T ACES_Inverse(
 }
 
 template<class T>
-T ACESReference_Inverse(T Color)
+T ACESFitted_Inverse(T Color)
 {
 	return ACES_Inverse(Color, ACES_e, ACES_a);
 }
@@ -1044,31 +1044,55 @@ const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSec
 	return outputColor;
 }
 
-#if ACES_HDR_ON
+#if ACES_HDR_ENABLED
 PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
-	float highlightsScaling = exp2(lerp(-2.f, 2.f, HdrDllPluginConstants.ToneMapperHighlights));
+	float highlightsScaling = exp2(lerp(-4.f, 4.f, HdrDllPluginConstants.ToneMapperHighlights));
 	float inputScaling = 1.f;
 	
-	if (PcwHdrComposite.Tmo == 1) {
-		// Menu or some interior (Robotics Science Facilities)
-		inputScaling *= ACES_HDR_HABLE_RATIO;
-	} else {
-		// Titan Science Facility
-		float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
-		float toeStrength      =       saturate(PerSceneConstants[3266u].z);
-		if (toeStrength == 0 || toeLength == 0 ) {
+	switch(PcwHdrComposite.Tmo) {
+		case 1: // ACESFitted
+		case 2: // ACESParametric (not supported - same as fitted)
+			// Menu or some interior (Robotics Science Facilities)
 			inputScaling *= ACES_HDR_HABLE_RATIO;
+			break;
+		case 3:
+		{
+			// Titan Science Facility
+			float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
+			float toeStrength      =       saturate(PerSceneConstants[3266u].z);
+			if (toeStrength == 0 || toeLength == 0 ) {
+				inputScaling *= ACES_HDR_HABLE_RATIO;
+			}
+			break;
 		}
+		default:
+			break;
 	}
+
+	float3 bloom = 0;
+	#if defined(APPLY_BLOOM)
+		bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD) * PcwHdrComposite.BloomMultiplier;
+	#endif
+	float3 userBloom = bloom * 2.f * HdrDllPluginConstants.ToneMapperBloom;
+	float exposure = (HdrDllPluginConstants.DisplayMode > 0)
+		? (HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f)
+		: 1.f;
+
 	float yMin = pow(10.0f, lerp(0.f, -12.f, HdrDllPluginConstants.ToneMapperShadows));
 	float yMax = ACES_HDR_SDR_NITS
 		* highlightsScaling
+		* exposure
 		* (HdrDllPluginConstants.DisplayMode > 0
 				? HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits
 				: 1.f)
 		;
 
-	float3 toneMapperInput = inputColor * inputScaling;
+	
+	float3 toneMapperInput = inputColor
+		* inputScaling
+		* exposure
+		+ userBloom;
+		
 	float3 toneMappedColor = (HdrDllPluginConstants.ToneMapperColorSpace == 0)
 		?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
 		: aces_rrt_odt(toneMapperInput, yMin, yMax);
@@ -1160,7 +1184,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	psOutput.SV_Target.a = 1.f;
 	return psOutput;
 }
-#endif // ACES_HDR_ON
+#endif // ACES_HDR_ENABLED
 
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput)
@@ -1206,6 +1230,22 @@ PSOutput PS(PSInput psInput)
 
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
 	float3 inputColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
+
+#if ACES_HDR_ENABLED
+	if (HdrDllPluginConstants.ToneMapperType == 1) {
+		return composite_aces_hdr(psInput, inputColor);
+	}
+#endif
+
+#if BYPASS_TONEMAPPER_ENABLED
+	if (HdrDllPluginConstants.ToneMapperType == 2) {
+		PSOutput psOutput;
+		psOutput.SV_Target.rgb = inputColor;
+		psOutput.SV_Target.a = 1.f;
+		return psOutput;
+	}
+#endif
+
 
 #if CLAMP_INPUT_OUTPUT
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
@@ -1280,14 +1320,6 @@ PSOutput PS(PSInput psInput)
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
 
-#if ACES_HDR_ON
-	// ACES HDR has HDR=>SDR path that is sequenced differently than SDR=>HDR
-	// If "Hable" or "Aces SDR" is running (which is the default gameplay tonemapper), replace it with Aces HDR
-	if ((tonemapperIndex == 1 || tonemapperIndex == 3) && HdrDllPluginConstants.ToneMapperType == 1) {
-		return composite_aces_hdr(psInput, inputColor);
-	}
-	// TODO: Fix DRAW_TONEMAPPER
-#endif
 
 	const float untonemappedColorLuminance = Luminance(inputColor);
 	float tonemappedColorLuminance;
@@ -1296,8 +1328,8 @@ PSOutput PS(PSInput psInput)
 	{
 		case 1:
 		{
-			tonemappedColor          = ACESReference(inputColor, clampACES);
-			tonemappedColorLuminance = ACESReference(untonemappedColorLuminance, clampACES);
+			tonemappedColor          = ACESFitted(inputColor, clampACES);
+			tonemappedColorLuminance = ACESFitted(untonemappedColorLuminance, clampACES);
 		} break;
 
 		case 2:
@@ -1419,10 +1451,10 @@ PSOutput PS(PSInput psInput)
 			{
 				if (needsInverseTonemap)
 				{
-					inverseTonemappedColor = ACESReference_Inverse(inverseTonemappedColor);
-					midGrayOut             = ACESReference_Inverse(midGrayIn);
+					inverseTonemappedColor = ACESFitted_Inverse(inverseTonemappedColor);
+					midGrayOut             = ACESFitted_Inverse(midGrayIn);
 				}
-				minHighlightsColorOut = ACESReference_Inverse(minHighlightsColorIn);
+				minHighlightsColorOut = ACESFitted_Inverse(minHighlightsColorIn);
 			} break;
 
 			case 2:

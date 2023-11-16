@@ -39,6 +39,9 @@
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
 #define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_sRGB)
 
+// Bypass any tonemapping
+#define BYPASS_TONEMAPPER_ENABLED 1
+
 // Custom push constants uploaded by the HDR DLL plugin code. Do note that register space comes at a premium when adding members. Bit/byte packing is advised.
 // Bools are set as uint to avoid padding inconsistencies between c++ and hlsl.
 struct StructHdrDllPluginConstants
