@@ -249,18 +249,27 @@ namespace Settings
 		EnumStepper ToneMapperType{
 			SettingID::kToneMapperType,
 			"Tone Mapper Type",
-			"Sets the tone mapper type.\n\nLuma offers an HDR-first filmic tone mapper based on ACES 1.3.",
+			"Sets the tone mapper type."
+				"\n"
+				"\nVanilla+ uses the original SDR tone mapper with enhancements for HDR support."
+				"\nACES is based on ACES 1.3 and supports variable output (SDR/HDR)."
+				"\nNone bypasses any tone mapping to allow for external tone mapping.",
 			"ToneMapperType", "ToneMapper",
 			0,
-			{ "Vanilla", "ACES HDR" }
+			{ "Vanilla+", "ACES", "None" }
 		};
 		EnumStepper ToneMapperColorSpace{
 			SettingID::kToneMapperColorSpace,
 			"Tone Mapper Color Space",
-			"Sets the working color space for the tone mapper. \n\nACES AP1 may improve color accuracy in some areas, though may also deviate from the original creative intent.",
+			"Sets the working color space used by tone mapper."
+				"\n"
+				"\nBT.709 is the original color space used by the game."
+				"\nACEScg may improve color accuracy in some areas"
+				"\nthough may also deviate from the original creative intent.",
+				"\n"
 			"ToneMapperColorSpace", "ToneMapper",
 			0,
-			{ "Vanilla", "ACES AP1" }
+			{ "BT.709", "ACEScg" }
 		};
 		Slider Highlights{
 			SettingID::kToneMapperHighlights,
