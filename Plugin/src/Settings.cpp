@@ -2,6 +2,8 @@
 
 #include "Utils.h"
 
+#define ICON_FK_UNDO reinterpret_cast<const char*>(u8"\uf0e2")
+
 namespace Settings
 {
 	std::string EnumStepper::GetStepperText(int32_t a_value) const
@@ -89,12 +91,15 @@ namespace Settings
 		}
 
 		// autodetect peak brightness (only works reliably if HDR is enabled)
-		if (bIsHDREnabled && PeakBrightnessAutoDetected.get_data() == false) {
+		if (bIsHDREnabled) {
 			float detectedMaxLuminance;
 			if (Utils::GetHDRMaxLuminance(swapChainObject->swapChainInterface, detectedMaxLuminance)) {
-			    *PeakBrightnessAutoDetected = true;
-				*PeakBrightness.value = std::max(detectedMaxLuminance, 80.f);
-				Save();
+				PeakBrightness.defaultValue = detectedMaxLuminance;
+				if (PeakBrightnessAutoDetected.get_data() == false) {
+					*PeakBrightnessAutoDetected = true;
+					*PeakBrightness.value = std::max(detectedMaxLuminance, 80.f);
+					Save();
+				}
 			}
 		}
 
@@ -325,6 +330,11 @@ namespace Settings
 			result = true;
 		}
 		DrawReshadeTooltip(a_checkbox.description.c_str());
+		if (DrawReshadeResetButton(a_checkbox)) {
+			*a_checkbox.value = a_checkbox.defaultValue;
+			Save();
+			result = true;
+		}
 	    return result;
     }
 
@@ -338,6 +348,11 @@ namespace Settings
 			result = true;
 		}
 		DrawReshadeTooltip(a_stepper.description.c_str());
+		if (DrawReshadeResetButton(a_stepper)) {
+			*a_stepper.value = a_stepper.defaultValue;
+			Save();
+			result = true;
+		}
 		return result;
     }
 
@@ -351,6 +366,11 @@ namespace Settings
 			result = true;
 		}
 		DrawReshadeTooltip(a_stepper.description.c_str());
+		if (DrawReshadeResetButton(a_stepper)) {
+			*a_stepper.value = a_stepper.defaultValue;
+			Save();
+			result = true;
+		}
 		return result;
 	}
 
@@ -364,8 +384,31 @@ namespace Settings
 			result = true;
 		}
 		DrawReshadeTooltip(a_slider.description.c_str());
+		if (DrawReshadeResetButton(a_slider)) {
+			*a_slider.value = a_slider.defaultValue;
+			Save();
+			result = true;
+		}
 		return result;
     }
+
+    bool Main::DrawReshadeResetButton(Setting& a_setting)
+	{
+		bool bResult = false;
+		ImGui::SameLine();
+		ImGui::PushID(&a_setting);
+		if (!a_setting.IsDefault()) {
+			if (ImGui::SmallButton(ICON_FK_UNDO)) {
+				bResult = true;
+			}
+		} else {
+			const auto& style = ImGui::GetStyle();
+			const float width = ImGui::CalcTextSize(ICON_FK_UNDO).x + style.FramePadding.x * 2.f;
+			ImGui::InvisibleButton("", ImVec2(width, 0));
+		}
+		ImGui::PopID();
+		return bResult;
+	}
 
     void Main::DrawReshadeSettings()
     {

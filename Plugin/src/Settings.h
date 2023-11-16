@@ -51,28 +51,44 @@ namespace Settings
 		kDevSetting05,
     };
 
-	struct Setting
+	class Setting
 	{
+	public:
 		SettingID id;
 	    std::string name;
 		std::string description;
+
+		Setting(SettingID a_id, const std::string& a_name, const std::string& a_description) :
+			id(a_id), name(a_name), description(a_description)
+		{}
+
+		virtual ~Setting() = default;
+		virtual bool IsDefault() const = 0;
+        
 	};
 
-	struct Checkbox : Setting
+	class Checkbox : public Setting
 	{
+	public:
 	    Boolean value;
 		bool defaultValue;
+
+		Checkbox(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, bool a_defaultValue) :
+			Setting{ a_id, a_name, a_description }, value{ a_key, a_section }, defaultValue(a_defaultValue) {}
+
+		bool IsDefault() const override { return value.get_data() == defaultValue; }
 	};
 
-	struct Stepper : Setting
+	class Stepper : public Setting
 	{
+	public:
 		Integer value;
 		int32_t defaultValue;
 
 		Stepper(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, int32_t a_defaultValue) :
 			Setting{ a_id, a_name, a_description }, value{ a_key, a_section }, defaultValue(a_defaultValue) {}
 
-		virtual ~Stepper() = default;
+		bool IsDefault() const override { return value.get_data() == defaultValue; }
 
 		virtual std::string GetStepperText(int32_t a_value) const = 0;
 		virtual int32_t GetNumOptions() const = 0;
@@ -81,8 +97,9 @@ namespace Settings
 		virtual void SetValueFromStepper(int32_t a_value) = 0;
 	};
 
-	struct EnumStepper : Stepper
+	class EnumStepper : public Stepper
 	{
+	public:
 		std::vector<std::string> optionNames;
 
 		EnumStepper(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, int32_t a_defaultValue, const std::vector<std::string>& a_optionNames) :
@@ -95,8 +112,9 @@ namespace Settings
 		void SetValueFromStepper(int32_t a_value) override { *value = a_value; }
 	};
 
-	struct ValueStepper : Stepper
+	class ValueStepper : public Stepper
 	{
+	public:
 	    int32_t minValue;
 		int32_t maxValue;
 		int32_t stepSize;
@@ -111,13 +129,19 @@ namespace Settings
 		void SetValueFromStepper(int32_t a_value) override { *value = GetValueFromStepper(a_value); }
 	};
 
-	struct Slider : Setting
+	class Slider : public Setting
 	{
+	public:
 	    Double value;
 		float  defaultValue;
 		float sliderMin;
 		float sliderMax;
 		std::string suffix = "";
+
+		Slider(SettingID a_id, const std::string& a_name, const std::string& a_description, const std::string& a_key, const std::string& a_section, float a_defaultValue, float a_sliderMin, float a_sliderMax, std::string_view a_suffix = "") :
+			Setting{ a_id, a_name, a_description }, value{ a_key, a_section }, defaultValue(a_defaultValue), sliderMin(a_sliderMin), sliderMax(a_sliderMax), suffix(a_suffix) {}
+
+		bool IsDefault() const override { return value.get_data() == defaultValue; }
 
 		float GetSliderPercentage() const;
 		std::string GetSliderText() const;
@@ -173,7 +197,7 @@ namespace Settings
 			SettingID::kForceSDROnHDR,
 			"Force SDR on scRGB HDR",
 			"When enabled, the game will still tonemap to SDR but output on an HDR scRGB swapchain.",
-			{ "ForceSDROnHDR", "Dev" },
+			"ForceSDROnHDR", "Dev",
 			false
 		};
 		ValueStepper PeakBrightness{
@@ -210,7 +234,7 @@ namespace Settings
 		    SettingID::kHDR_ExtendGamut,
 		    "Extend Gamut",
 		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation.\n\nNeutral at 0\%.",
-		    { "ExtendGamut", "HDR" },
+		    "ExtendGamut", "HDR",
 		    0.f,
 		    0.f,
 		    100.f,
@@ -220,7 +244,7 @@ namespace Settings
 		    SettingID::kHDR_Saturation,
 		    "Saturation",
 		    "Sets the saturation strength in HDR modes.\n\nNeutral default at 50\%.",
-		    { "Saturation", "HDR" },
+		    "Saturation", "HDR",
 		    50.f,
 		    0.f,
 		    100.f,
@@ -230,7 +254,7 @@ namespace Settings
 		    SettingID::kHDR_Contrast,
 		    "Contrast",
 		    "Sets the contrast strength in HDR modes.\n\nNeutral default at 50\%.",
-		    { "Contrast", "HDR" },
+		    "Contrast", "HDR",
 		    50.f,
 		    0.f,
 		    100.f,
@@ -240,7 +264,7 @@ namespace Settings
 		    SettingID::kSecondaryBrightness,
 		    "Brightness",
 		    "Modulates the brightness in SDR modes.\n\nNeutral default at 50\%.",
-		    { "SecondaryBrightness", "Main" },
+		    "SecondaryBrightness", "Main",
 		    50.f,
 		    0.f,
 		    100.f,
@@ -275,7 +299,7 @@ namespace Settings
 			SettingID::kToneMapperHighlights,
 			"Highlights",
 			"Sets the highlights strength in the tone mapper modes.\n\nNeutral default at 50\%.",
-			{ "Highlights", "ToneMapper" },
+			"Highlights", "ToneMapper",
 			50.f,
 			0.f,
 			100.f,
@@ -285,7 +309,7 @@ namespace Settings
 			SettingID::kToneMapperShadows,
 			"Shadows",
 			"Sets the shadows strength in the tone mapper.\n\nNeutral default at 50\%.",
-			{ "Shadows", "ToneMapper" },
+			"Shadows", "ToneMapper",
 			50.f,
 			0.f,
 			100.f,
@@ -295,7 +319,7 @@ namespace Settings
 			SettingID::kToneMapperBloom,
 			"Bloom",
 			"Sets the bloom strength in the tone mapper.\n\nNeutral default at 50\%.",
-			{ "Bloom", "ToneMapper" },
+			"Bloom", "ToneMapper",
 			50.f,
 			0.f,
 			100.f,
@@ -305,7 +329,7 @@ namespace Settings
 		    SettingID::kLUTCorrectionStrength,
 		    "LUT Correction Strength",
 		    "Sets the LUT correction (normalization) strength.\nThis removes the fogginess from the game vanilla LUTs.",
-		    { "LUTCorrectionStrength", "Main" },
+		    "LUTCorrectionStrength", "Main",
 		    100.f,
 		    0.f,
 		    100.f,
@@ -315,7 +339,7 @@ namespace Settings
 		    SettingID::kColorGradingStrength,
 		    "Color Grading Strength",
 		    "Sets the color grading strength.\nThis setting influences how much the LUTs influence the final image.",
-		    { "ColorGradingStrength", "Main" },
+		    "ColorGradingStrength", "Main",
 		    100.f,
 		    0.f,
 		    100.f,
@@ -325,7 +349,7 @@ namespace Settings
 		    SettingID::kGammaCorrectionStrength,
 		    "Gamma Correction Strength",
 		    "Sets the gamma correction strength.\nThe game used the sRGB gamma formula but was calibrated on gamma 2.2 displays.\n\n100\% should be closer to the original look.",
-		    { "GammaCorrectionStrength", "Main" },
+		    "GammaCorrectionStrength", "Main",
 		    100.f,
 		    0.f,
 		    100.f,
@@ -335,7 +359,7 @@ namespace Settings
 			SettingID::kVanillaMenuLUTs,
 			"Vanilla Menu LUTs",
 			"When enabled, menu LUTs will be unaffected by the \"LUT Correction Strength\" and \"Color Grading Strength\" settings.",
-			{ "VanillaMenuLUTs", "Main" },
+			"VanillaMenuLUTs", "Main",
 			true
 		};
 		EnumStepper  FilmGrainType{
@@ -350,24 +374,23 @@ namespace Settings
 			SettingID::kFilmGrainCap,
 			"Film Grain Framerate",
 			"Sets a framerate cap on the improved film grain.\nSet to 0 for uncapped film grain framerate.",
-			{ "FilmGrainCap", "Main" },
+			"FilmGrainCap", "Main",
 			0.f,
 			0.f,
-			100.f,
-			""
+			100.f
 		};
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
 			"Toggles the game's default post-sharpen pass.\nBy default, this pass runs after other sharpening or upscaling methods, and it is always forced on.",
-			{ "PostSharpen", "Main" },
+			"PostSharpen", "Main",
 			true
 		};
-		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", { "DevSetting01", "Dev" }, 0.f, 0.f, 100.f };
-		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", { "DevSetting02", "Dev" }, 0.f, 0.f, 100.f };
-		Slider DevSetting03{ SettingID::kDevSetting03, "DevSetting03", "Development setting", { "DevSetting03", "Dev" }, 0.f, 0.f, 100.f };
-		Slider DevSetting04{ SettingID::kDevSetting04, "DevSetting04", "Development setting", { "DevSetting04", "Dev" }, 50.f, 0.f, 100.f };
-		Slider DevSetting05{ SettingID::kDevSetting05, "DevSetting05", "Development setting", { "DevSetting05", "Dev" }, 50.f, 0.f, 100.f };
+		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", "DevSetting01", "Dev", 0.f, 0.f, 100.f };
+		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", "DevSetting02", "Dev", 0.f, 0.f, 100.f };
+		Slider DevSetting03{ SettingID::kDevSetting03, "DevSetting03", "Development setting", "DevSetting03", "Dev", 0.f, 0.f, 100.f };
+		Slider DevSetting04{ SettingID::kDevSetting04, "DevSetting04", "Development setting", "DevSetting04", "Dev", 50.f, 0.f, 100.f };
+		Slider DevSetting05{ SettingID::kDevSetting05, "DevSetting05", "Development setting", "DevSetting05", "Dev", 50.f, 0.f, 100.f };
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
 
 		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "HDR" };
@@ -420,6 +443,7 @@ namespace Settings
 		bool DrawReshadeEnumStepper(EnumStepper& a_stepper);
 		bool DrawReshadeValueStepper(ValueStepper& a_stepper);
 		bool DrawReshadeSlider(Slider& a_slider);
+		bool DrawReshadeResetButton(Setting& a_setting);
 		void DrawReshadeSettings();
     };
 
