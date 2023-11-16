@@ -22,8 +22,7 @@
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
-//TODO: WIP
-#define ENABLE_LUT_EXTRAPOLATION (FORCE_VANILLA_LOOK ? 0 : 0)
+#define ENABLE_LUT_EXTRAPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
 #define ENABLE_REPLACED_TONEMAP 1
 #define ALLOW_EXPAND_GAMUT 1
 // 0 inverts all of the range (the whole image), to then re-tonemap it with an HDR tonemapper.
@@ -707,6 +706,25 @@ float3 PostProcess_Inverse(
 	return Color;
 }
 
+// Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
+// Or simply, it takes any original color (before some post process is applied to it) and re-applies the same transformation the post process had applied to a different (but similar) color.
+float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColorRatio, float3 postProcessColorOffset, float3 tonemappedColor)
+{
+	float3 postProcessedRatioColor = inverseTonemappedColor;
+	float3 postProcessedOffsetColor = inverseTonemappedColor;
+	postProcessedRatioColor *= postProcessColorRatio;
+	postProcessedOffsetColor += postProcessColorOffset;
+// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
+// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
+// Note: in case "INVERT_TONEMAP_TYPE" was 0, we might want to test the "postProcessedOffsetColor" blend in range more carefully.
+// For the "INVERT_TONEMAP_TYPE" >0 case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
+#if 1
+	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
+#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE" > 1 (tonemap by luminance)
+	return select(tonemappedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
+#endif
+}
+
 // Takes input coordinates. Returns output color in linear space (also works in sRGB but it's not ideal).
 float3 TetrahedralInterpolation(
 	Texture3D<float3> LUTTextureIn,
@@ -868,23 +886,12 @@ float3 GradingLUT(float3 color, float2 uv)
 	LUTColor = gamma_sRGB_to_linear(LUTColor);
 #endif // LUT_MAPPING_TYPE
 
-#if ENABLE_LUT_EXTRAPOLATION //TODO: does it even make sense given that "LUTCoordinates" is in sRGB? Negative numbers would be fkep up
-	// Extrapolate colors beyond the 0-1 input coordinates by finding the closest color to the LUT cube edge,
-	// and calculating the "color change" acceleration in that direction.
-	const float3 LUTCenterCoordinates = 0.5f;
-	//TODO: this should probably take into account the direction of our color and only move to the center of the closest 3D LUT texel
-	const float colorCenteringOffset = length((LUT_SIZE / 2.f) - 1.f) / length(LUT_SIZE / 2.f);
-	const float3 LUTCenteredCoordinates = ((saturate(LUTCoordinates) - LUTCenterCoordinates) * colorCenteringOffset) + LUTCenterCoordinates;
-
-#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-	float3 LUTCenterColor = TetrahedralInterpolation(LUTTexture, LUTCenteredCoordinates);
-#else
-	float3 LUTCenterColor = LUTTexture.Sample(Sampler0, LUTCenteredCoordinates * (1.f - (1.f / LUT_SIZE)) + ((1.f / LUT_SIZE) / 2.f));
-#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-
-	// Shift the color in the opposite direction of the centered one, by the ratio between the centered and the extra/external offset
-	LUTColor = lerp(LUTColor, LUTCenterColor, -abs(LUTCoordinates - saturate(LUTCoordinates)) / abs(saturate(LUTCoordinates) - LUTCenteredCoordinates));
-	//TODO: clip negative luminance colors?
+#if ENABLE_LUT_EXTRAPOLATION
+	// Extrapolate colors beyond the 0-1 input coordinates by re-applying the same color offset ratio the LUT applied to the clamped color.
+	// NOTE: this might slightly shift the output hues from what the LUT dictacted depending on how far the input is from the 0-1 range.
+	const float3 postProcessColorRatio = safeDivision(LUTColor, saturate(color));
+	const float3 postProcessColorOffset = LUTColor - saturate(color);
+	LUTColor = RestorePostProcess(color, postProcessColorRatio, postProcessColorOffset, LUTColor);
 #endif // ENABLE_LUT_EXTRAPOLATION
 
 	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
@@ -895,24 +902,6 @@ float3 GradingLUT(float3 color, float2 uv)
 }
 
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
-
-// Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
-float3 RestorePostProcess(float3 inverseTonemappedColor, float3 postProcessColorRatio, float3 postProcessColorOffset, float3 tonemappedColor)
-{
-	float3 postProcessedRatioColor = inverseTonemappedColor;
-	float3 postProcessedOffsetColor = inverseTonemappedColor;
-	postProcessedRatioColor *= postProcessColorRatio;
-	postProcessedOffsetColor += postProcessColorOffset;
-// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
-// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
-// Note: in case "INVERT_TONEMAP_TYPE" was 0, we might want to test the "postProcessedOffsetColor" blend in range more carefully.
-// For the "INVERT_TONEMAP_TYPE" >0 case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
-#if 1
-	return lerp(postProcessedOffsetColor, postProcessedRatioColor, saturate(tonemappedColor / MaxShadowsColor));
-#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE" > 1 (tonemap by luminance)
-	return select(tonemappedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
-#endif
-}
 
 void PostInverseTonemapByChannel(
 	float                         InputChannel,
@@ -1235,7 +1224,7 @@ PSOutput PS(PSInput psInput)
 	if (HdrDllPluginConstants.ToneMapperType == 1) {
 		return composite_aces_hdr(psInput, inputColor);
 	}
-#endif
+#endif // ACES_HDR_ENABLED
 
 #if BYPASS_TONEMAPPER_ENABLED
 	if (HdrDllPluginConstants.ToneMapperType == 2) {
@@ -1244,8 +1233,7 @@ PSOutput PS(PSInput psInput)
 		psOutput.SV_Target.a = 1.f;
 		return psOutput;
 	}
-#endif
-
+#endif // BYPASS_TONEMAPPER_ENABLED
 
 #if CLAMP_INPUT_OUTPUT
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
@@ -1319,7 +1307,6 @@ PSOutput PS(PSInput psInput)
 	const bool clampACES = false;
 
 	int tonemapperIndex = ForceTonemapper > 0 ? ForceTonemapper : PcwHdrComposite.Tmo;
-
 
 	const float untonemappedColorLuminance = Luminance(inputColor);
 	float tonemappedColorLuminance;

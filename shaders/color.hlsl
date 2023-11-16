@@ -4,8 +4,8 @@
 static const float WhiteNits_sRGB = 80.f;
 static const float ReferenceWhiteNits_BT2408 = 203.f;
 
-// SDR mid gray.
-// This is based on the commonly used value, though perception space mid gray in sRGB or Gamma 2.2 would theoretically be ~0.2155
+// SDR linear mid gray.
+// This is based on the commonly used value, though perception space mid gray (0.5) in sRGB or Gamma 2.2 would theoretically be ~0.2155 in linear.
 static const float MidGray = 0.18f;
 
 // Start of the highlights shoulder (empirical)
