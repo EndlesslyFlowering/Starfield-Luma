@@ -45,20 +45,35 @@ namespace Settings
 
 		swapChainObject = a_swapChainObject;
 
-		// check for old NativeHDR being present
+		// check for other plugins being present
 		auto isModuleLoaded = [&](LPCWSTR a_moduleName) {
 			HMODULE hModule = nullptr;
 			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, a_moduleName, &hModule);
 			return hModule != nullptr;
 		};
 
-		constexpr std::array moduleNames = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
+		constexpr std::array moduleNamesNativeHDR = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
+		constexpr std::array moduleNamesShaderInjector = { L"SFShaderInjector.dll", L"SFShaderInjector.asi" };
 
-		for (auto& moduleName : moduleNames) {
+		// check for old NativeHDR being present
+		for (auto& moduleName : moduleNamesNativeHDR) {
 			if (isModuleLoaded(moduleName)) {
 				ERROR("An old version of the Native(Auto)HDR plugin is loaded. Please remove it while using Luma. It is a successor to the previous mod.")
 				return false;
 			}
+		}
+
+		// check for Shader Injector being present
+		bool bShaderInjectorFound = false;
+		for (auto& moduleName : moduleNamesShaderInjector) {
+			if (!bShaderInjectorFound && isModuleLoaded(moduleName)) {
+				bShaderInjectorFound = true;
+			}
+		}
+
+		if (!bShaderInjectorFound) {
+			ERROR("Starfield Shader Injector is not loaded. Luma requires it to function properly. Please download and install the plugin - https://www.nexusmods.com/starfield/mods/5562")
+			return false;
 		}
 
 		// check hdr support
