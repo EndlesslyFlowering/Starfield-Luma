@@ -1049,6 +1049,12 @@ const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSec
 PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	float highlightsScaling = exp2(lerp(-4.f, 4.f, HdrDllPluginConstants.ToneMapperHighlights));
 	float inputScaling = 1.f;
+	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
+		? HdrDllPluginConstants.HDRPeakBrightnessNits
+		: ReferenceWhiteNits_BT2408; // 203
+	const float whiteNits = (HdrDllPluginConstants.DisplayMode > 0)
+		? HdrDllPluginConstants.HDRGamePaperWhiteNits
+		: ReferenceWhiteNits_BT2408; // 203
 	
 	switch(PcwHdrComposite.Tmo) {
 		case 1: // ACESFitted
@@ -1075,21 +1081,23 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		bloom = Bloom.Sample(Sampler0, psInput.TEXCOORD) * PcwHdrComposite.BloomMultiplier;
 	#endif
 	float3 userBloom = bloom * 2.f * HdrDllPluginConstants.ToneMapperBloom;
-	float exposure = (HdrDllPluginConstants.DisplayMode > 0)
-		? (HdrDllPluginConstants.HDRGamePaperWhiteNits / 203.f)
-		: 1.f;
+	float exposure = whiteNits / ReferenceWhiteNits_BT2408;
 
 	float yMin = pow(10.0f, lerp(0.f, -12.f, HdrDllPluginConstants.ToneMapperShadows));
 	float yMax = ACES_HDR_SDR_NITS
-		* highlightsScaling
 		* exposure
-		* (HdrDllPluginConstants.DisplayMode > 0
-				? HdrDllPluginConstants.HDRPeakBrightnessNits / HdrDllPluginConstants.HDRGamePaperWhiteNits
-				: 1.f)
+		* peakNits / whiteNits
 		;
 
-	
-	float3 toneMapperInput = inputColor
+	// TODO: Use curve instead of linear
+	float3 boostedHighlights = inputColor;
+	float inputColorY = Luminance(inputColor);
+	if (inputColorY > 0.90f) {
+		 boostedHighlights += (boostedHighlights * highlightsScaling)
+		 	* (inputColorY - 0.90f);
+	}
+
+	float3 toneMapperInput = boostedHighlights
 		* inputScaling
 		* exposure
 		+ userBloom;
@@ -1097,31 +1105,16 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
 		: aces_rrt_odt(toneMapperInput, yMin, yMax);
 
-	float outputStrength = HdrDllPluginConstants.DisplayMode > 0
-		? HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB
-		: 1.f;
-
-	// Should be in [0-Peak/80] range
-	const float3 hdrOutputColor = toneMappedColor * highlightsScaling * outputStrength;
-
-	// Should be in [0-1] range
-	const float3 sdrOutputColor = (HdrDllPluginConstants.DisplayMode > 0)
-		? saturate(
-				bt2446_hdr_to_sdr(
-					hdrOutputColor * WhiteNits_sRGB / HdrDllPluginConstants.HDRPeakBrightnessNits,
-					HdrDllPluginConstants.HDRPeakBrightnessNits,
-					ReferenceWhiteNits_BT2408
-				)
-			) // Clamp if <1000nits peak
-		: hdrOutputColor;
+	// Bring back to 0-1+ range
+	const float3 scaledToneMappedColor = toneMappedColor * (peakNits / ReferenceWhiteNits_BT2408);
 
 	float prePostProcessColorLuminance;
 	float3 postProcessedColor = 
 	#if defined(APPLY_CINEMATICS)
 		// Params are meant for Hable, but should be okay for desaturation
-		lerp(sdrOutputColor, PostProcess(sdrOutputColor, prePostProcessColorLuminance), PostProcessStrength);
+		lerp(scaledToneMappedColor, PostProcess(scaledToneMappedColor, prePostProcessColorLuminance), PostProcessStrength);
 	#else
-		sdrOutputColor;
+		scaledToneMappedColor;
 	#endif
 	
 	float3 colorGradedColor =
@@ -1147,14 +1140,9 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 
 	float3 outputColor = gammaCorrectedColor;
 	if (HdrDllPluginConstants.DisplayMode > 0) {
-		float hdrY = Luminance(max(0, hdrOutputColor ));
-		float sdrY = Luminance(max(0, sdrOutputColor * HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB ));
-		float hdrYDelta = sdrY ? hdrY / sdrY : 0.f;
-		outputColor *= hdrYDelta;
 		outputColor = apply_user_hdr_postprocess(outputColor);
 
-		// Scaled up by paperwhite when in HDR
-		outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
+		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
 		outputColor = max(0, BT709_To_WBT2020(outputColor));
 	} else {
 		// TODO: Extract into shared function
