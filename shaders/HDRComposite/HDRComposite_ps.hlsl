@@ -1047,7 +1047,6 @@ const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSec
 
 #if ACES_HDR_ENABLED
 PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
-	float highlightsScaling = exp2(lerp(-4.f, 4.f, HdrDllPluginConstants.ToneMapperHighlights));
 	float inputScaling = 1.f;
 	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
 		? HdrDllPluginConstants.HDRPeakBrightnessNits
@@ -1090,17 +1089,20 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		;
 
 	// TODO: Use curve instead of linear
+	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
 	float3 boostedHighlights = inputColor;
 	float inputColorY = Luminance(inputColor);
 	if (inputColorY > 0.90f) {
-		 boostedHighlights += (boostedHighlights * highlightsScaling)
-		 	* (inputColorY - 0.90f);
+		float maxY = 10000.f / 80.f;
+		float newY = linearNormalization(inputColorY, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
+		boostedHighlights *= newY / inputColorY;
 	}
 
 	float3 toneMapperInput = boostedHighlights
 		* inputScaling
 		* exposure
 		+ userBloom;
+
 	float3 toneMappedColor = (HdrDllPluginConstants.ToneMapperColorSpace == 0)
 		?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
 		: aces_rrt_odt(toneMapperInput, yMin, yMax);
@@ -1122,6 +1124,10 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		max(0, GradingLUT(postProcessedColor, psInput.TEXCOORD));
 	#else
 		postProcessedColor;
+	#endif
+
+	#if !ENABLE_LUT_EXTRAPOLATION
+		colorGradedColor = min(1.f, colorGradedColor) * max(1.f, postProcessedColor);
 	#endif
 
 	float3 gammaCorrectedColor =
