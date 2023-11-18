@@ -1115,8 +1115,8 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	// Should be in [0-1] range
 	outputColor = (HdrDllPluginConstants.DisplayMode > 0)
 		? (HdrDllPluginConstants.ToneMapperColorSpace == 0)
-				? aces_odt_tone_map(toneMapperInput, yMin, 48.f)
-				: aces_rrt_odt(toneMapperInput, yMin, 48.f)
+			? aces_odt_tone_map(toneMapperInput, yMin, ACES_HDR_SDR_NITS * 400.f / ReferenceWhiteNits_BT2408 )
+			: aces_rrt_odt(toneMapperInput, yMin, ACES_HDR_SDR_NITS * 400.f / ReferenceWhiteNits_BT2408)
 		: saturate(outputColor);
 
 	float3 sdrOutputColor = outputColor;
