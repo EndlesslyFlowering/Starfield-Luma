@@ -517,23 +517,13 @@ float3 aces_odt_tone_map(float3 rgbPre, float minY, float maxY) {
 	return clamp(linearCV, 0.0, 65535.0f);
 }
 
-float3 aces_odt(float3 rgbPre, float minY, float maxY, bool darkToDim = false) {
+float3 aces_odt(float3 rgbPre, float minY, float maxY) {
 
 	float3 scaled = aces_odt_tone_map(rgbPre, minY, maxY);
 	
 	scaled = lerp( scaled, mul( BlueCorrectInvAP1, scaled ), 0.6f );
 	
-	float3 XYZ = mul( AP1_2_XYZ_MAT, scaled );
-	XYZ = mul( D60_2_D65_CAT, XYZ );
-
-	if (darkToDim) {
-		float3 xyY = XYZ_2_xyY(XYZ);
-		xyY.z = clamp(xyY.z, 0.0, 65504.0);
-		xyY.z = pow(xyY.z, 0.9811); // DIM_SURROUND_GAMMA
-		XYZ = xyY_2_XYZ(xyY);
-	}
-
-	float3 linearCV = mul( XYZ_2_sRGB_MAT, XYZ );
+	float3 linearCV = mul( AP1_2_SRGB, scaled );
 
 	linearCV = clamp(linearCV, 0.0, 65535.0f);
 	float3 outputCV = linCV_2_Y(linearCV, maxY, 0.0);
@@ -543,11 +533,10 @@ float3 aces_odt(float3 rgbPre, float minY, float maxY, bool darkToDim = false) {
 }
 
 
-float3 aces_rrt_odt(float3 srgb, float minY, float maxY, bool darkToDim = false) {
+float3 aces_rrt_odt(float3 srgb, float minY, float maxY) {
 	return aces_odt(
 		aces_rrt(srgb),
 		minY,
-		maxY,
-		darkToDim
+		maxY
 	);
 }
