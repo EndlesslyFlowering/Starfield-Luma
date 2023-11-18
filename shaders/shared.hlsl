@@ -28,7 +28,7 @@
 #define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
-#define LUT_MAX_UINT (uint)LUT_SIZE - 1u
+#define LUT_MAX_UINT (uint)(LUT_SIZE - 1u)
 // If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
 // Requires "SDR_USE_GAMMA_2_2".
 // Cannot be set to false with "LUT_MAPPING_TYPE" == 2, as the point of doing LUTs mapping in OKLAB is for the blackest point to have no luminosity but still have a hue
