@@ -397,15 +397,16 @@ float3 bt2446_hdr_to_sdr(float3 linRGB, float lHDR, float lSDR) {
 	const float3 rgb = pow(linRGB, 1.f/2.4f);
 
 	const float pHDR = 1.f + (32.f * pow(lHDR / 10000.0f, 1.f / 2.4f));
+	const float pSDR = 1.f + (32.f * pow(lSDR / 10000.0f, 1.f / 2.4f));
+
 	const float Y = Luminance(rgb); // Luma
 	
 	const float Yp = log(1.f + (pHDR - 1.0) * Y) / log(pHDR);
 
 	const float Yc = (Yp < 0.7399f) ? 1.0770f * max(0, Yp)
-		: (Yp < 0.9909f) ? (-1.1510 * Yp * Yp) + (2.7811f * Yp) - 0.6302f
+		: (Yp < 0.9909f) ? (-1.1510f * Yp * Yp) + (2.7811f * Yp) - 0.6302f
 		: 0.5000f * min(Yp, 1.f) + 0.5000f;
 
-	const float pSDR = 1.f + (32.f * pow(lSDR / 10000.0f, 1.f / 2.4f));
 	const float Ysdr = (pow(pSDR, Yc) - 1.f) / (pSDR - 1.f);
 
 	const float fYsdr = Ysdr / (1.1f * Y);
@@ -420,4 +421,40 @@ float3 bt2446_hdr_to_sdr(float3 linRGB, float lHDR, float lSDR) {
 	);
 	float3 outLinRgb = pow(max(0, outRGB), 2.4f);
 	return outLinRgb;
+}
+
+float toneMapGainBT2446a(float Y_HDR, float L_HDR, float L_SDR) {
+	float rho_hdr = 1.0 + 32.0 * pow(L_HDR / 10000.0, 1.0/2.4);
+	float rho_sdr = 1.0 + 32.0 * pow(L_SDR / 10000.0, 1.0/2.4);
+
+	// Y_HDR is "A normalized full-range linear display-light HDR signal"
+	float Yprime = pow(Y_HDR / L_HDR, 1.0/2.4);
+
+	float Yp_prime = log(1.0 + (rho_hdr - 1.0) * Yprime) / log(rho_hdr);
+	float Yc_prime = 0.0;
+	if (Yp_prime < 0.0) {
+		Yc_prime = 0.0;
+	} else if (Yp_prime < 0.7399) {
+		Yc_prime = 1.0770 * Yp_prime;
+	} else if (Yp_prime < 0.9909) {
+		Yc_prime = -1.1510 * pow(Yp_prime, 2.0) + 2.7811*Yp_prime - 0.6302;
+	} else if (Yp_prime <= 1.0) {
+		Yc_prime = 0.5 * Yp_prime + 0.5;
+	} else {
+		Yc_prime = 1.0;
+	}
+	float Ysdr_prime = (pow(rho_sdr, Yc_prime) - 1.0) / (rho_sdr - 1.0);
+
+	float Ysdr = pow(Ysdr_prime, 2.4);
+	return (Ysdr * L_SDR) / Y_HDR;
+}
+
+// From Chromium dev
+float3 bt2446_bt709(float3 linRGB, float lHDR, float lSDR) {
+	float3 tonemap_input = BT709_To_BT2020(linRGB);
+	float3 gain = float3(toneMapGainBT2446a(tonemap_input.r, lHDR, lSDR),
+                      toneMapGainBT2446a(tonemap_input.g, lHDR, lSDR),
+                      toneMapGainBT2446a(tonemap_input.b, lHDR, lSDR));
+	tonemap_input *= gain;
+	return BT2020_To_BT709(tonemap_input);
 }
