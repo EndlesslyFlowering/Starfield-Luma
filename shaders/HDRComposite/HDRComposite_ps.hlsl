@@ -1107,33 +1107,46 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
 		: aces_rrt_odt(toneMapperInput, yMin, yMax);
 
-	// Bring back to 0-1+ range
+	// Bring back to 0-1+ range (0-1 at 203)
 	const float3 scaledToneMappedColor = toneMappedColor * (peakNits / ReferenceWhiteNits_BT2408);
+
+#if 1 || !ENABLE_LUT_EXTRAPOLATION
+	// Should be in [0-1] range
+	float3 sdrOutputColor = (HdrDllPluginConstants.DisplayMode > 0)
+		? saturate(
+				bt2446_bt709(
+					scaledToneMappedColor,
+					peakNits,
+					136.f // Magic value?
+				)
+			)
+		: saturate(scaledToneMappedColor);
+#else
+	float3 sdrOutputColor = scaledToneMappedColor;
+#endif
+	
+	float3 colorGradedColor =
+	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
+		max(0, GradingLUT(sdrOutputColor, psInput.TEXCOORD));
+	#else
+		sdrOutputColor;
+	#endif
+
+	// colorGradedColor = min(1.f, colorGradedColor) * max(1.f, sdrOutputColor);
 
 	float prePostProcessColorLuminance;
 	float3 postProcessedColor = 
 	#if defined(APPLY_CINEMATICS)
 		// Params are meant for Hable, but should be okay for desaturation
-		lerp(scaledToneMappedColor, PostProcess(scaledToneMappedColor, prePostProcessColorLuminance), PostProcessStrength);
+		lerp(colorGradedColor, PostProcess(colorGradedColor, prePostProcessColorLuminance), PostProcessStrength);
 	#else
-		scaledToneMappedColor;
-	#endif
-	
-	float3 colorGradedColor =
-	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
-		max(0, GradingLUT(postProcessedColor, psInput.TEXCOORD));
-	#else
-		postProcessedColor;
-	#endif
-
-	#if !ENABLE_LUT_EXTRAPOLATION
-		colorGradedColor = min(1.f, colorGradedColor) * max(1.f, postProcessedColor);
+		colorGradedColor;
 	#endif
 
 	float3 gammaCorrectedColor =
 	#if SDR_USE_GAMMA_2_2
 		lerp(
-			colorGradedColor,
+			postProcessedColor,
 			pow(gamma_linear_to_sRGB(colorGradedColor), 2.2f),
 			HdrDllPluginConstants.GammaCorrection
 			#if (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
@@ -1141,11 +1154,17 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 			#endif
 		);
 	#else
-		colorGradedColor;
+		postProcessedColor;
 	#endif
 
 	float3 outputColor = gammaCorrectedColor;
 	if (HdrDllPluginConstants.DisplayMode > 0) {
+	#if 1 || !ENABLE_LUT_EXTRAPOLATION
+		float hdrY = Luminance(max(0, scaledToneMappedColor ));
+		float sdrY = Luminance(max(0, sdrOutputColor));
+		float hdrYDelta = sdrY ? hdrY / sdrY : 0.f;
+		outputColor *= hdrYDelta;
+	#endif
 		outputColor = apply_user_hdr_postprocess(outputColor);
 
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
