@@ -44,7 +44,7 @@
 #define DRAW_TONEMAPPER 0
 
 #define ACES_HDR_ENABLED 1
-#define ACES_HDR_SDR_NITS 100.f
+#define ACES_HDR_SDR_NITS 108.f
 #define ACES_HDR_HABLE_RATIO 3.5f
 
 cbuffer CSharedFrameData : register(b0, space6)
@@ -1045,9 +1045,84 @@ const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSec
 	return outputColor;
 }
 
+#if DRAW_TONEMAPPER
+static const uint DrawToneMapperSize = 512;
+static const uint ToneMapperPadding = 8;
+static const uint ToneMapperBins = DrawToneMapperSize - (2 * ToneMapperPadding);
+
+bool DrawToneMapperStart(PSInput psInput, inout float3 inputColor, inout uint toneMapperY, inout float valueX) {
+	float width;
+	float height;
+	toneMapperY = -1u;
+	bool drawToneMapper = false;
+	InputColorTexture.GetDimensions(width, height);
+	int2 offset = int2(
+		psInput.SV_Position.x - (width - DrawToneMapperSize),
+		(DrawToneMapperSize) - psInput.SV_Position.y
+	);
+	if (offset.x >= 0 && offset.y >= 0) {
+		inputColor = float3(0.15f,0.15f,0.15f);
+		if (
+			offset.x >= ToneMapperPadding
+			&& offset.y >= ToneMapperPadding
+			&& offset.x < (DrawToneMapperSize - ToneMapperPadding)
+			&& offset.y < (DrawToneMapperSize - ToneMapperPadding)
+		) {
+			drawToneMapper = true;
+			uint toneMapperX = offset.x - ToneMapperPadding;
+			toneMapperY = offset.y - ToneMapperPadding;
+
+			// From 0.01 to Peak nits (in log)
+			const float xMin = log10(0.01 / 80.0f);
+			const float xMax = log10(10000 / 80.f );
+			const float xRange = xMax - xMin;
+			valueX = (float(toneMapperX) / float(ToneMapperBins)) * (xRange) + xMin;
+			valueX = pow(10.f, valueX);
+			inputColor = float3(valueX,valueX,valueX);
+		}
+	}
+	return drawToneMapper;
+}
+
+void DrawToneMapperEnd(uint toneMapperY, float valueX, inout float3 outputColor) {
+	// From 0.01 to Peak nits (in log)
+	const float yMin = log10(0.01);
+	const float yMax = log10(10000.f);
+	const float yRange = yMax - yMin;
+	float valueY = (float(toneMapperY) / float(ToneMapperBins)) * (yRange) + yMin;
+	float peakNits = HdrDllPluginConstants.DisplayMode != 0
+		? HdrDllPluginConstants.HDRPeakBrightnessNits
+		: 80.f;
+	valueY = pow(10.f, valueY);
+	valueY /= 80.f;
+	float outputY = Luminance(outputColor);
+	if (HdrDllPluginConstants.DisplayMode > 0) {
+		outputY *= 80.f / 203.f;
+	}
+	if (outputY > valueY ) {
+		if (outputY < 0.18f) {
+			outputColor = float3(0.3f,0,0.3f);
+		} else if (outputY > peakNits / 80.f) {
+			outputColor = float3(0, 0.3f, 0.3f);
+		} else {
+			outputColor = max(0.05f, valueY);
+		}
+	} else {
+		if (valueX < 0.18f) {
+			outputColor = float3(0,0.3f,0);
+		} else if (valueX >= peakNits / 80.f) {
+			outputColor = float3(0,0,0.3f);
+		} else {
+			outputColor = 0.05f;
+		}
+	}
+}
+
+#endif
+
 #if ACES_HDR_ENABLED
 PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
-	float inputScaling = 1.f;
+	float inputScaling = 1.2f; // Base exposure to closely match Vanilla
 	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
 		? HdrDllPluginConstants.HDRPeakBrightnessNits
 		: ReferenceWhiteNits_BT2408; // 203
@@ -1083,6 +1158,12 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 			* 2.f * HdrDllPluginConstants.ToneMapperBloom;
 	#endif
 	
+	#if DRAW_TONEMAPPER
+	uint toneMapperY;
+	float valueX;
+	bool drawToneMapper = DrawToneMapperStart(psInput, outputColor, toneMapperY, valueX);
+	#endif
+	
 	float exposure = whiteNits / ReferenceWhiteNits_BT2408;
 	float yMin = pow(10.0f, lerp(0.f, -12.f, HdrDllPluginConstants.ToneMapperShadows));
 	float yMax = ACES_HDR_SDR_NITS
@@ -1093,15 +1174,14 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	// TODO: Use curve instead of linear
 	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
 	float outputColorY = Luminance(outputColor);
-	if (outputColorY > 0.90f) {
-		float maxY = 10000.f / 80.f;
-		float newY = linearNormalization(outputColorY, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
-		outputColor *= newY / outputColorY;
-	}
+	float maxY = 10000.f / 80.f;
+	float newY = linearNormalization(outputColorY, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
+	outputColor *= newY / (outputColorY > 0.90f ? outputColorY : newY);
+
 
 	float3 toneMapperInput = outputColor = outputColor
-		* inputScaling
-		* exposure;
+	* inputScaling
+	* exposure;
 
 	outputColor = (HdrDllPluginConstants.ToneMapperColorSpace == 0)
 		?	aces_odt_tone_map(outputColor, yMin, yMax)
@@ -1115,8 +1195,8 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	// Should be in [0-1] range
 	outputColor = (HdrDllPluginConstants.DisplayMode > 0)
 		? (HdrDllPluginConstants.ToneMapperColorSpace == 0)
-			? aces_odt_tone_map(toneMapperInput, yMin, ACES_HDR_SDR_NITS * 400.f / ReferenceWhiteNits_BT2408 )
-			: aces_rrt_odt(toneMapperInput, yMin, ACES_HDR_SDR_NITS * 400.f / ReferenceWhiteNits_BT2408)
+			? aces_odt_tone_map(toneMapperInput, yMin, ACES_HDR_SDR_NITS)
+			: aces_rrt_odt(toneMapperInput, yMin, ACES_HDR_SDR_NITS)
 		: saturate(outputColor);
 
 	float3 sdrOutputColor = outputColor;
@@ -1159,8 +1239,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	#if 1 || !ENABLE_LUT_EXTRAPOLATION
 		float hdrY = Luminance(scaledToneMappedColor);
 		float sdrY = Luminance(sdrOutputColor);
-		float hdrYDelta = sdrY ? hdrY / sdrY : 0.f;
-		outputColor *= hdrYDelta;
+		outputColor *= sdrY ? hdrY / sdrY : 0;
 	#endif
 		outputColor = apply_user_hdr_postprocess(outputColor);
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
@@ -1188,6 +1267,12 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 			outputColor = saturate(outputColor);
 		#endif
 	}
+
+#if DRAW_TONEMAPPER
+	if (drawToneMapper) {
+		DrawToneMapperEnd(toneMapperY, valueX, outputColor);
+	}
+#endif // DRAW_TONEMAPPER
 
 	PSOutput psOutput;
 	psOutput.SV_Target.rgb = outputColor;
@@ -1270,43 +1355,9 @@ PSOutput PS(PSInput psInput)
 #endif // APPLY_BLOOM
 
 #if DRAW_TONEMAPPER
-	static const uint DrawToneMapperSize = 512;
-	static const uint toneMapperPadding = 8;
-	static const uint toneMapperBins = DrawToneMapperSize - (2 * toneMapperPadding);
-	float width;
-	float height;
-	float valueX;
-	float valueY;
-	uint toneMapperX;
 	uint toneMapperY;
-
-	bool drawToneMapper = false;
-	InputColorTexture.GetDimensions(width, height);
-	int2 offset = int2(
-		psInput.SV_Position.x - (width - DrawToneMapperSize),
-		(DrawToneMapperSize) - psInput.SV_Position.y
-	);
-	if (offset.x >= 0 && offset.y >= 0) {
-		inputColor = float3(0.15f,0.15f,0.15f);
-		if (
-			offset.x >= toneMapperPadding
-			&& offset.y >= toneMapperPadding
-			&& offset.x < (DrawToneMapperSize - toneMapperPadding)
-			&& offset.y < (DrawToneMapperSize - toneMapperPadding)
-		) {
-			drawToneMapper = true;
-			toneMapperX = offset.x - toneMapperPadding;
-			toneMapperY = offset.y - toneMapperPadding;
-
-			// From 0.01 to Peak nits (in log)
-			const float xMin = log10(0.01 / 80.0f);
-			const float xMax = log10(10000 / 80.f );
-			const float xRange = xMax - xMin;
-			valueX = (float(toneMapperX) / float(toneMapperBins)) * (xRange) + xMin;
-			valueX = pow(10.f, valueX);
-			inputColor = float3(valueX,valueX,valueX);
-		}
-	}
+	float valueX;
+	bool drawToneMapper = DrawToneMapperStart(psInput, inputColor, toneMapperY, valueX);
 #endif
 
 	float3 outputColor = inputColor;
@@ -1600,37 +1651,7 @@ PSOutput PS(PSInput psInput)
 
 #if DRAW_TONEMAPPER
 	if (drawToneMapper) {
-		// From 0.01 to Peak nits (in log)
-		const float yMin = log10(0.01);
-		const float yMax = log10(10000.f);
-		const float yRange = yMax - yMin;
-		float valueY = (float(toneMapperY) / float(toneMapperBins)) * (yRange) + yMin;
-		float peakNits = HdrDllPluginConstants.DisplayMode != 0
-			? HdrDllPluginConstants.HDRPeakBrightnessNits
-			: 80.f;
-		valueY = pow(10.f, valueY);
-		valueY /= 80.f;
-		float outputY = Luminance(outputColor);
-		if (HdrDllPluginConstants.DisplayMode > 0) {
-			outputY *= 80.f / 203.f;
-		}
-		if (outputY > valueY ) {
-			if (outputY < 0.18f) {
-				outputColor = float3(0.3f,0,0.3f);
-			} else if (outputY > peakNits / 80.f) {
-				outputColor = float3(0, 0.3f, 0.3f);
-			} else {
-				outputColor = max(0.05f, valueY);
-			}
-		} else {
-			if (valueX < 0.18f) {
-				outputColor = float3(0,0.3f,0);
-			} else if (valueX >= peakNits / 80.f) {
-				outputColor = float3(0,0,0.3f);
-			} else {
-				outputColor = 0.05f;
-			}
-		}
+		DrawToneMapperEnd(toneMapperY, valueX, outputColor);
 	}
 #endif // DRAW_TONEMAPPER
 
