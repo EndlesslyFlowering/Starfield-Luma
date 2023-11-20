@@ -38,10 +38,6 @@ float4 PS(PSInputs inputs) : SV_Target
 {
 	float4 color = inputTexture.Sample(inputSampler, inputs.uv);
 
-#if BYPASS_TONEMAPPER_ENABLED
-	if (HdrDllPluginConstants.ToneMapperType == 2) return color;
-#endif
-
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT) \
  || defined(OUTPUT_TO_R10G10B10A2)
 
