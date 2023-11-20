@@ -137,11 +137,6 @@ namespace Settings
 		// The game will tonemap to SDR if this is false
 		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR();
     }
-		
-		bool Main::IsToneMapperTypeACESHDR() const
-		{
-			return ToneMapperType.value.get_data() == 1;
-		}
 
 	bool Main::IsFilmGrainTypeImproved() const
 	{
@@ -203,7 +198,6 @@ namespace Settings
 		// There is no reason this wouldn't work in HDR, but for now it's disabled
 		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR() ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
-		a_outShaderConstants.ToneMapperColorSpace = static_cast<uint32_t>(ToneMapperColorSpace.value.get_data());
 		a_outShaderConstants.Highlights = static_cast<float>(Highlights.value.get_data() * 0.01f);                        // 0-100 to 0-1
 		a_outShaderConstants.Shadows = static_cast<float>(Shadows.value.get_data() * 0.01f);                              // 0-100 to 0-1
 		a_outShaderConstants.Bloom = static_cast<float>(Bloom.value.get_data() * 0.01f);                              // 0-100 to 0-1
@@ -255,7 +249,6 @@ namespace Settings
 			config->Bind(Contrast.value, Contrast.defaultValue);
 			config->Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
 			config->Bind(ToneMapperType.value, ToneMapperType.defaultValue);
-			config->Bind(ToneMapperColorSpace.value, ToneMapperColorSpace.defaultValue);
 			config->Bind(Highlights.value, Highlights.defaultValue);
 			config->Bind(Shadows.value, Shadows.defaultValue);
 			config->Bind(Bloom.value, Bloom.defaultValue);
@@ -447,9 +440,6 @@ namespace Settings
 			DrawReshadeSlider(SecondaryBrightness);
 		}
 		DrawReshadeEnumStepper(ToneMapperType);
-		if (IsToneMapperTypeACESHDR()) {
-			DrawReshadeEnumStepper(ToneMapperColorSpace);
-		}
 		DrawReshadeSlider(Highlights);
 		DrawReshadeSlider(Shadows);
 		DrawReshadeSlider(Bloom);

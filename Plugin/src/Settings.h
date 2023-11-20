@@ -30,7 +30,6 @@ namespace Settings
 		kHDR_Contrast,
 		kSecondaryBrightness,
 		kToneMapperType,
-		kToneMapperColorSpace,
 		kToneMapperHighlights,
 		kToneMapperShadows,
 		kToneMapperBloom,
@@ -162,7 +161,6 @@ namespace Settings
 		float    Contrast;
 		float    SDRSecondaryBrightness;
 		uint32_t ToneMapperType;
-		uint32_t ToneMapperColorSpace;
 		float    Highlights;
 		float    Shadows;
 		float    Bloom;
@@ -180,7 +178,7 @@ namespace Settings
 		float    DevSetting04;
 		float    DevSetting05;
 	};
-	static inline uint32_t shaderConstantsSize = 26;
+	static inline uint32_t shaderConstantsSize = 25;
 
     class Main : public DKUtil::model::Singleton<Main>
     {
@@ -277,23 +275,10 @@ namespace Settings
 				"\n"
 				"\nVanilla+ uses the original SDR tone mapper with enhancements for HDR support."
 				"\nACES is based on ACES 1.3 and supports variable output (SDR/HDR)."
-				"\nNone bypasses any tone mapping to allow for external tone mapping.",
+				"\nOpenDRT an newer tone mapper that supports variable output (SDR/HDR).",
 			"ToneMapperType", "ToneMapper",
 			0,
-			{ "Vanilla+", "ACES", "None" }
-		};
-		EnumStepper ToneMapperColorSpace{
-			SettingID::kToneMapperColorSpace,
-			"Tone Mapper Color Space",
-			"Sets the working color space used by tone mapper."
-				"\n"
-				"\nBT.709 is the original color space used by the game."
-				"\nACEScg may improve color accuracy in some areas"
-				"\nthough may also deviate from the original creative intent.",
-				"\n"
-			"ToneMapperColorSpace", "ToneMapper",
-			0,
-			{ "BT.709", "ACEScg" }
+			{ "Vanilla+", "ACES", "OpenDRT" }
 		};
 		Slider Highlights{
 			SettingID::kToneMapperHighlights,
@@ -404,7 +389,6 @@ namespace Settings
 		bool IsDisplayModeSetToHDR() const;
 		bool IsGameRenderingSetToHDR() const;
 		bool IsFilmGrainTypeImproved() const;
-		bool IsToneMapperTypeACESHDR() const;
 
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }

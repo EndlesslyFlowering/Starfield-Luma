@@ -2,6 +2,7 @@
 #include "../color.hlsl"
 #include "../math.hlsl"
 #include "ACES.hlsl"
+#include "Open_DRT.hlsl"
 #include "RootSignature.hlsl"
 
 // These are defined at compile time (shaders permutations),
@@ -1183,26 +1184,21 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	* inputScaling
 	* exposure;
 
-	outputColor = (HdrDllPluginConstants.ToneMapperColorSpace == 0)
-		?	aces_odt_tone_map(outputColor, yMin, yMax)
-		: aces_rrt_odt(outputColor, yMin, yMax);
-
-
-#if 1 || !ENABLE_LUT_EXTRAPOLATION
-	// Bring back to 0-1+ range (0-1 at 203)
-	const float3 scaledToneMappedColor = outputColor * (peakNits / ReferenceWhiteNits_BT2408);
-
-	// Should be in [0-1] range
-	outputColor = (HdrDllPluginConstants.DisplayMode > 0)
-		? (HdrDllPluginConstants.ToneMapperColorSpace == 0)
+	// TODO: Bring back LUT Extrapolation support (Single-pass)
+	// OpenDRT desaturates low peak nits
+	float3 sdrOutputColor = (HdrDllPluginConstants.ToneMapperType == 1)
 			? aces_odt_tone_map(toneMapperInput, yMin, ACES_HDR_SDR_NITS)
-			: aces_rrt_odt(toneMapperInput, yMin, ACES_HDR_SDR_NITS)
-		: saturate(outputColor);
+			: open_drt_transform(toneMapperInput, 10000.f, 4.f, HdrDllPluginConstants.ToneMapperShadows * 2.f);
 
-	float3 sdrOutputColor = outputColor;
-#else
-	outputColor = scaledToneMappedColor;
-#endif
+	float3 scaledToneMappedColor = (HdrDllPluginConstants.DisplayMode > 0)
+		? (peakNits / ReferenceWhiteNits_BT2408) *
+			((HdrDllPluginConstants.ToneMapperType == 1)
+			?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
+			: open_drt_transform(toneMapperInput, peakNits, 0, HdrDllPluginConstants.ToneMapperShadows * 2.f))
+		: sdrOutputColor;
+
+	outputColor = saturate(sdrOutputColor);
+
 	outputColor =
 	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 		GradingLUT(outputColor, psInput.TEXCOORD);
@@ -1221,11 +1217,11 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		outputColor;
 	#endif
 
-	float3 gammaCorrectedColor =
+	outputColor =
 	#if SDR_USE_GAMMA_2_2
 		lerp(
 			outputColor,
-			pow(gamma_linear_to_sRGB(outputColor), 2.2f),
+			pow(gamma_linear_to_sRGB(max(0,outputColor)), 2.2f),
 			HdrDllPluginConstants.GammaCorrection
 			#if (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
 				* (1.f - HdrDllPluginConstants.ColorGradingStrength)
@@ -1327,19 +1323,10 @@ PSOutput PS(PSInput psInput)
 	float3 inputColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
 
 #if ACES_HDR_ENABLED
-	if (HdrDllPluginConstants.ToneMapperType == 1) {
+	if (HdrDllPluginConstants.ToneMapperType >= 1) {
 		return composite_aces_hdr(psInput, inputColor);
 	}
 #endif // ACES_HDR_ENABLED
-
-#if BYPASS_TONEMAPPER_ENABLED
-	if (HdrDllPluginConstants.ToneMapperType == 2) {
-		PSOutput psOutput;
-		psOutput.SV_Target.rgb = inputColor;
-		psOutput.SV_Target.a = 1.f;
-		return psOutput;
-	}
-#endif // BYPASS_TONEMAPPER_ENABLED
 
 #if CLAMP_INPUT_OUTPUT
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
