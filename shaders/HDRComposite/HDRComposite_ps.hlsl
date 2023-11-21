@@ -1174,12 +1174,14 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 
 	// TODO: Use curve instead of linear
 	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
-	float outputColorY = Luminance(outputColor);
-	float maxY = 10000.f / 80.f;
-	float newY = linearNormalization(outputColorY, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
-	outputColor *= newY / (outputColorY > 0.90f ? outputColorY : newY);
+	if (HdrDllPluginConstants.ToneMapperType == 1) {
+		float outputColorY = Luminance(outputColor);
+		float maxY = 10000.f / 80.f;
+		float newY = linearNormalization(outputColorY, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
+		outputColor *= newY / (outputColorY > 0.90f ? outputColorY : newY);
+	}
 
-
+	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
 	float3 toneMapperInput = outputColor = outputColor
 	* inputScaling
 	* exposure;
@@ -1187,14 +1189,14 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	// TODO: Bring back LUT Extrapolation support (Single-pass)
 	// OpenDRT desaturates low peak nits
 	float3 sdrOutputColor = (HdrDllPluginConstants.ToneMapperType == 1)
-			? aces_odt_tone_map(toneMapperInput, yMin, ACES_HDR_SDR_NITS)
-			: open_drt_transform(toneMapperInput, 10000.f, 4.f, HdrDllPluginConstants.ToneMapperShadows * 2.f);
+			? aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, ACES_HDR_SDR_NITS * highlightsScaling)
+			: open_drt_transform(toneMapperInput, 203.f * 100.f, 10.f, shadowsScaling, highlightsScaling);
 
 	float3 scaledToneMappedColor = (HdrDllPluginConstants.DisplayMode > 0)
 		? (peakNits / ReferenceWhiteNits_BT2408) *
 			((HdrDllPluginConstants.ToneMapperType == 1)
-			?	aces_odt_tone_map(toneMapperInput, yMin, yMax)
-			: open_drt_transform(toneMapperInput, peakNits, 0, HdrDllPluginConstants.ToneMapperShadows * 2.f))
+			?	aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, yMax * highlightsScaling)
+			: open_drt_transform(toneMapperInput, peakNits * 100.f, 10.f, shadowsScaling, highlightsScaling))
 		: sdrOutputColor;
 
 	outputColor = saturate(sdrOutputColor);
