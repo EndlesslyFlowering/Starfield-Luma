@@ -273,29 +273,29 @@ float3 open_drt_transform(
   rgb = acesRgb;
 
   // Adjust to ACES Highlights
-  float3 highlightedRgb = rgb;
-  highlightedRgb = ex_high(highlightedRgb, -0.55f, -6.0f, 0.5f, 0);
-  highlightedRgb = ex_high(highlightedRgb, 0.5f, -3.0f, 0.5f, 0);
-  highlightedRgb = ex_high(highlightedRgb, 0.924f, -1.0f, 0.5f, 0);
-  highlightedRgb = ex_high(highlightedRgb, -0.15f, 2.68f, 0.19f, 0);
-  // // orange highlights hueshift to magenta (needed with ACES highlights)
-  highlightedRgb = n6_hueshift(highlightedRgb,
-    0, // red
-    0, // yellow
-    0, // magenta
-    0, // blue
-    0, // cyan
-    0, // green
-    1.76f, // custom strength
-    0.27f * 360.f, // custom hue
-    0.4f, // custom width
-    0.05f, // strength
-    0.28f, // chroma limit
-    1.f, // zone extract?
-    3.2f, // zone range [-4,4]
-    1.f // low/high?
-  );
-  rgb = lerp(rgb, highlightedRgb, highlights);
+  // float3 highlightedRgb = rgb;
+  // highlightedRgb = ex_high(highlightedRgb, -0.55f, -6.0f, 0.5f, 0);
+  // highlightedRgb = ex_high(highlightedRgb, 0.5f, -3.0f, 0.5f, 0);
+  // highlightedRgb = ex_high(highlightedRgb, 0.924f, -1.0f, 0.5f, 0);
+  // highlightedRgb = ex_high(highlightedRgb, -0.15f, 2.68f, 0.19f, 0);
+  // orange highlights hueshift to magenta (needed with ACES highlights)
+  // highlightedRgb = n6_hueshift(highlightedRgb,
+  //   0, // red
+  //   0, // yellow
+  //   0, // magenta
+  //   0, // blue
+  //   0, // cyan
+  //   0, // green
+  //   1.76f, // custom strength
+  //   0.27f * 360.f, // custom hue
+  //   0.4f, // custom width
+  //   0.05f, // strength
+  //   0.28f, // chroma limit
+  //   1.f, // zone extract?
+  //   3.2f, // zone range [-4,4]
+  //   1.f // low/high?
+  // );
+  // rgb = lerp(rgb, highlightedRgb, highlights);
 
   
   // **************************************************
