@@ -286,6 +286,7 @@ float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float s
     3.2f, // zone range [-4,4]
     1.f // low/high?
   );
+  rgb = orangeFix;
 
   
   // **************************************************
