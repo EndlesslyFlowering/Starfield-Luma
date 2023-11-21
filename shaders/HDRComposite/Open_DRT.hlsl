@@ -256,21 +256,30 @@ float3 n6_hueshift(float3 rgb,
   return rgb;
 }
 
-float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float shadowAdjust = 1.f, float highlights = 1.f) 
+float3 open_drt_transform(
+  float3 rgb,
+  float Lp = 100.f,
+  float gb = 0.12,
+  float shadows = 1.f,
+  float highlights = 1.f,
+  float vibrancy = 0.5f
+  )
 {
 
-  // Adjust to ACES
+  // Adjust to ACES Shadows
   float3 acesRgb = rgb;
-  acesRgb += 0.001f;
-  acesRgb = shd_con(acesRgb, -1.2f, 0.097f * shadowAdjust, 0);
-  acesRgb = ex_high(acesRgb, -0.55f, -6.0f, 0.5f, 0);
-  acesRgb = ex_high(acesRgb, 0.5f, -3.0f, 0.5f, 0);
-  acesRgb = ex_high(acesRgb, 0.924f, -1.0f, 0.5f, 0);
-  acesRgb = ex_high(acesRgb, -0.15f, 2.68f, 0.19f, 0);
+  acesRgb += 0.002f;
+  acesRgb = shd_con(acesRgb, -1.2f * exp2(shadows), 0.097f * exp2(shadows), 0);
   rgb = acesRgb;
-  
-  // orange highlights hueshift to magenta
-  float3 orangeFix = n6_hueshift(rgb,
+
+  // Adjust to ACES Highlights
+  float3 highlightedRgb = rgb;
+  highlightedRgb = ex_high(highlightedRgb, -0.55f, -6.0f, 0.5f, 0);
+  highlightedRgb = ex_high(highlightedRgb, 0.5f, -3.0f, 0.5f, 0);
+  highlightedRgb = ex_high(highlightedRgb, 0.924f, -1.0f, 0.5f, 0);
+  highlightedRgb = ex_high(highlightedRgb, -0.15f, 2.68f, 0.19f, 0);
+  // // orange highlights hueshift to magenta (needed with ACES highlights)
+  highlightedRgb = n6_hueshift(highlightedRgb,
     0, // red
     0, // yellow
     0, // magenta
@@ -286,7 +295,7 @@ float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float s
     3.2f, // zone range [-4,4]
     1.f // low/high?
   );
-  rgb = orangeFix;
+  rgb = lerp(rgb, highlightedRgb, highlights);
 
   
   // **************************************************
@@ -294,7 +303,7 @@ float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float s
   // --------------------------------------------------
 
   // Dechroma
-  float dch = 0.4f;
+  float dch = 0.4f * vibrancy;
 
   // Chroma contrast
   float chc_p = 1.2f; // amount of contrast
@@ -305,7 +314,7 @@ float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float s
   float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
-  float3 weights = float3(0.25f, 0.45f, 0.3f);
+  float3 weights = float3(0.25f, 0.45f, 0.3f) * vibrancy;
 
   // Hue Shift RGB controls
   float3 hs = float3(0.3f, -0.1f, -0.5f);
@@ -352,7 +361,7 @@ float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float s
   // s0 and s are input x scale for middle grey intersection constraint
   // m0 and m are output y scale for peak white intersection constraint
   float s0 = flare(gy, fl, 1);
-  float m0 = flare(py, fl, 1);
+  float m0 = flare(py * highlights, fl, 1);
   float ip = 1.0f/c;
   float s = (px*gx*(pow(m0, ip) - pow(s0, ip)))/(px*pow(s0, ip) - gx*pow(m0, ip));
   float m = pow(m0, ip)*(s + px)/px;
