@@ -108,6 +108,16 @@ float3 shd_con(float3 rgb, float ex, float str, int invert) {
   return rgb;
 }
 
+float3 zone_extract(float3 input, float3 rgb, float zp, int zr) {
+  float n = max(1e-12f, max(rgb.x, max(rgb.y, rgb.z)));
+  const float fl = 0.01f;
+  float zpow = pow(2.0f, -zp + 1.0f);
+  float toe = (n * n / (n + fl));
+  float f = pow((toe / (toe + 1.0f)) / n, zpow);
+  if (zr == 1) f = 1.0f - pow((n / (n + 1.0f)) / n, zpow);
+  return input * (1.0f - f) + rgb * f;
+}
+
 float3 ex_high(float3 rgb, float ex, float pv, float fa, int inv) {
   // Zoned highlight exposure with falloff : https://www.desmos.com/calculator/ylq5yvkhoq
 
@@ -131,6 +141,121 @@ float3 ex_high(float3 rgb, float ex, float pv, float fa, int inv) {
   return rgb * s;
 }
 
+// Calculate classical HSV-style "chroma"
+float calc_chroma(float3 rgb) {
+  float mx = max(rgb.x, max(rgb.y, rgb.z));
+  float mn = min(rgb.x, min(rgb.y, rgb.z));
+  float ch = mx - mn;
+  return sdivf(ch, mx);
+}
+
+float calc_hue(float3 rgb) {
+  float mx = max(rgb.x, max(rgb.y, rgb.z));
+  float mn = min(rgb.x, min(rgb.y, rgb.z));
+  float ch = mx - mn;
+  float h;
+  if (ch == 0.0f) h = 0.0f;
+  else if (mx == rgb.x) h = ((rgb.y - rgb.z) / ch + 6.0f) % 6.0f;
+  else if (mx == rgb.y) h = (rgb.z - rgb.x) / ch + 2.0f;
+  else if (mx == rgb.z) h = (rgb.x - rgb.y) / ch + 4.0f;
+  return h;
+}
+
+// Extract a range from e0 to e1 from f, clamping values above or below.
+float extract(float e0, float e1, float x) {
+  return clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+}
+
+// Linear window function to extract a range from float x: https://www.desmos.com/calculator/uzsk5ta5v7
+float extract_window(float e0, float e1, float e2, float e3, float x) {
+  return x < e1 ? extract(e0, e1, x) : extract(e3, e2, x);
+}
+
+float extract_hue_angle(float h, float o, float w, int sm) {
+  float hc = extract_window(2.0f - w, 2.0f, 2.0f, 2.0f + w, (h + o) % 6.0f);
+  if (sm == 1)
+    hc = hc * hc * (3.0f - 2.0f * hc); // smoothstep
+  return hc;
+}
+
+float3 n6_hueshift(float3 rgb, 
+    float sy, float sr, float sm, float sb, float sc, float sg,
+    float scu, float cuh, float cuw,
+    float str, float chl, int ze, float zp, int zr) {
+  
+  float3 input = rgb;
+
+  // max(r,g,b) norm
+  float n = max(rgb.x, max(rgb.y, rgb.z));
+  
+  // RGB Ratios
+  float3 r;
+  if (n == 0.0f) r = float3(0.0f, 0.0f, 0.0f);
+  else r = rgb / n;
+ 
+  // Chroma
+  // Strength controls a lerp between min(r,g,b) and max(r,g,b) for the calculation of chroma
+  float ch = min(r.x, min(r.y, r.z)) * (1.0f - str) + str;
+  ch = ch == 0.0f ? 0.0f : min(1.0f, 1.0f - min(r.x / ch, min(r.y / ch, r.z / ch)));
+  
+  // Chroma limit: reduces effect on more saturated colors, depending on chroma limit strength
+  // 0.5 < chl < 1 : power function on limit
+  // 0 < chl < 0.5 : mix back limit (better handles out of gamut colorimetry)
+  float f0 = chl < 0.5f ? max(0.0f, 0.5f - chl) * 2.0f : 1.0f / max(1e-3f, (1.0f - chl) * 2.0f);
+  ch = chl < 0.5f ? ch * f0 + ch * (1.0f - ch) * (1.0f - f0) : ch * pow(max(0.0f, 1.0f - ch), f0);
+
+  // Hue
+  float hue = calc_hue(r);
+
+  // Hue extraction for primaries (RGB)
+  float3 hp = float3(
+    extract_hue_angle(hue, 2.0f, 1.0f, 0),
+    extract_hue_angle(hue, 6.0f, 1.0f, 0),
+    extract_hue_angle(hue, 4.0f, 1.0f, 0));
+  hp = hp * ch;
+
+  // Hue extraction for secondaries (CMY)
+  float3 hs = float3(
+    extract_hue_angle(hue, 5.0f, 1.0f, 0),
+    extract_hue_angle(hue, 3.0f, 1.0f, 0),
+    extract_hue_angle(hue, 1.0f, 1.0f, 0));
+  hs = hs * ch;
+
+  // Hue shift primaries
+  r.x = r.x + sb*hp.z - sg*hp.y;
+  r.y = r.y + sr*hp.x - sb*hp.z;
+  r.z = r.z + sg*hp.y - sr*hp.x;
+  
+  // Hue shift secondaries
+  r.x = r.x + sy*hs.z - sm*hs.y;
+  r.y = r.y + sc*hs.x - sy*hs.z;
+  r.z = r.z + sm*hs.y - sc*hs.x;
+
+  // Hue extraction for custom
+  float hc = extract_hue_angle(hue, cuh / 60.0f, cuw, 0);
+  hc = hc * ch;
+  
+  // Calculate params for custom hue angle shift
+  float h = cuh / 60.0f; // Convert degrees to 0-6 hue angle
+  float s = scu * cuw; // Rotate only as much as the custom width
+  // Calculate per-channel shift values based on hue angle
+  float sc0 = h < 3.0f ? s - s*min(1, abs(h - 2.0f)) : s*min(1.0f, abs(h - 5.0f)) - s;
+  float sc1 = h < 1.0f ? s - s*min(1.0f, abs(h)) : h < 5.0f ? s*min(1.0f, abs(h - 3.0f)) - s : s - s*min(1.0f, abs(h - 6.0f));
+  float sc2 = h < 2.0f ? s*min(1.0f, abs(h - 1.0f)) - s : s - s*min(1.0f, abs(h - 4.0f));
+
+  // Hue shift custom
+  r.x = r.x + hc*(sc2-sc1);
+  r.y = r.y + hc*(sc0-sc2);
+  r.z = r.z + hc*(sc1-sc0);
+  
+  rgb = r * n;
+
+  // Zone extract
+  if (ze == 1) rgb = zone_extract(input, rgb, zp, zr);
+
+  return rgb;
+}
+
 float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float shadowAdjust = 1.f, float highlights = 1.f) 
 {
 
@@ -142,9 +267,26 @@ float3 open_drt_transform(float3 rgb, float Lp = 100.f, float gb = 0.12, float s
   acesRgb = ex_high(acesRgb, 0.5f, -3.0f, 0.5f, 0);
   acesRgb = ex_high(acesRgb, 0.924f, -1.0f, 0.5f, 0);
   acesRgb = ex_high(acesRgb, -0.15f, 2.68f, 0.19f, 0);
-  float3 acesDelta = (rgb - acesRgb);
   rgb = acesRgb;
   
+  // orange highlights hueshift to magenta
+  float3 orangeFix = n6_hueshift(rgb,
+    0, // red
+    0, // yellow
+    0, // magenta
+    0, // blue
+    0, // cyan
+    0, // green
+    1.76f, // custom strength
+    0.27f * 360.f, // custom hue
+    0.4f, // custom width
+    0.05f, // strength
+    0.28f, // chroma limit
+    1.f, // zone extract?
+    3.2f, // zone range [-4,4]
+    1.f // low/high?
+  );
+
   
   // **************************************************
   // Parameter Setup
