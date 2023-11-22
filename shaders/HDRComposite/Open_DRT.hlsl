@@ -268,7 +268,7 @@ float3 open_drt_transform(
 
   // Adjust to ACES Shadows
   float3 acesRgb = rgb;
-  acesRgb += 0.002f;
+  // acesRgb += 0.001f;
   acesRgb = shd_con(acesRgb, -1.2f * exp2(shadows), 0.097f * exp2(shadows), 0);
   rgb = acesRgb;
 

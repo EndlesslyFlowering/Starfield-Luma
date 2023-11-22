@@ -1190,13 +1190,13 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	// OpenDRT desaturates low peak nits
 	float3 sdrOutputColor = (HdrDllPluginConstants.ToneMapperType == 1)
 			? aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, ACES_HDR_SDR_NITS * highlightsScaling)
-			: open_drt_transform(toneMapperInput, 203.f * 100.f, 10.f, shadowsScaling, highlightsScaling);
+			: open_drt_transform(toneMapperInput, 203.f * 40.f, 6.666f, shadowsScaling, highlightsScaling);
 
 	float3 scaledToneMappedColor = (HdrDllPluginConstants.DisplayMode > 0)
 		? (peakNits / ReferenceWhiteNits_BT2408) *
 			((HdrDllPluginConstants.ToneMapperType == 1)
 			?	aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, yMax * highlightsScaling)
-			: open_drt_transform(toneMapperInput, peakNits * 100.f, 10.f, shadowsScaling, highlightsScaling))
+			: open_drt_transform(toneMapperInput, peakNits * 40.f, 6.666f, shadowsScaling, highlightsScaling))
 		: sdrOutputColor;
 
 	outputColor = saturate(sdrOutputColor);
