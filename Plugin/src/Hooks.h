@@ -58,8 +58,8 @@ namespace Hooks
 			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F0), Hook_EndOfFrame);  // 205436, 0x3F7 pre 1.8
 			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B32), Hook_PostEndOfFrame);  // 205436, 0x7CB pre 1.8
 
-			//dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x17E), HookedScaleformCompositeSetRenderTarget);  // 0x174 pre 1.8
-			//dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x297), HookedScaleformCompositeDraw);  // 0x249 pre 1.8
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x17E), HookedScaleformCompositeSetRenderTarget);  // 0x174 pre 1.8
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x297), HookedScaleformCompositeDraw);  // 0x249 pre 1.8
 		}
 
 	private:

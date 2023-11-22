@@ -3,7 +3,7 @@
 #define ShaderRootSignature \
 	"RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT), " \
 	\
-	"RootConstants(num32BitConstants=2, b0), " \
+	"RootConstants(num32BitConstants=3, b0), " \
 	\
 	"DescriptorTable( " \
 		"SRV(t0, space=8, flags=DESCRIPTORS_VOLATILE), " \
