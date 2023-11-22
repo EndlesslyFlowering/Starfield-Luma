@@ -117,8 +117,39 @@ struct PushConstantWrapper_HDRComposite
 	float BloomMultiplier;
 };
 
-struct FrameDebug { int2 u1; int2 u2; int2 u3; int u4; int u5; float u6; int u7; int u8; int u9; int u10; int u11; int u12; int u13; };
-struct FrameData { int u1; int u2; float2 u3; float u4; float u5; float u6; float Gamma; FrameDebug u8; float4 u9; float u10; float u11; int u12; int u13; };
+struct UserOptions {
+	float fUserContrast;  // _23_m0[2].x [0-3]
+	uint uHDRSupported;   // _23_m0[2].y [0|1]
+	float fHDRBrightness; // _23_m0[2].z [0-1]
+	float fUserUnknown1;  // _23_m0[2].w [3.5?]
+	int2 u3;              // _23_m0[3].xy
+	int u4;               // _23_m0[3].z
+	int u5;               // _23_m0[3].w
+	float u6;             // _23_m0[4].x
+	int u7;               // _23_m0[4].y
+	int u8;               // _23_m0[4].z
+	int u9;               // _23_m0[4].w
+	int u10;              // _23_m0[5].x
+	int u11;              // _23_m0[5].y
+	int u12;              // _23_m0[5].z
+	int u13;              // _23_m0[5].w
+}; // float4[4]
+struct FrameData {
+	int u1;          // _23_m0[0].x
+	int u2;          // _23_m0[0].y
+	float2 u3;       // _23_m0[0].zw
+	float u4;        // _23_m0[1].x
+	float u5;        // _23_m0[1].y
+	float u6;        // _23_m0[1].z
+	float Gamma;     // _23_m0[1].w
+	UserOptions UserOptions;  // _23_m0[2].xyzw _23_m0[3].xyzw _23_m0[4].xyzw _23_m0[5].xyzw
+	float4 u9;       // _23_m0[6].xyzw
+	float u10;       // _23_m0[7].x
+	float u11;       // _23_m0[7].y
+	int u12;         // _23_m0[7].z
+	int u13;         // _23_m0[7].w
+	float4 u14;      // _23_m0[8].xyzw
+}; // float4[9]
 
 struct HDRCompositeData
 {
