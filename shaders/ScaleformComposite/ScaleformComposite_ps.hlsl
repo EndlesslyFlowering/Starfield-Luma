@@ -25,8 +25,9 @@
 
 struct PushConstantWrapper_ScaleformCompositeLayout
 {
-	float UIIntensity; // 1.0f under most cases
-	float Unknown2; // 2.4f (probably the pow value of their broken sRGB formula)
+	float UIIntensity; // 1.0f always
+	float UIBrightness; // display settings menu > Brightness
+	float UIContrast; // display settings menu > Contrast
 };
 
 ConstantBuffer<PushConstantWrapper_ScaleformCompositeLayout> ScaleformCompositeLayout : register(b0);
