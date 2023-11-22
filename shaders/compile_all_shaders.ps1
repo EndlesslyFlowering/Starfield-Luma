@@ -9,41 +9,41 @@ $ShaderOutputEmbedPDB = $false
 $main =
 {
 	#HDRComposite
-	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "FF1A"
-	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "600FF1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
-	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "700FF1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
-	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "800FF1A" -Defines "APPLY_MERGED_COLOR_GRADING_LUT"
-	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "E00FF1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
-	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "F00FF1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
+	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "1FE1A"
+	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "C01FE1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
+	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "E01FE1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
+	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "1001FE1A" -Defines "APPLY_MERGED_COLOR_GRADING_LUT"
+	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "1C01FE1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
+	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "1E01FE1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
 
 	#Copy
-	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "400FF59"  -Defines "OUTPUT_TO_R10G10B10A2"
-	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "2000FF59" -Defines "OUTPUT_TO_R16G16B16A16_SFLOAT"
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "801FE56"  -Defines "OUTPUT_TO_R10G10B10A2"
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "4001FE56" -Defines "OUTPUT_TO_R16G16B16A16_SFLOAT"
 
 	#FilmGrain
-	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "FF75" -Entry "main"
+	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "1FE72" -Entry "main"
 
 	#ColorGradingMerge
-	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF81"
+	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE85"
 	#HDRColorGradingMerge
-	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "FF82" -OutputName "HDRColorGradingMerge"
+	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE86" -OutputName "HDRColorGradingMerge"
 
 	#ContrastAdaptiveSharpening
-	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "FF94" -Entry "main"
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "100FF94" -Defines "USE_PACKED_MATH" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "300FF94" -Defines "USE_PACKED_MATH", "USE_UPSCALING" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
+	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "1FE95" -Entry "main"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "201FE95" -Defines "USE_PACKED_MATH" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "601FE95" -Defines "USE_PACKED_MATH", "USE_UPSCALING" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 
 	#PostSharpen
-	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "FF9A"
+	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "1FE9B"
 
 	#ScaleformComposite
-	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "FFAA"
+	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "1FEAB"
 
 	#BinkMovie
-	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "FFAB"
+	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAC"
 
 	#LensFlare
-	Compile-Shader -Type "ps" -TechniqueName "LensFlare" -TechniqueId "2FF7F" -Entry "main"
+	Compile-Shader -Type "ps" -TechniqueName "LensFlare" -TechniqueId "5FE83" -Entry "main"
 }
 
 

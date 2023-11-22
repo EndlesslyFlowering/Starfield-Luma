@@ -35,7 +35,7 @@ namespace Hooks
 		static void Hook()
 		{
 			// set color space and save swapchain object pointer
-			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x3EA), Hook_UnkFunc);
+			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x42C), Hook_UnkFunc);  // 0x3EA pre 1.8
 
 			// disable photo mode screenshots with HDR
 			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(415473);
@@ -44,22 +44,22 @@ namespace Hooks
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
-			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136113, 0x62F), Hook_CreateMonitorSetting);
+			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x63A), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8
 			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
 			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
 			_SettingsDataModelSliderChanged1 = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135739, 0xA3), Hook_SettingsDataModelSliderChanged1);
 			_SettingsDataModelSliderChanged2 = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135956, 0x4), Hook_SettingsDataModelSliderChanged2);
 
-			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x89), Hook_RecreateSwapchain);
+			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x8F), Hook_RecreateSwapchain);  // 0x89 pre 1.8
 
 			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204409, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
 			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204408, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
 
-			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(205436, 0x3F7), Hook_EndOfFrame);
-			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(205436, 0x7CB), Hook_PostEndOfFrame);
+			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F0), Hook_EndOfFrame);  // 205436, 0x3F7 pre 1.8
+			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B32), Hook_PostEndOfFrame);  // 205436, 0x7CB pre 1.8
 
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x174), HookedScaleformCompositeSetRenderTarget);
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x249), HookedScaleformCompositeDraw);
+			//dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x17E), HookedScaleformCompositeSetRenderTarget);  // 0x174 pre 1.8
+			//dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x297), HookedScaleformCompositeDraw);  // 0x249 pre 1.8
 		}
 
 	private:
