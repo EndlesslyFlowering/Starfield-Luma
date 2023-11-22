@@ -53,10 +53,11 @@
 		"SRV(t5, space=7, flags=DATA_VOLATILE), " \
 		"SRV(t6, space=7, flags=DATA_VOLATILE), " \
 		"UAV(u0, space=7), " \
+		"SRV(t7, space=7, flags=DATA_VOLATILE), " \
 		"UAV(u1, space=7), " \
 		"UAV(u2, space=7), " \
 		"UAV(u3, space=7), " \
-		"SRV(t7, numDescriptors=12, space=7, flags=DATA_VOLATILE) " \
+		"SRV(t8, numDescriptors=12, space=7, flags=DATA_VOLATILE) " \
 	"), " \
 	\
 	"SRV(t0, space=7), " \

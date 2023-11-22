@@ -327,7 +327,7 @@ namespace Hooks
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
-				uploadRootConstants(shaderConstants, 1, false);  // BinkMovie
+				uploadRootConstants(shaderConstants, 2, false);  // BinkMovie
 				break;
 			}
 		}

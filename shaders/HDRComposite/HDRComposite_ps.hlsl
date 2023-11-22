@@ -87,7 +87,9 @@ SamplerState Sampler0 : register(s0, space9); // Clamped Bilinear
 struct PSInput
 {
 	float4 SV_Position : SV_Position0;
+#if (defined(APPLY_MERGED_COLOR_GRADING_LUT) || defined(APPLY_BLOOM))
 	float2 TEXCOORD    : TEXCOORD0;
+#endif
 };
 
 struct PSOutput
