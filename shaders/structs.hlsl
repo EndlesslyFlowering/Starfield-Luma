@@ -275,5 +275,6 @@ struct ContrastAdaptiveSharpeningData
 	CASConst1 upscalingConst1;
 	uint4     rectLimits0;
 	uint4     rectLimits1;
-};
+	float4    unknown0;
+}; // float4[9]
 //ContrastAdaptiveSharpening end
