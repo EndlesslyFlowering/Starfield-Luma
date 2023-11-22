@@ -262,40 +262,37 @@ float3 open_drt_transform(
   float gb = 0.12,
   float shadows = 1.f,
   float highlights = 1.f,
-  float vibrancy = 0.5f
+  float saturation = 1.f,
+  float contrast = 1.f
   )
 {
 
   // Adjust to ACES Shadows
-  float3 acesRgb = rgb;
-  // acesRgb += 0.001f;
-  acesRgb = shd_con(acesRgb, -1.2f * exp2(shadows), 0.097f * exp2(shadows), 0);
-  rgb = acesRgb;
+  // rgb += 0.001f;
+  rgb = shd_con(rgb, -1.2f * exp2(shadows), 0.097f * exp2(shadows), 0);
 
   // Adjust to ACES Highlights
-  // float3 highlightedRgb = rgb;
-  // highlightedRgb = ex_high(highlightedRgb, -0.55f, -6.0f, 0.5f, 0);
-  // highlightedRgb = ex_high(highlightedRgb, 0.5f, -3.0f, 0.5f, 0);
-  // highlightedRgb = ex_high(highlightedRgb, 0.924f, -1.0f, 0.5f, 0);
-  // highlightedRgb = ex_high(highlightedRgb, -0.15f, 2.68f, 0.19f, 0);
-  // orange highlights hueshift to magenta (needed with ACES highlights)
-  // highlightedRgb = n6_hueshift(highlightedRgb,
+  rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f, 0);
+  rgb = ex_high(rgb, 0.5f, -3.0f, 0.5f, 0);
+  rgb = ex_high(rgb, 0.924f, -1.0f, 0.5f, 0);
+  rgb = ex_high(rgb, -0.15f, 2.68f, 0.19f, 0);
+  // orange highlights hueshift to magenta (only with high vibrancy)
+  // rgb = rgb; = n6_hueshift(rgb = rgb;,
   //   0, // red
   //   0, // yellow
   //   0, // magenta
   //   0, // blue
   //   0, // cyan
   //   0, // green
-  //   1.76f, // custom strength
-  //   0.27f * 360.f, // custom hue
-  //   0.4f, // custom width
-  //   0.05f, // strength
-  //   0.28f, // chroma limit
+  //   20.f, // custom strength
+  //   0.31f * 360.f, // custom hue
+  //   0.09f, // custom width
+  //   0.0015f, // strength
+  //   0.25f, // chroma limit
   //   1.f, // zone extract?
-  //   3.2f, // zone range [-4,4]
+  //   2.16f, // zone range [-4,4]
   //   1.f // low/high?
   // );
-  // rgb = lerp(rgb, highlightedRgb, highlights);
 
   
   // **************************************************
@@ -303,18 +300,18 @@ float3 open_drt_transform(
   // --------------------------------------------------
 
   // Dechroma
-  float dch = 0.4f * vibrancy;
+  float dch = 0.4f * 0.5f;
 
   // Chroma contrast
-  float chc_p = 1.2f; // amount of contrast
+  float chc_p = 1.2f * saturation; // amount of contrast
   float chc_m = 0.5f; // pivot of contrast curve
 
   // Tonescale parameters
-  float c = 1.1f; // contrast
+  float c = 1.1f * contrast; // contrast
   float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
-  float3 weights = float3(0.25f, 0.45f, 0.3f) * vibrancy;
+  float3 weights = float3(0.25f, 0.45f, 0.3f) * 0.20f;
 
   // Hue Shift RGB controls
   float3 hs = float3(0.3f, -0.1f, -0.5f);
