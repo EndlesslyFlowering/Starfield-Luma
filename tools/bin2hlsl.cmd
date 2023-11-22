@@ -10,7 +10,7 @@ goto :init
 
 :usage
     echo USAGE:
-    echo   %__BAT_NAME% "inputfile" "outputfile" 
+    echo   %__BAT_NAME% "inputfile"
     echo.
     echo.  /?, --help           shows this help
     echo.  /v, --version        shows the version
@@ -62,8 +62,8 @@ goto :init
     if /i "%~1"=="-e"         set "OptVerbose=yes"  & shift & goto :parse
     if /i "%~1"=="--verbose"  set "OptVerbose=yes"  & shift & goto :parse
 
-    if not defined bin2hlslInput     set "bin2hlslInput=%~1"     & shift & goto :parse
-    if not defined bin2hlslOutput  set "bin2hlslOutput=%~1"  & shift & goto :parse
+    if not defined bin2hlslInput   set "bin2hlslInput=%~f1"   & shift & goto :parse
+    if not defined bin2hlslOutput  set "bin2hlslOutput=%~f1"  & shift & goto :parse
 
     shift
     goto :parse
@@ -76,11 +76,16 @@ goto :init
         echo **** DEBUG IS ON
     )
 
-    .\dxil-spirv\dxil-spirv.exe "%bin2hlslInput%" --output "%bin2hlslInput%".tmp
+    set /p stage=shader type? (vert, frag, geom, tesc, tese, comp): 
 
-    if defined bin2hlslOutput      .\spirv-cross\spirv-cross.exe "%bin2hlslInput%".tmp --hlsl --shader-model 66 > "%bin2hlslOutput%"
-    if not defined bin2hlslOutput  .\spirv-cross\spirv-cross.exe "%bin2hlslInput%".tmp --hlsl --shader-model 66
-    del "%bin2hlslInput%".tmp
+    set "dxil_spirv_params=--dead-code-eliminate --use-reflection-names --min-precision-native-16bit --storage-input-output-16bit --validate"
+    set "spirv_cross_params=--hlsl --stage %stage% --relax-nan-checks --shader-model 66 --hlsl-enable-16bit-types --hlsl-preserve-structured-buffers"
+
+    "%~dp0\tools\dxil-spirv\dxil-spirv.exe" "%bin2hlslInput%" %dxil_spirv_params% --output "%bin2hlslInput%.tmp"
+
+    if defined bin2hlslOutput     "%~dp0\tools\spirv-cross\spirv-cross.exe" "%bin2hlslInput%.tmp" %spirv_cross_params% --output "%bin2hlslOutput%"
+    if not defined bin2hlslOutput "%~dp0\tools\spirv-cross\spirv-cross.exe" "%bin2hlslInput%.tmp" %spirv_cross_params%
+    del "%bin2hlslInput%.tmp"
 
 :end
     call :cleanup
