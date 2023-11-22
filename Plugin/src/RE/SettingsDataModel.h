@@ -58,14 +58,15 @@ namespace RE
 
 			StringUIValue m_Text;                        // 00
 			StringUIValue m_Description;                 // 20
-			TUIValue<unsigned int> m_ID;                 // 40
-			TUIValue<unsigned int> m_Type;               // 60
-			TUIValue<unsigned int> m_Category;           // 80
-			TUIValue<bool> m_Enabled;                    // A0
-			NestedUIValue<SliderData> m_SliderData;      // C0
-			NestedUIValue<StepperData> m_StepperData;    // 158
-			NestedUIValue<CheckBoxData> m_CheckBoxData;  // 248
-			char _pad2C0[0x8];							 // 2D0
+			StringUIValue m_Preview;				     // 40
+			TUIValue<unsigned int> m_ID;                 // 60
+			TUIValue<unsigned int> m_Type;               // 80
+			TUIValue<unsigned int> m_Category;           // A0
+			TUIValue<bool> m_Enabled;                    // C0
+			NestedUIValue<SliderData> m_SliderData;      // E0
+			NestedUIValue<StepperData> m_StepperData;    // 178
+			NestedUIValue<CheckBoxData> m_CheckBoxData;  // 268
+			char _pad2C0[0x8];							 // 2F0
 
 			GeneralSetting()
 			{
@@ -102,8 +103,8 @@ namespace RE
 			int m_SettingID;
 		};
 
-		char _pad0[0x190 + 0x20];                                      // 0
-		TUIDataShuttleContainerMap<SubSettingsList> m_SubSettingsMap;  // 1B0
+		char _pad0[0x1B8];                                             // 0
+		TUIDataShuttleContainerMap<SubSettingsList> m_SubSettingsMap;  // 1B8
 
 		SubSettingsList::GeneralSetting* FindSettingById(int Id)
 		{
@@ -129,7 +130,7 @@ namespace RE
 
 	static_assert(sizeof(ArrayUIValue<NestedUIValue<SubSettingsList::GeneralSetting::SliderData>, 0>) == 0x78);
 
-	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting>) == 0x318);
+	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting>) == 0x338);
 	static_assert(sizeof(ArrayNestedUIValue<SubSettingsList::GeneralSetting, 0>) == 0x78);
 
 	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList>) == 0xA8);

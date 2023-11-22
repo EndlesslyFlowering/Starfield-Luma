@@ -8,7 +8,7 @@
 class Offsets
 {
 public:
-	using BufferArray = std::array<RE::BufferDefinition*, 204>;
+	using BufferArray = std::array<RE::BufferDefinition*, 200>;
 	static inline BufferArray* bufferArray = nullptr;
 
 	using tGetDXGIFormat = DXGI_FORMAT (*)(RE::BS_DXGI_FORMAT a_bgsFormat);
@@ -41,7 +41,7 @@ public:
 
 		ToggleVsync = reinterpret_cast<tToggleVsync>(dku::Hook::IDToAbs(184653));
 		unkToggleVsyncArg1Ptr = reinterpret_cast<uintptr_t*>(dku::Hook::IDToAbs(878340));
-		bEnableVsync = reinterpret_cast<bool*>(dku::Hook::IDToAbs(875798));
+		bEnableVsync = reinterpret_cast<bool*>(dku::Hook::IDToAbs(1171838));  // 875798 pre 1.8
 
 		MessageMenuManagerPtr = reinterpret_cast<void**>(dku::Hook::IDToAbs(878772));
 		ShowMessageBox = reinterpret_cast<tShowMessageBox>(dku::Hook::IDToAbs(167094));

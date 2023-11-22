@@ -250,12 +250,12 @@ namespace Hooks
 		// RootParameterIndex is the index of our custom RootConstants() entry in the root signature. It's taken from the corresponding
 		// RootSignature.hlsl file stored next to each technique hlsl file.
 		switch (techniqueId) {
-		case 0xFF1A:
-		case 0x600FF1A:
-		case 0x700FF1A:
-		case 0x800FF1A:
-		case 0xE00FF1A:
-		case 0xF00FF1A:
+		case 0x1FE1A:
+		case 0xC01FE1A:
+		case 0xE01FE1A:
+		case 0x1001FE1A:
+		case 0x1C01FE1A:
+		case 0x1E01FE1A:
 			{
 				Settings::ShaderConstants shaderConstants;
 				const auto settings = Settings::Main::GetSingleton();
@@ -267,8 +267,8 @@ namespace Hooks
 				break;
 			}
 
-		case 0x400FF59:
-		case 0x2000FF59:
+		case 0x801FE56:
+		case 0x4001FE56:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -276,7 +276,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0xFF75:
+		case 0x1FE72:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -284,7 +284,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0xFF81:
+		case 0x1FE85:
 			{
 				Settings::ShaderConstants shaderConstants;
 				const auto settings = Settings::Main::GetSingleton();
@@ -297,9 +297,9 @@ namespace Hooks
 				break;
 			}
 
-		//case 0xFF94:
-		case 0x100FF94:
-		case 0x300FF94:
+		//case 0x1FE95:
+		case 0x201FE95:
+		case 0x601FE95:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -307,7 +307,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0xFF9A:
+		case 0x1FE9B:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -315,7 +315,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0xFFAA:
+		case 0x1FEAB:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -323,7 +323,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0xFFAB:
+		case 0x1FEAC:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
