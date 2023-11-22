@@ -158,8 +158,8 @@ namespace RE
 		ContactShadowsBuffer,
 		ContactShadowsSwapBuffer,
 		RayTracedLightingDiffuseBuffer,
-		IndirectLightingDiffuseBuffer,
-		IndirectLightingSpecularBuffer,
+		IndirectLightingBufferFullRes,
+		IndirectLightingBufferHalfRes,
 		ColorBuffer01,
 		ColorBufferUAV,
 		NativeResolutionColorBuffer01,
@@ -174,26 +174,20 @@ namespace RE
 		ImageSpaceBufferR16G16B16A16,
 		ImageSpaceBufferR32G32B32A32,
 		ImageSpaceHalfResBuffer,
+		ImageSpaceHalfResBufferPreUpscale,
 		ScaleformCompositeBuffer,
 		ColorGradingLUT,
 		LumaLowResPreUpscale,
 		LumaLowResPostUpscale,
 		BloomPyramidPreUpscale,
 		BloomPyramidPostUpscale,
-		HDRLum,
 		HDRSingleValueAverageLum,
-		HDRBloom,
-		HDRBloomDS1,
-		HDRBloomDS2,
-		HDRBloomDS3,
-		HDRBloomDS4,
-		HDRBloomDS5,
-		HDRBloomDS6,
 		SAOCameraZ,
 		SAORawAO,
 		SAOFinalAO,
 		FrameBuffer,
 		NullRenderTarget,
+		SkyOcclusionMask,
 		VisualizationBuffer,
 		HeightClipmap,
 		BlurHeightClipmap,
@@ -238,6 +232,8 @@ namespace RE
 		VelocityDepthBuffer,
 		RefractionMaskCoarse,
 		ReflectionProbeSHAtlas,
+		DLSSExposureTexture,
+		DLSSDepth,
 		FSR2ReactiveMask,
 		FSR2TandCMask,
 		FSR2_PREPARED_INPUT_COLOR,
@@ -368,22 +364,21 @@ namespace RE
 	struct BGSSwapChainObject
 	{
 		HWND hwnd;
-		uint64_t unk08;
-		uint32_t unk10;
 		uint32_t bufferCount;
 		uint32_t width;
 		uint32_t height;
-		uint32_t unk20;
+		uint32_t unk14;
 		uint32_t sampleQuality;
 		BS_DXGI_FORMAT format;
+		uint64_t unk20;
+		uint64_t unk28;
 		uint64_t unk30;
 		uint64_t unk38;
 		uint64_t unk40;
-		uint64_t unk48;
 		IDXGISwapChain3* swapChainInterface;
-		uint64_t unk58;
+		uint64_t unk50;
 		ID3D12Resource** renderTargets;
-		uint64_t unk68;
+		uint64_t unk60;
 		HANDLE handle;
 	};
 }
