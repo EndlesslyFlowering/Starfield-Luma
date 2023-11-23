@@ -19,10 +19,17 @@
 // 2 improved (looks more natural, avoids values below 0, but will overshoot beyond 1 more often, and will raise blacks)
 // 3 Sigmoidal inspired and biases contrast increases towards the lower and top end
 #define POST_PROCESS_CONTRAST_TYPE (FORCE_VANILLA_LOOK ? 1 : 2)
+// Similar to "APPLY_MERGED_COLOR_GRADING_LUT"
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
-#define ENABLE_LUT_EXTRAPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
+#define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
+// 0 Linear space. Gradients look wrong and there's a lot of invalid colors.
+// 1 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
+// 2 Oklab. Gradients look okish but there's a lot of invalid colors.
+// 3 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green), but looks pretty desaturated on highlights.
+// 4 Oklch - maintain hue. Gradients look off, not too many invalid colors.
+#define DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE 3
 #define ENABLE_REPLACED_TONEMAP 1
 #define ALLOW_EXPAND_GAMUT 1
 // 0 inverts all of the range (the whole image), to then re-tonemap it with an HDR tonemapper.
@@ -41,12 +48,45 @@
 // Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
 // It also dampens colors, making them darker and less saturation, especially bright colors.
 #define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
+// 0 restore SDR post process (and LUT) on the HDR tonemapped image. This makes bright saturated colors pop more, but doesn't always retain the right hue.
+// 1 restore SDR post process (and LUT) on the HDR tonemapped image, and make sure we conserve the hue of the final SDR image.
+// 2 directly apply the post process on the HDR tonemapped image, but we restore the LUT difference from the SDR image. Similar to 0.
+// 3 directly apply the post process on the HDR tonemapped image, but we restore the LUT difference from the SDR image, and make sure we conserve the hue of the final SDR image. Similar to 1.
+// 4 directly apply the post process (and LUT) on the HDR tonemapped image, with LUT extrapolation (the final result depends on "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE").
+//   This is probably the most "correct" one and closer to vanilla, even if it doesn't always pop as much as other inaccurate settings.
+// 5 user setting between 2 and 4.
+#define HDR_POST_PROCESS_TYPE 5
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
 
 #define ACES_HDR_ENABLED 1
 #define ACES_HDR_SDR_NITS 108.f
 #define ACES_HDR_HABLE_RATIO 3.5f
+
+template<class T>
+T TO_LUT_EXTRAPOLATION_SPACE(T x, uint LUTExtrapolationColorSpace)
+{
+	if (LUTExtrapolationColorSpace <= 0)
+		return x;
+	if (LUTExtrapolationColorSpace == 1)
+		return gamma_linear_to_sRGB_mirrored(x);
+	if (LUTExtrapolationColorSpace == 2)
+		return linear_srgb_to_oklab(x);
+	/*if (LUTExtrapolationColorSpace >= 3)*/
+	return linear_srgb_to_oklch(x);
+}
+template<class T>
+T FROM_LUT_EXTRAPOLATION_SPACE(T x, uint LUTExtrapolationColorSpace)
+{
+	if (LUTExtrapolationColorSpace <= 0)
+		return x;
+	if (LUTExtrapolationColorSpace == 1)
+		return gamma_sRGB_to_linear_mirrored(x);
+	if (LUTExtrapolationColorSpace == 2)
+		return oklab_to_linear_srgb(x);
+	/*if (LUTExtrapolationColorSpace >= 3)*/
+	return oklch_to_linear_srgb(x);
+}
 
 cbuffer CSharedFrameData : register(b0, space6)
 {
@@ -625,7 +665,7 @@ float3 PostProcess(
 	Color = ((Color - ColorLuminance) * hableSaturation) + ColorLuminance;
 
 	// Blend in another color based on the luminance.
-	// NOTE: this could cause negative colors.
+	// NOTE: this could cause negative colors if the color filter had values below 0.
 	Color += lerp(float3(0.f, 0.f, 0.f), ColorLuminance * highlightsColorFilter.rgb, highlightsColorFilter.a);
 	Color *= brightnessMultiplier;
 
@@ -633,7 +673,7 @@ float3 PostProcess(
 
 	// Contrast adjustment (shift the colors from 0<->1 to (e.g.) -0.5<->0.5 range, multiply and shift back).
 	// The higher the distance from the contrast middle point, the more contrast will change the color.
-	// This generates negative colors for contrast > 1, and LUT's can't take them, unless they have "ENABLE_LUT_EXTRAPOLATION"
+	// This generates negative colors for contrast > 1, and LUT's can't take them, unless they have "LUT_EXTRAPOLATION_TYPE" > 0
 	Color = ((Color - contrastMidPoint) * contrastIntensity) + contrastMidPoint;
 
 #elif POST_PROCESS_CONTRAST_TYPE == 2
@@ -673,6 +713,8 @@ float3 PostProcess(
 	return Color;
 }
 
+// Unused function to de-apply post process from the SDR tonemapped image after applying the LUT to then invert the SDR tonemapping and re-apply HDR tonemapping.
+// The idea has been discared for better looking and faster alternatives.
 float3 PostProcess_Inverse(
 	float3 Color,
 	float  OriginalColorLuminance,
@@ -714,6 +756,7 @@ float3 PostProcess_Inverse(
 
 // Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
 // Or simply, it takes any original color (before some post process is applied to it) and re-applies the same transformation the post process had applied to a different (but similar) color.
+// The images are expected to have roughly the same mid gray.
 float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 PostProcessedColor, bool ForceKeepHue = false)
 {
 	const float3 postProcessColorRatio = safeDivision(PostProcessedColor, SourceColor);
@@ -740,6 +783,96 @@ float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 
 	}
 
 	return newPostProcessedColor;
+}
+
+// Applies user post process settings (meant for HDR output path only)
+float3 UserHDRPostProcess(float3 inputColor)
+{
+	float3 outputColor = inputColor;
+#if ALLOW_EXPAND_GAMUT
+	// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
+	// also they'd end up messing up the application of LUTs too badly.
+	if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
+	{
+		// Pow by 2 to make the 0-1 setting slider more perceptually linear
+		outputColor = ExtendGamut(outputColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
+	}
+#endif
+
+	// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
+	float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
+	saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
+#endif
+	outputColor = Saturation(outputColor, saturation);
+
+	// Secondary user driven contrast
+	const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
+#if 0 // By luminance (no hue shift) (looks off)
+	float outputColorLuminance = Luminance(outputColor);
+	outputColor *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
+#else // By channel (also increases saturation)
+	outputColor = pow(abs(outputColor) / MidGray, secondaryContrast) * MidGray * sign(outputColor);
+#endif
+	return outputColor;
+}
+
+void PostInverseTonemapByChannel(
+	float                         InputChannel,
+	float                         TonemappedChannel,
+	inout float                   InverseTonemappedColorChannel,
+	const SDRTonemapByLuminancePP sPP)
+{
+#if 1 // Directly use the input/source non tonemapped color for comparisons against the highlights
+	const bool isHighlight = InputChannel >= sPP.minHighlightsColorOut;
+	static const float HighlightAlphaBlendMultiplier = 2.5f; // Found empirically, the best balance between fixing "banding" and not having the shift noticeable.
+	const float highlightAlpha = saturate(((InputChannel - sPP.minHighlightsColorOut) / sPP.minHighlightsColorOut) * HighlightAlphaBlendMultiplier);
+#elif 0
+	const bool isHighlight = (sPP.needsInverseTonemap ? InverseTonemappedColorChannel : InputChannel) >= sPP.minHighlightsColorOut;
+#else // The least precise of them all
+	const bool isHighlight = TonemappedChannel >= sPP.minHighlightsColorIn;
+#endif
+	float sourceHighlightInverseTonemappedColorChannel = InverseTonemappedColorChannel;
+	// Restore the SDR tonemapped colors for non highlights,
+	// We scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
+	if (INVERT_TONEMAP_TYPE > 0)
+	{
+		sourceHighlightInverseTonemappedColorChannel = TonemappedChannel * (sPP.minHighlightsColorOut / sPP.minHighlightsColorIn);
+		if (!isHighlight)
+			InverseTonemappedColorChannel = sourceHighlightInverseTonemappedColorChannel;
+	}
+	// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
+	if (isHighlight)
+	{
+		// Use alpha to smooth any gradient disconnects (not a perfect solution)
+		InverseTonemappedColorChannel = lerp(sourceHighlightInverseTonemappedColorChannel, InputChannel, highlightAlpha);
+	}
+}
+
+float3 PostGradingGammaCorrect(float3 TonemappedPostProcessedGradedColor)
+{
+#if GAMMA_CORRECT_SDR_RANGE_ONLY
+	const float3 tonemappedPostProcessedGradedSDRColors = saturate(TonemappedPostProcessedGradedColor);
+	const float3 tonemappedPostProcessedGradedSDRExcessColors = TonemappedPostProcessedGradedColor - tonemappedPostProcessedGradedSDRColors;
+	TonemappedPostProcessedGradedColor = tonemappedPostProcessedGradedSDRColors;
+#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+
+// Do this even if "ENABLE_LUT" is false, for consistency
+#if SDR_USE_GAMMA_2_2 && (!ENABLE_LUT || !GAMMA_CORRECTION_IN_LUTS)
+	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
+	// Possibly, if there's no color grading LUT, there shouldn't be any gamma adjustment, as the error might have been exclusively baked into LUTs,
+	// while a neutral LUT (or no LUT) image would have never been calibrated, so we couldn't say for sure there was a gamma mismatch in it, but for the sake of simplicity,
+	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
+	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(TonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
+#elif SDR_USE_GAMMA_2_2 && ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS
+	// If gamma correction is in LUTs but LUTs are disabled, do it here
+	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(TonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection * (1.f - HdrDllPluginConstants.ColorGradingStrength));
+#endif // SDR_USE_GAMMA_2_2
+
+#if GAMMA_CORRECT_SDR_RANGE_ONLY
+	TonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
+#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+	return TonemappedPostProcessedGradedColor;
 }
 
 // Takes input coordinates. Returns output color in linear space (also works in sRGB but it's not ideal).
@@ -876,39 +1009,168 @@ float3 TetrahedralInterpolation(
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 
-// In/Out linear space
-float3 GradingLUT(float3 color, float2 uv)
+// Samples the grading LUT at the specified coordinates. Supports coordinates outside of the 0-1 range through LUT extrapolation.
+// In: LUT coordinates in sRGB (not clamped)
+// Out: linear space
+float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE, bool specifyOriginalColor = false, float3 originalColor = 0.f)
+{
+	const float3 unclampedNeutralLUTColor = specifyOriginalColor ? originalColor : gamma_sRGB_to_linear_mirrored(LUTCoordinates);
+	const float3 unclampedLUTCoordinates = LUTCoordinates;
+#if 0 // Old flowed method, just keeping it in case it was to ever come useful
+	bool LUTCoordinatesClamped;
+	// Make sure the LUT coordinates are clamped following the normal of the color instead of just a saturate().
+	// Note that due to the coordinates being in sRGB gamma/perceptual space, this operation isn't fully correct,
+	// as we are doing math (e.g. normalization) on a non linear color, though it's the best we can do,
+	// as a LUT cube with linear coordinates mapping is extremely complicated and non appropriate for other reasons.
+	LUTCoordinates = clampCubeCoordinates(LUTCoordinates, LUTCoordinatesClamped);
+	const float3 neutralLUTColor = gamma_sRGB_to_linear_mirrored(LUTCoordinates); // We can't use "originalColor" here
+#else
+	LUTCoordinates = saturate(LUTCoordinates);
+	const bool LUTCoordinatesClamped = length(unclampedLUTCoordinates - LUTCoordinates) > FLT_MIN; // Some threshold is needed here
+	const float3 neutralLUTColor = specifyOriginalColor ? saturate(originalColor) : gamma_sRGB_to_linear_mirrored(LUTCoordinates);
+#endif // LUT_EXTRAPOLATION_TYPE
+
+	const float3 LUTCoordinatesScale = (LUT_SIZE - 1.f) / LUT_SIZE; // Also "1-(1/LUT_SIZE)"
+	const float3 LUTCoordinatesOffset = 1.f / (2.f * LUT_SIZE); // Also "(1/LUT_SIZE)/2"
+	float3 LUTColor;
+	if (NearestNeighbor)
+	{
+		LUTColor = LUTTexture.Load(uint4((LUTCoordinates * LUT_MAX_UINT) + 0.5f, 0)).rgb;
+	}
+	else
+	{
+#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+		LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
+#else
+		LUTColor = LUTTexture.Sample(Sampler0, (LUTCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
+#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
+	}
+	
+#if LUT_MAPPING_TYPE == 0
+	// We always work in linear space so convert to it.
+	// We never acknowledge the original wrong gamma function here (we don't really care).
+	LUTColor = gamma_sRGB_to_linear_mirrored(LUTColor);
+#endif // LUT_MAPPING_TYPE
+
+#if LUT_EXTRAPOLATION_TYPE == 1
+	// Extrapolate colors beyond the 0-1 input coordinates by finding the closest color to the LUT cube edge,
+	// and calculating the "color change" velocity in that direction.
+	// This is the only way to make sure we extrapolate colors that reliably work with all types of LUTs,
+	// for example, the "night vision" LUT, which changes all colors to green and white (we can't allow any other hue to come out of it),
+	// or any LUT that clips highlights to 1 beyond the input color is 1 (in that case, we'd need input colors beyond 1 to also map to 1).
+	// 
+	// We keep the LUT coordinates in sRGB gamma, which should roughly work even outside the 0-1 range (especially beyond 1, not as much below 0).
+	if (LUTCoordinatesClamped && LUTExtrapolationColorSpace >= 0) // Theoretically an optimization. The result should be valid nonetheless.
+	{
+		// Find the "next" color in the same direction (LUTCoordinates) as the target clamped color.
+		const float LUTCenteringMultiplier = 1.f; // Neutral at 1 (~one texel)
+#if 0 // Old flowed method, just keeping it in case it was to ever come useful
+		// We move the coordinates back towards the cube center by a LUT texel.
+		const float3 LUTCenterCoordinates = 0.5f;
+		const float3 LUTCenteredCoordinates = ((LUTCoordinates - LUTCenterCoordinates) * (1.f - ((2.f * LUTCenteringMultiplier) / LUT_MAX_UINT))) + LUTCenterCoordinates;
+#else
+		// We move the coordinates back by the normal of the coordinates in excess of 0-1, by a LUT texel.
+		const float3 LUTCenteredCoordinates = LUTCoordinates - (normalize(unclampedLUTCoordinates - LUTCoordinates) * (1.f - (LUTCenteringMultiplier / LUT_MAX_UINT)));
+#endif
+		float3 LUTCenteredColor = LUTTexture.Sample(Sampler0, (LUTCenteredCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
+#if LUT_MAPPING_TYPE == 0 // NOTE: this and the above gamma->linear conversion could be optimized away in the "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE" 2 case
+		LUTCenteredColor = gamma_sRGB_to_linear_mirrored(LUTCenteredColor);
+#endif // LUT_MAPPING_TYPE
+
+		float extrapolationRatio;
+		// Shift the color in the opposite direction of the centered one, by the ratio between the centered and the extra/external offset.
+		if (LUTExtrapolationColorSpace <= 0)
+		{
+			// "unclampedNeutralLUTColor" equals "gamma_sRGB_to_linear_mirrored(unclampedLUTCoordinates)" and "neutralLUTColor" equals "gamma_sRGB_to_linear_mirrored(LUTCoordinates)".
+			extrapolationRatio = length(unclampedNeutralLUTColor - neutralLUTColor) / length(neutralLUTColor - gamma_sRGB_to_linear_mirrored(LUTCenteredCoordinates));
+		}
+		else if (LUTExtrapolationColorSpace >= 2)
+		{
+			// This ratio represents the color change in OKLAB gamma/perception space (pow 3).
+			// Note: it seems like multiplying "extrapolationRatio" by 0.5 might provide smoother results (no sudden gradient shifts when we start extrapolating)
+			extrapolationRatio = length(linear_to_gamma_mirrored(unclampedNeutralLUTColor, 3.f) - linear_to_gamma_mirrored(neutralLUTColor, 3.f)) / length(linear_to_gamma_mirrored(neutralLUTColor, 3.f) - linear_to_gamma_mirrored(gamma_sRGB_to_linear_mirrored(LUTCenteredCoordinates), 3.f));
+		}
+		else
+		{
+			// This ratio represents the color change in sRGB gamma/perception space, not in linear space, so we could apply it on gamma space colors.
+			extrapolationRatio = length(unclampedLUTCoordinates - LUTCoordinates) / length(LUTCoordinates - LUTCenteredCoordinates);
+		}
+
+		if (LUTExtrapolationColorSpace < 3)
+		{
+			LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(lerp(TO_LUT_EXTRAPOLATION_SPACE(LUTCenteredColor, LUTExtrapolationColorSpace), TO_LUT_EXTRAPOLATION_SPACE(LUTColor, LUTExtrapolationColorSpace), extrapolationRatio + 1.f), LUTExtrapolationColorSpace);
+		}
+		else // This branch produces the same exact result as the lerp() above except in the "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE" 3 case
+		{
+			const float3 derivedLUTColor = TO_LUT_EXTRAPOLATION_SPACE(LUTColor, LUTExtrapolationColorSpace);
+			const float3 derivedLUTCenteredColor = TO_LUT_EXTRAPOLATION_SPACE(LUTCenteredColor, LUTExtrapolationColorSpace);
+			float3 derivedLUTColorChangeOffset = derivedLUTColor - derivedLUTCenteredColor;
+#if 0 // This doesn't help enough to enable it
+			// If the luminance/intensity changed in a direction, but the average LUT color went in the other direction,
+			// ignore luminance changes, as they'd likely not be extrapolated correctly with high "extrapolationRatio" values.
+			if (LUTExtrapolationColorSpace >= 3)
+			{
+				const float derivedLUTColorAverageChangeOffset = linear_to_gamma_mirrored(average(LUTColor), 3.f) - linear_to_gamma_mirrored(average(LUTCenteredColor), 3.f);
+				const float derivedLUTColorChangeRatio = safeDivision(derivedLUTColorAverageChangeOffset, derivedLUTColorChangeOffset.x);
+				// Multiply by two to allow for a 50% tolerance.
+				derivedLUTColorChangeOffset.x *= saturate(derivedLUTColorChangeRatio * 2.f);
+			}
+#endif
+			// Reproject the centererd color change ratio onto the full range
+			const float3 extrapolatedDerivedLUTColorChangeOffset = derivedLUTColorChangeOffset * extrapolationRatio;
+			float3 extrapolatedDerivedLUTColor = derivedLUTColor + extrapolatedDerivedLUTColorChangeOffset;
+			if (LUTExtrapolationColorSpace >= 3)
+			{
+				// Avoid negative luminance. This can happen in case "derivedLUTColorChangeOffset" intensity/luminance was negative, even if we were at a bright/colorful LUT edge,
+				// especially if the input color is extremely bright. We can't really fix the color from ending up as black though, unless we find a way to auto detect it.
+				extrapolatedDerivedLUTColor.x = max(extrapolatedDerivedLUTColor.x, 0.f);
+				
+				if (LUTExtrapolationColorSpace == 3)
+				{
+					LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(float3(extrapolatedDerivedLUTColor.x, derivedLUTColor.yz), LUTExtrapolationColorSpace);
+				}
+				else // "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE" 4 case
+				{
+					// Shift luminance and chroma to the extrapolated values, keep the original LUT edge hue (we can't just apply the same hue change, hue isn't really scalable).
+					// This has problems in case the LUT color was white, so basically the hue is picked at random.
+					LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(float3(extrapolatedDerivedLUTColor.xy, derivedLUTColor.z), LUTExtrapolationColorSpace);
+				}
+			}
+			else
+			{
+				LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(extrapolatedDerivedLUTColor, LUTExtrapolationColorSpace);
+			}
+		}
+		// LUT extrapolation could easily generate invalid colors.
+		// We could not remove invalid colors and let them be clipped at the end, but we can't really keep the target hue here even if we wanted.
+		if (Luminance(LUTColor) < 0.f)
+			LUTColor = 0.f;
+	}
+#elif LUT_EXTRAPOLATION_TYPE == 2
+	// Extrapolate colors beyond the 0-1 input coordinates by re-applying the same color offset ratio the LUT applied to the clamped color.
+	// NOTE: this might slightly shift the output hues from what the LUT dictacted depending on how far the input is from the 0-1 range,
+	// though we generally don't care about it as the positives outweight the negatives (edge cases).
+	LUTColor = RestorePostProcess(unclampedNeutralLUTColor, neutralLUTColor, LUTColor);
+#endif // LUT_EXTRAPOLATION_TYPE
+
+	return LUTColor;
+}
+
+// In/Out: linear space
+float3 GradingLUT(float3 color, float2 uv, int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE)
 {
 // Overall, we don't really care about maintaining the wrong sRGB gamma formula as it broke LUT mapping, causing clipping, and just looked bad.
 #if !FORCE_VANILLA_LOOK
-	const float3 LUTCoordinates = gamma_linear_to_sRGB(color);
+	float3 LUTCoordinates = gamma_linear_to_sRGB_mirrored(color);
 #else
 	// Read gamma ini value, defaulting at 2.4 (makes little sense)
 	float inverseGamma = 1.f / (max(SharedFrameData.Gamma, 0.001f));
 	// Weird linear -> sRGB conversion that clips values just above 0.
-	const float3 LUTCoordinates = max(gamma_linear_to_sRGB_Bethesda_Optimized(color, inverseGamma), 0.f); // Does "max()" is probably unnecessary as LUT sampling is already clamped.
+	// There was a max() with 0 in the vanilla code here, but it's unnecessary as LUT sampling is already clamped.
+	const float3 LUTCoordinates = gamma_linear_to_sRGB_Bethesda_Optimized(color, inverseGamma);
 #endif // FORCE_VANILLA_LOOK
 
-#if ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-	float3 LUTColor = TetrahedralInterpolation(LUTTexture, LUTCoordinates);
-#else
-	float3 LUTCoordinatesScale = (LUT_SIZE - 1.0f) / LUT_SIZE; // Also "1-(1/LUT_SIZE)"
-	float3 LUTCoordinatesOffset = 1.0f / (2.0f * LUT_SIZE); // Also "(1/LUT_SIZE)/2"
-	float3 LUTColor = LUTTexture.Sample(Sampler0, (LUTCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
-#endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
-
-#if LUT_MAPPING_TYPE == 0
-	// We always work in linear space so convert to it.
-	// We never acknowledge the original wrong gamma function here (we don't really care).
-	LUTColor = gamma_sRGB_to_linear(LUTColor);
-#endif // LUT_MAPPING_TYPE
-
-#if ENABLE_LUT_EXTRAPOLATION
-	// Extrapolate colors beyond the 0-1 input coordinates by re-applying the same color offset ratio the LUT applied to the clamped color.
-	// NOTE: this might slightly shift the output hues from what the LUT dictacted depending on how far the input is from the 0-1 range,
-	// though we generally don't care about it as the positives outweight the negatives (edge cases).
-	LUTColor = RestorePostProcess(color, saturate(color), LUTColor);
-#endif // ENABLE_LUT_EXTRAPOLATION
+	float3 LUTColor = SampleGradingLUT(LUTCoordinates, false, LUTExtrapolationColorSpace, true, color);
 
 	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 	const float LUTMaskAlpha = (1.f - LUTMaskTexture.Sample(Sampler0, uv).x) * HdrDllPluginConstants.ColorGradingStrength;
@@ -917,54 +1179,40 @@ float3 GradingLUT(float3 color, float2 uv)
 	return LUTColor;
 }
 
-#endif // APPLY_MERGED_COLOR_GRADING_LUT
-
-void PostInverseTonemapByChannel(
-	float                         InputChannel,
-	float                         TonemappedChannel,
-	inout float                   InverseTonemappedColorChannel,
-	const SDRTonemapByLuminancePP sPP)
-{
-#if 1 // Directly use the input/source non tonemapped color for comparisons against the highlights
-	const bool isHighlight = InputChannel >= sPP.minHighlightsColorOut;
-	static const float HighlightAlphaBlendMultiplier = 2.5f; // Found empirically, the best balance between fixing "banding" and not having the shift noticeable.
-	const float highlightAlpha = saturate(((InputChannel - sPP.minHighlightsColorOut) / sPP.minHighlightsColorOut) * HighlightAlphaBlendMultiplier);
-#elif 0
-	const bool isHighlight = (sPP.needsInverseTonemap ? InverseTonemappedColorChannel : InputChannel) >= sPP.minHighlightsColorOut;
-#else // The least precise of them all
-	const bool isHighlight = TonemappedChannel >= sPP.minHighlightsColorIn;
-#endif
-	float sourceHighlightInverseTonemappedColorChannel = InverseTonemappedColorChannel;
-	// Restore the SDR tonemapped colors for non highlights,
-	// We scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
-	if (INVERT_TONEMAP_TYPE > 0)
-	{
-		sourceHighlightInverseTonemappedColorChannel = TonemappedChannel * (sPP.minHighlightsColorOut / sPP.minHighlightsColorIn);
-		if (!isHighlight)
-			InverseTonemappedColorChannel = sourceHighlightInverseTonemappedColorChannel;
-	}
-	// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
-	if (isHighlight)
-	{
-		// Use alpha to smooth any gradient disconnects (not a perfect solution)
-		InverseTonemappedColorChannel = lerp(sourceHighlightInverseTonemappedColorChannel, InputChannel, highlightAlpha);
-	}
-}
-
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && DRAW_LUT
+#if DRAW_LUT
 float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT) {
+	const uint LUTMin = 0;
+	uint LUTMax = LUT_MAX_UINT;
+	uint LUTSizeMultiplier = 1;
+#if LUT_EXTRAPOLATION_TYPE >= 1
+	LUTSizeMultiplier = 3; // This will end up multiplying the number of shown cube slices as well
+	// Shift the LUT coordinates generation to account for 50% of extra area beyond 1 and 50% below 0,
+	// so "LUTPixelPosition3D" would represent the LUT from -0.5 to 1.5 before being normalized.
+	// The bottom and top 25% squares (cube sections) will be completely outside of the valid cube range and be completely extrapolated,
+	// while for the middle 50% squares, only their outer half would be extrapolated. 
+	LUTMax += LUT_SIZE_UINT * (LUTSizeMultiplier - 1);
+#endif
+	PixelScale = pow(PixelScale, 1.f / LUTSizeMultiplier);
+
 	const uint2 LUTPixelPosition2D = PixelPosition / PixelScale;
-	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % LUT_SIZE_UINT, LUTPixelPosition2D.y, LUTPixelPosition2D.x / LUT_SIZE_UINT);
-	if (!any(LUTPixelPosition3D < 0u) && !any(LUTPixelPosition3D > LUT_MAX_UINT))
+	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % (LUT_SIZE_UINT * LUTSizeMultiplier), LUTPixelPosition2D.y, LUTPixelPosition2D.x / (LUT_SIZE_UINT * LUTSizeMultiplier));
+	if (!any(LUTPixelPosition3D < LUTMin) && !any(LUTPixelPosition3D > LUTMax))
 	{
 		DrawnLUT = true;
-		float3 loadedColor = LUTTexture.Load(uint4(LUTPixelPosition3D, 0)).rgb;
-#if LUT_MAPPING_TYPE == 0
-		loadedColor = gamma_sRGB_to_linear(loadedColor);
-#endif // LUT_MAPPING_TYPE
-		const float3 neutralLUT = gamma_sRGB_to_linear(LUTPixelPosition3D / float(LUT_MAX_UINT)); // NOTE: this ignores "GAMMA_CORRECTION_IN_LUTS" and "SDR_USE_GAMMA_2_2"
-		loadedColor = lerp(neutralLUT, loadedColor, HdrDllPluginConstants.ColorGradingStrength);
-		return loadedColor;
+		const int3 normalizedLUTPixelPosition3D = (int3)LUTPixelPosition3D - (int3)((LUTSizeMultiplier - 1) * LUT_SIZE_UINT / 2);
+		
+		const float2 LUTPixelPosition2DFloat = PixelPosition / (float)PixelScale;
+		float3 LUTPixelPosition3DFloat = float3(fmod(LUTPixelPosition2DFloat.x, LUT_SIZE_UINT * LUTSizeMultiplier), LUTPixelPosition2DFloat.y, (uint)(LUTPixelPosition2DFloat.x / (LUT_SIZE_UINT * LUTSizeMultiplier)));
+		LUTPixelPosition3DFloat.xy -= 0.5f; // Normalize the coordinates (haven't fully understood why this is needed yet)
+		const float3 normalizedLUTPixelPosition3DFloat = LUTPixelPosition3DFloat - (int3)((LUTSizeMultiplier - 1) * LUT_SIZE_UINT / 2);
+	
+		const bool NearestNeighbor = false;
+		// The color the neutral LUT would have, in sRGB gamma space
+		const float3 LUTCoordinates = (NearestNeighbor ? normalizedLUTPixelPosition3D : normalizedLUTPixelPosition3DFloat) / float(LUT_MAX_UINT);
+		const float3 LUTColor = SampleGradingLUT(LUTCoordinates, NearestNeighbor);
+		// NOTE: we do not lerp with the neutral LUT based on "HdrDllPluginConstants.ColorGradingStrength" here, as it's too complicated to replicate all the settings,
+		// use "AdditionalNeutralLUTPercentage" from the ColorGradingMerge shader to achieve the same.
+		return LUTColor;
 	}
 	return 0;
 }
@@ -1013,47 +1261,16 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 		else if (yPoint == row++) xyz = uint3(coord  , inverse, coord  ); // Green to Magenta
 		else if (yPoint == row++) xyz = uint3(coord  , coord  , inverse); // Blue to Yellow
 
-		float3 loadedColor = LUTTexture.Load(uint4(xyz.rgb, 0)).rgb;
+		float3 LUTColor = LUTTexture.Load(uint4(xyz.rgb, 0)).rgb;
 #if LUT_MAPPING_TYPE == 0
-		loadedColor = gamma_sRGB_to_linear(loadedColor);
+		LUTColor = gamma_sRGB_to_linear_mirrored(LUTColor);
 #endif // LUT_MAPPING_TYPE
-		const float3 neutralLUT = gamma_sRGB_to_linear(xyz.rgb / float(LUT_MAX_UINT)); // NOTE: this ignores "GAMMA_CORRECTION_IN_LUTS" and "SDR_USE_GAMMA_2_2"
-		loadedColor = lerp(neutralLUT, loadedColor, HdrDllPluginConstants.ColorGradingStrength);
-		return loadedColor;
+		return LUTColor;
 	}
 	return 0;
 }
-#endif // APPLY_MERGED_COLOR_GRADING_LUT && DRAW_LUT
-
-float3 apply_user_hdr_postprocess(float3 inputColor) {
-	float3 outputColor = inputColor;
-#if ALLOW_EXPAND_GAMUT
-		// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
-		// also they'd end up messing up the application of LUTs too badly.
-		if (HdrDllPluginConstants.HDRExtendGamut > 0.f)
-		{
-			// Pow by 2 to make the 0-1 setting slider more perceptually linear
-			outputColor = ExtendGamut(outputColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
-		}
-#endif
-
-		// Secondary user driven saturation. This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
-		float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
-		saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
-#endif
-		outputColor = Saturation(outputColor, saturation);
-
-		// Secondary user driven contrast
-const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
-#if 0 // By luminance (no hue shift) (looks off)
-		float outputColorLuminance = Luminance(outputColor);
-		outputColor *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
-#else // By channel (also increases saturation)
-		outputColor = pow(abs(outputColor) / MidGray, secondaryContrast) * MidGray * sign(outputColor);
-#endif
-	return outputColor;
-}
+#endif // DRAW_LUT
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
 
 #if DRAW_TONEMAPPER
 static const uint DrawToneMapperSize = 512;
@@ -1071,7 +1288,7 @@ bool DrawToneMapperStart(PSInput psInput, inout float3 inputColor, inout uint to
 		(DrawToneMapperSize) - psInput.SV_Position.y
 	);
 	if (offset.x >= 0 && offset.y >= 0) {
-		inputColor = float3(0.15f,0.15f,0.15f);
+		inputColor = float3(0.15f, 0.15f, 0.15f);
 		if (
 			offset.x >= ToneMapperPadding
 			&& offset.y >= ToneMapperPadding
@@ -1083,8 +1300,8 @@ bool DrawToneMapperStart(PSInput psInput, inout float3 inputColor, inout uint to
 			toneMapperY = offset.y - ToneMapperPadding;
 
 			// From 0.01 to Peak nits (in log)
-			const float xMin = log10(0.01 / 80.0f);
-			const float xMax = log10(10000 / 80.f );
+			const float xMin = log10(0.01 / WhiteNits_sRGB);
+			const float xMax = log10(PQMaxNits / WhiteNits_sRGB);
 			const float xRange = xMax - xMin;
 			valueX = (float(toneMapperX) / float(ToneMapperBins)) * (xRange) + xMin;
 			valueX = pow(10.f, valueX);
@@ -1097,22 +1314,22 @@ bool DrawToneMapperStart(PSInput psInput, inout float3 inputColor, inout uint to
 void DrawToneMapperEnd(uint toneMapperY, float valueX, inout float3 outputColor) {
 	// From 0.01 to Peak nits (in log)
 	const float yMin = log10(0.01);
-	const float yMax = log10(10000.f);
+	const float yMax = log10(PQMaxNits);
 	const float yRange = yMax - yMin;
 	float valueY = (float(toneMapperY) / float(ToneMapperBins)) * (yRange) + yMin;
 	float peakNits = HdrDllPluginConstants.DisplayMode != 0
 		? HdrDllPluginConstants.HDRPeakBrightnessNits
-		: 80.f;
+		: WhiteNits_sRGB;
 	valueY = pow(10.f, valueY);
-	valueY /= 80.f;
+	valueY /= WhiteNits_sRGB;
 	float outputY = Luminance(outputColor);
 	if (HdrDllPluginConstants.DisplayMode > 0) {
-		outputY *= 80.f / 203.f;
+		outputY *= WhiteNits_sRGB / 203.f;
 	}
 	if (outputY > valueY ) {
 		if (outputY < 0.18f) {
 			outputColor = float3(0.3f,0,0.3f);
-		} else if (outputY > peakNits / 80.f) {
+		} else if (outputY > peakNits / WhiteNits_sRGB) {
 			outputColor = float3(0, 0.3f, 0.3f);
 		} else {
 			outputColor = max(0.05f, valueY);
@@ -1120,7 +1337,7 @@ void DrawToneMapperEnd(uint toneMapperY, float valueX, inout float3 outputColor)
 	} else {
 		if (valueX < 0.18f) {
 			outputColor = float3(0,0.3f,0);
-		} else if (valueX >= peakNits / 80.f) {
+		} else if (valueX >= peakNits / WhiteNits_sRGB) {
 			outputColor = float3(0,0,0.3f);
 		} else {
 			outputColor = 0.05f;
@@ -1185,7 +1402,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
 	if (HdrDllPluginConstants.ToneMapperType == 1) {
 		float outputColorY = Luminance(outputColor);
-		float maxY = 10000.f / 80.f;
+		float maxY = PQMaxNits / WhiteNits_sRGB;
 		float newY = linearNormalization(outputColorY, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
 		outputColor *= newY / (outputColorY > 0.90f ? outputColorY : newY);
 	}
@@ -1211,7 +1428,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	outputColor = saturate(sdrOutputColor);
 
 	outputColor =
-	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
+	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
 		GradingLUT(outputColor, psInput.TEXCOORD);
 	#else
 		outputColor;
@@ -1219,34 +1436,21 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 
 	// colorGradedColor = min(1.f, colorGradedColor) * max(1.f, sdrOutputColor);
 
-	float prePostProcessColorLuminance;
-	outputColor = 
 	#if defined(APPLY_CINEMATICS)
-		// Params are meant for Hable, but should be okay for desaturation
-		lerp(outputColor, PostProcess(outputColor, prePostProcessColorLuminance), PostProcessStrength);
-	#else
-		outputColor;
+	float prePostProcessColorLuminance;
+	// Params are meant for Hable, but should be okay for desaturation
+	outputColor = lerp(outputColor, PostProcess(outputColor, prePostProcessColorLuminance), PostProcessStrength);
 	#endif
 
-	outputColor =
-	#if SDR_USE_GAMMA_2_2
-		lerp(
-			outputColor,
-			pow(gamma_linear_to_sRGB(max(0,outputColor)), 2.2f),
-			HdrDllPluginConstants.GammaCorrection
-			#if (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
-				* (1.f - HdrDllPluginConstants.ColorGradingStrength)
-			#endif
-		);
-	#else
-		outputColor;
+	#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+	outputColor = PostGradingGammaCorrect(outputColor);
 	#endif
 
 	if (HdrDllPluginConstants.DisplayMode > 0) {
 	#if 1 || !ENABLE_LUT_EXTRAPOLATION
 		float hdrY = Luminance(scaledToneMappedColor);
 		float sdrY = Luminance(sdrOutputColor);
-		outputColor *= sdrY ? hdrY / sdrY : 0;
+		outputColor *= sdrY ? (hdrY / sdrY) : 0.f;
 	#endif
 		outputColor = apply_user_hdr_postprocess(outputColor);
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
@@ -1367,6 +1571,7 @@ PSOutput PS(PSInput psInput)
 	tonemappedColor = inputColor;
 	tonemappedByLuminanceColor = inputColor;
 	float3 tonemappedPostProcessedColor = tonemappedColor;
+	float3 tonemappedPostProcessedGradedColor = tonemappedPostProcessedColor;
 #else
 
 	float acesParam_modE;
@@ -1413,52 +1618,45 @@ PSOutput PS(PSInput psInput)
 
 #if defined(APPLY_CINEMATICS)
 	float prePostProcessColorLuminance;
+	// NOTE: applying most of the post process before LUTs is not a very smart choice,
+	// because there's multiple operations that can move the values outside of the 0-1 range,
+	// so LUT mapping would clip and hue shift, but also, applying contrast/saturation before LUT
+	// implies that LUTs will apply on a different baseline, which means even more hue shift
+	// (e.g. if mid tones were tinted red and highlights blue, the tint would shift due to post processing).
+	// We could move part of this after LUTs, but we want to retain the original game look more than anything else (depending on the scene settings, results could vary drastically).
 	float3 tonemappedPostProcessedColor = lerp(tonemappedColor, PostProcess(tonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
 #else
 	float3 tonemappedPostProcessedColor = tonemappedColor; // No need to do anything (not even a saturate here)
 #endif //APPLY_CINEMATICS
 
-#endif // ENABLE_TONEMAP
-
 	float3 tonemappedPostProcessedGradedColor = tonemappedPostProcessedColor;
 
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP
+// NOTE: this will skip gamma correction, independently of "GAMMA_CORRECTION_IN_LUTS".
+// This is intentional because the original code never applied gamma if not through the LUT application,
+// so we can't really assume it had a gamma mismatch baked in the image.
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 
 #if ENABLE_LUT
-	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD);
+	// We don't need to keep the hue here, a lose extrapolation is fine.
+	// Note that we also do this in SDR, to avoid further runtime branches.
+	const int LUTExtrapolationColorSpace = 1;
+	tonemappedPostProcessedGradedColor = GradingLUT(tonemappedPostProcessedColor, psInput.TEXCOORD, LUTExtrapolationColorSpace);
 #endif // ENABLE_LUT
 
-#if GAMMA_CORRECT_SDR_RANGE_ONLY
-	const float3 tonemappedPostProcessedGradedSDRColors = saturate(tonemappedPostProcessedGradedColor);
-	const float3 tonemappedPostProcessedGradedSDRExcessColors = tonemappedPostProcessedGradedColor - tonemappedPostProcessedGradedSDRColors;
-	tonemappedPostProcessedGradedColor = tonemappedPostProcessedGradedSDRColors;
-#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
+	tonemappedPostProcessedGradedColor = PostGradingGammaCorrect(tonemappedPostProcessedGradedColor);
 
-// Do this even if "ENABLE_LUT" is false, for consistency
-#if SDR_USE_GAMMA_2_2 && (!ENABLE_LUT || !GAMMA_CORRECTION_IN_LUTS)
-	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
-	// Possibly, if there's no color grading LUT, there shouldn't be any gamma adjustment, as the error might have been exclusively baked into LUTs,
-	// while a neutral LUT (or no LUT) image would have never been calibrated, so we couldn't say for sure there was a gamma mismatch in it, but for the sake of simplicity,
-	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
-#elif SDR_USE_GAMMA_2_2 && (ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS)
-	// If gamma correction is in LUTs but LUTs are disabled, do it here
-	tonemappedPostProcessedGradedColor = lerp(tonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(tonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection * (1.f - HdrDllPluginConstants.ColorGradingStrength));
-#endif // SDR_USE_GAMMA_2_2
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
 
 	// The dll makes sure this is 1 when we are in HDR.
 	if (HdrDllPluginConstants.SDRSecondaryBrightness != 1.f)
 	{
 		float3 oklabColor = linear_srgb_to_oklab(tonemappedPostProcessedGradedColor);
-		oklabColor[0] = pow(oklabColor[0], linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 1.25f, 0.75f));
+		// We make sure this doesn't have negative brightness with abs()*sign() (it might have been very unlikely anyway)
+		oklabColor[0] = pow(abs(oklabColor[0]), linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 1.25f, 0.75f)) * sign(oklabColor[0]);
 		tonemappedPostProcessedGradedColor = oklab_to_linear_srgb(oklabColor);
 	}
 
-#if GAMMA_CORRECT_SDR_RANGE_ONLY
-	tonemappedPostProcessedGradedColor += tonemappedPostProcessedGradedSDRExcessColors;
-#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
-
-#endif // APPLY_MERGED_COLOR_GRADING_LUT
+#endif // ENABLE_TONEMAP
 
 	const float3 finalOriginalColor = tonemappedPostProcessedGradedColor; // Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 
@@ -1468,6 +1666,7 @@ PSOutput PS(PSInput psInput)
 	if (SDRTonemapByLuminance)
 	{
 		tonemappedColor = tonemappedByLuminanceColor;
+		// NOTE: we should probably do the same to "tonemappedPostProcessedColor" and "tonemappedPostProcessedGradedColor" if they are used
 	}
 #endif
 
@@ -1481,12 +1680,12 @@ PSOutput PS(PSInput psInput)
 		const float midGrayIn = MidGray;
 		float midGrayOut = midGrayIn;
 
-		float3 inverseTonemappedPostProcessedColor;
-//TODO: rename "minHighlightsColorIn" and "minHighlightsColorOut" to something more generic, as now we have "INVERT_TONEMAP_TYPE" (so it could be highlights or midtones, ...)
+// NOTE: we should rename "minHighlightsColorIn" and "minHighlightsColorOut" to something more generic, as now we have "INVERT_TONEMAP_TYPE" (so it could be highlights or midtones, ...),
+// but it's not really necessary, as this dictates the point where we might start using the HDR tonemapper, which is indeed related to highlights.
 #if INVERT_TONEMAP_TYPE != 1 // invert highlights
 		float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception SDR space
 #else // invert midtones and highlights
-		float minHighlightsColorIn = MaxShadowsColor; // We consider shdadow the first ~33% of perception SDR space
+		float minHighlightsColorIn = MaxShadowsColor; // We consider shadow the first ~33% of perception SDR space
 #endif
 		float minHighlightsColorOut = minHighlightsColorIn;
 #if DEVELOPMENT
@@ -1598,22 +1797,51 @@ PSOutput PS(PSInput psInput)
 		inverseTonemappedColor /= midGrayScale;
 		minHighlightsColorOut  /= midGrayScale;
 
-		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, tonemappedColor, finalOriginalColor, true);
+		float3 inverseTonemappedPostProcessedColor;
+		const bool restorePostProcessForceKeepHue = HDR_POST_PROCESS_TYPE == 1 || HDR_POST_PROCESS_TYPE == 3; // If true, we force keeping the LUT hue to make sure they are always applied "correctly" (this actually can often look worse though)
+#if HDR_POST_PROCESS_TYPE == 0 || HDR_POST_PROCESS_TYPE == 1
+		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, tonemappedColor, finalOriginalColor, restorePostProcessForceKeepHue);
+#else // HDR_POST_PROCESS_TYPE
+
+#if defined(APPLY_CINEMATICS)
+		float prePostProcessColorLuminance;
+		inverseTonemappedPostProcessedColor = lerp(inverseTonemappedColor, PostProcess(inverseTonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
+#else
+		inverseTonemappedPostProcessedColor = inverseTonemappedColor;
+#endif // APPLY_CINEMATICS
+
+		const bool strictLUTApplication = (HDR_POST_PROCESS_TYPE == 5) ? HdrDllPluginConstants.StrictLUTApplication : (HDR_POST_PROCESS_TYPE == 4);
+
+		if (strictLUTApplication)
+		{
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+#if ENABLE_LUT
+			inverseTonemappedPostProcessedColor = GradingLUT(inverseTonemappedPostProcessedColor, psInput.TEXCOORD);
+#endif // ENABLE_LUT
+			inverseTonemappedPostProcessedColor = PostGradingGammaCorrect(inverseTonemappedPostProcessedColor);
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
+		}
+		else
+		{
+			inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedPostProcessedColor, tonemappedPostProcessedColor, finalOriginalColor, restorePostProcessForceKeepHue);
+		}
+
+#endif // HDR_POST_PROCESS_TYPE
 
 #if 0 // Enable this if you want the highlights shoulder start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
 		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, tonemappedColor, finalOriginalColor); // NOTE: this is broken since refactoring the RestorePostProcess() logic
 #endif
 
-		inverseTonemappedPostProcessedColor = apply_user_hdr_postprocess(inverseTonemappedPostProcessedColor);
+		inverseTonemappedPostProcessedColor = UserHDRPostProcess(inverseTonemappedPostProcessedColor);
 
 		inverseTonemappedPostProcessedColor *= paperWhite;
 		minHighlightsColorOut *= paperWhite;
 
 		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
-		// Never compress highlights before the top ~half of the image (the actual ratio is based on a user param), even if it means we have two separate mid tones sections,
+		// Never compress highlights before the top 2/3 of the image (the actual ratio is based on a user param), even if it means we have two separate mid tones sections,
 		// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
-		//TODO: rename the "HdrDllPluginConstants.ToneMapperHighlights" description because here it just drivers the highlights shoulder starting point, not their "strenght"
-		float highlightsShoulderStart = max(maxOutputLuminance * HdrDllPluginConstants.ToneMapperHighlights, minHighlightsColorOut);
+		const float highlightsModulationPow = HdrDllPluginConstants.ToneMapperHighlights >= 0.5f ? linearNormalization(HdrDllPluginConstants.ToneMapperHighlights, 0.5f, 1.f, 1.f / 3.f, 1.f) : linearNormalization(HdrDllPluginConstants.ToneMapperHighlights, 0.0f, 0.5f, 0.f, 1.f / 3.f);
+		float highlightsShoulderStart = max(maxOutputLuminance * highlightsModulationPow, minHighlightsColorOut);
 		highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
 
 		outputColor = DICETonemap(inverseTonemappedPostProcessedColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
@@ -1643,6 +1871,8 @@ PSOutput PS(PSInput psInput)
 #endif // SDR_LINEAR_INTERMEDIARY
 
 #if CLAMP_INPUT_OUTPUT
+		// To keep the UI blending behaviour the same as vanilla SDR, we should clamp the image,
+		// though if we don't, we possibly retain more detail in transparent UI background colors (hopefully nothing will be bright enough to ruin the UI readability).
 		outputColor = saturate(outputColor);
 #endif // CLAMP_INPUT_OUTPUT
 	}

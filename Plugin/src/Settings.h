@@ -37,6 +37,7 @@ namespace Settings
 		kColorGradingStrength,
 		kGammaCorrectionStrength,
 		kVanillaMenuLUTs,
+		kStrictLUTApplication,
 		kFilmGrainType,
 		kFilmGrainCap,
 		kPostSharpen,
@@ -165,6 +166,7 @@ namespace Settings
 		float    Shadows;
 		float    Bloom;
 		float    LUTCorrectionStrength;
+		uint32_t StrictLUTApplication;
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
 		uint32_t FilmGrainType;
@@ -346,6 +348,13 @@ namespace Settings
 			"When enabled, menu LUTs will be unaffected by the \"LUT Correction Strength\" and \"Color Grading Strength\" settings.",
 			"VanillaMenuLUTs", "Main",
 			true
+		};
+		Checkbox StrictLUTApplication{
+			SettingID::kStrictLUTApplication,
+			"Strict LUT Application",
+			"Makes LUTs apply in a way that is more similar to the vanilla SDR look. Leave off for a more HDR look.",
+			"StrictLUTApplication", "HDR",
+			false
 		};
 		EnumStepper  FilmGrainType{
 		    SettingID::kFilmGrainType,
