@@ -1414,24 +1414,43 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	* inputScaling
 	* exposure;
 
-	// TODO: Bring back LUT Extrapolation support (Single-pass)
-	// OpenDRT desaturates low peak nits
-	float3 sdrOutputColor = (HdrDllPluginConstants.ToneMapperType == 1)
-			? aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, ACES_HDR_SDR_NITS * highlightsScaling)
-			: open_drt_transform(toneMapperInput, ReferenceWhiteNits_BT2408 * 40.f, 6.666f, shadowsScaling, highlightsScaling);
-
-	float3 scaledToneMappedColor = (HdrDllPluginConstants.DisplayMode > 0)
-		? (peakNits / ReferenceWhiteNits_BT2408) *
-			((HdrDllPluginConstants.ToneMapperType == 1)
+	// Compute ungraded tone map for exact nits
+	// Boost by peakNits/white to exceed SDR range (when in HDR)
+	float3 displayMatchedColor = (peakNits / ReferenceWhiteNits_BT2408)
+		* ((HdrDllPluginConstants.ToneMapperType == 1)
 			?	aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, yMax * highlightsScaling)
-			: open_drt_transform(toneMapperInput, peakNits * 40.f, 6.666f, shadowsScaling, highlightsScaling))
-		: sdrOutputColor;
+			: open_drt_transform(
+					toneMapperInput,
+					peakNits * 40.f,
+					5.f,
+					shadowsScaling,
+					highlightsScaling
+				)
+			);
 
-#if LUT_EXTRAPOLATION_TYPE > 0
-	outputColor = HdrDllPluginConstants.StrictLUTApplication ? saturate(sdrOutputColor) : scaledToneMappedColor;
-#else
-	outputColor = saturate(sdrOutputColor);
-#endif
+	// Default to single-pass with HDR colors
+	float3 sdrOutputColor = displayMatchedColor;
+	#if LUT_EXTRAPOLATION_TYPE > 0
+		// If LUT extrapolation is available, we can skip an SDR pass,
+		// unless requests strict SDR LUTs
+		if (HdrDllPluginConstants.StrictLUTApplication)
+	#endif
+		{
+		// Already clamped to [0-1]
+		sdrOutputColor = (HdrDllPluginConstants.DisplayMode > 0)
+			? (HdrDllPluginConstants.ToneMapperType == 1)
+				? aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, ACES_HDR_SDR_NITS * highlightsScaling)
+				: open_drt_transform(
+					toneMapperInput,
+					ReferenceWhiteNits_BT2408 * 40.f,
+					5.f,
+					shadowsScaling,
+					highlightsScaling
+				)
+			: sdrOutputColor;
+		}
+
+	outputColor = sdrOutputColor;
 
 	#if defined(APPLY_CINEMATICS)
 	float prePostProcessColorLuminance;
@@ -1450,14 +1469,16 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	#endif
 
 	if (HdrDllPluginConstants.DisplayMode > 0) {
-	#if LUT_EXTRAPOLATION_TYPE <= 0
+	#if LUT_EXTRAPOLATION_TYPE > 0
+		// If LUT extrapolation is available,
+		// but user disabled it, use SDR-based fallback
 		if (HdrDllPluginConstants.StrictLUTApplication)
+	#endif
 		{
-			float hdrY = Luminance(scaledToneMappedColor);
+			float hdrY = Luminance(displayMatchedColor);
 			float sdrY = Luminance(sdrOutputColor);
 			outputColor *= sdrY ? (hdrY / sdrY) : 0.f;
 		}
-	#endif
 		outputColor = UserHDRPostProcess(outputColor);
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
 		outputColor = max(0, BT709_To_WBT2020(outputColor));
