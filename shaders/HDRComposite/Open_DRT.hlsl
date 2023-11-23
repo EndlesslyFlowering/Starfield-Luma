@@ -300,6 +300,8 @@ float3 open_drt_transform(
   // --------------------------------------------------
 
   // Dechroma
+  float vibrancy = 0.20f;
+
   float dch = 0.4f * 0.5f;
 
   // Chroma contrast
@@ -311,7 +313,7 @@ float3 open_drt_transform(
   float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
-  float3 weights = float3(0.25f, 0.45f, 0.3f) * 0.20f;
+  float3 weights = float3(0.25f, 0.45f, 0.3f) * vibrancy;
 
   // Hue Shift RGB controls
   float3 hs = float3(0.3f, -0.1f, -0.5f);
@@ -358,7 +360,7 @@ float3 open_drt_transform(
   // s0 and s are input x scale for middle grey intersection constraint
   // m0 and m are output y scale for peak white intersection constraint
   float s0 = flare(gy, fl, 1);
-  float m0 = flare(py * highlights, fl, 1);
+  float m0 = flare(py * highlights * vibrancy, fl, 1);
   float ip = 1.0f/c;
   float s = (px*gx*(pow(m0, ip) - pow(s0, ip)))/(px*pow(s0, ip) - gx*pow(m0, ip));
   float m = pow(m0, ip)*(s + px)/px;
