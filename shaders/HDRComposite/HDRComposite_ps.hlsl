@@ -505,7 +505,7 @@ float3 DICETonemap(
 	float i1 = 0.5f * PQ_LMS.x + 0.5f * PQ_LMS.y;
 
 	// return untouched Color if no tone mapping is needed
-	if (i1 < ShoulderStartInPq)
+	if (i1 <= ShoulderStartInPq)
 	{
 		return Color;
 	}
@@ -514,7 +514,7 @@ float3 DICETonemap(
 		float i2 = luminanceCompress(i1, TargetCllInPq, ShoulderStartInPq, false, FLT_MAX, HighlightsModulationPow);
 
 		//saturation adjustment to blow out highlights
-		float minI = min((i1 / i2), (i2 / i1));
+		float minI = min(i1 / i2, i2 / i1);
 
 		//to L'M'S'
 		PQ_LMS = ICtCp_to_PQ_LMS(float3(i2,

@@ -68,7 +68,7 @@ float luminanceCompress(float InValue, float OutMaxValue, float ShoulderStart = 
 {
 	const float compressableValue = InValue - ShoulderStart;
 	const float compressableRange = InMaxValue - ShoulderStart;
-	const float compressedRange = OutMaxValue - ShoulderStart;
+	const float compressedRange = max(OutMaxValue - ShoulderStart, FLT_MIN);
 	const float possibleOutValue = ShoulderStart + compressedRange * rangeCompress(compressableValue / compressedRange, considerMaxValue ? (compressableRange / compressedRange) : FLT_MAX, ModulationPow);
 	return InValue <= ShoulderStart ? InValue : possibleOutValue;
 }
