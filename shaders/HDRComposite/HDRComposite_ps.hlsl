@@ -925,23 +925,29 @@ void PostInverseTonemapByChannel(
 	inout float                   InverseTonemappedColorChannel,
 	const SDRTonemapByLuminancePP sPP)
 {
-#if 1 // Directly use the input/source non tonemapped color for comparisons against the highlights, hopefully this won't cause any gradients disconnects
+#if 1 // Directly use the input/source non tonemapped color for comparisons against the highlights
 	const bool isHighlight = InputChannel >= sPP.minHighlightsColorOut;
+	static const float HighlightAlphaBlendMultiplier = 2.5f; // Found empirically, the best balance between fixing "banding" and not having the shift noticeable.
+	const float highlightAlpha = saturate(((InputChannel - sPP.minHighlightsColorOut) / sPP.minHighlightsColorOut) * HighlightAlphaBlendMultiplier);
 #elif 0
 	const bool isHighlight = (sPP.needsInverseTonemap ? InverseTonemappedColorChannel : InputChannel) >= sPP.minHighlightsColorOut;
 #else // The least precise of them all
 	const bool isHighlight = TonemappedChannel >= sPP.minHighlightsColorIn;
 #endif
+	float sourceHighlightInverseTonemappedColorChannel = InverseTonemappedColorChannel;
 	// Restore the SDR tonemapped colors for non highlights,
 	// We scale all non highlights by the scale the smallest (first) highlight would have, so we keep the curves connected
-	if (INVERT_TONEMAP_TYPE > 0 && !isHighlight)
+	if (INVERT_TONEMAP_TYPE > 0)
 	{
-		InverseTonemappedColorChannel = TonemappedChannel * (sPP.minHighlightsColorOut / sPP.minHighlightsColorIn);
+		sourceHighlightInverseTonemappedColorChannel = TonemappedChannel * (sPP.minHighlightsColorOut / sPP.minHighlightsColorIn);
+		if (!isHighlight)
+			InverseTonemappedColorChannel = sourceHighlightInverseTonemappedColorChannel;
 	}
 	// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
-	if (sPP.needsInverseTonemap && isHighlight)
+	if (isHighlight)
 	{
-		InverseTonemappedColorChannel = InputChannel;
+		// Use alpha to smooth any gradient disconnects (not a perfect solution)
+		InverseTonemappedColorChannel = lerp(sourceHighlightInverseTonemappedColorChannel, InputChannel, highlightAlpha);
 	}
 }
 
