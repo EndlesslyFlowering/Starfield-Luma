@@ -224,6 +224,8 @@ namespace SFSE
 			kNoStructs = 1 << 0,
 			// works with the structure layout the game shipped with
 			kInitialLayout = 1 << 1,
+			// works with 1.8.86+ structure layout
+			kStructureIndependence_1_8_86_Layout = 1 << 2,
 			// additional bits will be added here when breaking changes happen
 		};
 
@@ -233,7 +235,7 @@ namespace SFSE
 		constexpr void UsesSigScanning(bool a_value) noexcept { addressIndependence.set(AddressIndependence::kSignatureScanning); }
 		constexpr void UsesAddressLibrary(bool a_value) noexcept { addressIndependence.set(AddressIndependence::kAddressLibrary); }
 		constexpr void HasNoStructUse(bool a_value) noexcept { structureCompatibility.set(StructureIndependence::kNoStructs); }
-		constexpr void IsLayoutDependent(bool a_value) noexcept { structureCompatibility.set(StructureIndependence::kInitialLayout); }
+		constexpr void IsLayoutDependent(bool a_value) noexcept { structureCompatibility.set(StructureIndependence::kStructureIndependence_1_8_86_Layout); }
 		constexpr void CompatibleVersions(std::initializer_list<std::uint32_t> a_versions) noexcept
 		{
 			// must be zero-terminated

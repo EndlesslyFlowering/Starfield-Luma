@@ -13,14 +13,11 @@ DLLEXPORT constinit auto SFSEPlugin_Version = []() noexcept {
 
 	// Address Library v1 (https://www.nexusmods.com/starfield/mods/3256)
 	data.UsesAddressLibrary(true);
-	// Version independent signature scanning
-	//data.UsesSigScanning(true);
 
 	// Uses version specific structure definitions
 	data.IsLayoutDependent(true);
-	//data.HasNoStructUse(true);
 
-	data.CompatibleVersions({ RUNTIME_VERSION_1_7_33 });
+	data.CompatibleVersions({ RUNTIME_VERSION_1_8_86 });
 
 	return data;
 }();
