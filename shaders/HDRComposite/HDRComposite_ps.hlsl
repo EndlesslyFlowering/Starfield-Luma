@@ -1427,8 +1427,8 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 			?	aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, yMax * highlightsScaling)
 			: open_drt_transform(
 					toneMapperInput,
-					peakNits * 40.f,
-					5.f,
+					peakNits,
+					0.f,
 					shadowsScaling,
 					highlightsScaling
 				)
@@ -1448,8 +1448,8 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 				? aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, ACES_HDR_SDR_NITS * highlightsScaling)
 				: open_drt_transform(
 					toneMapperInput,
-					ReferenceWhiteNits_BT2408 * 40.f,
-					5.f,
+					ReferenceWhiteNits_BT2408,
+					0.f,
 					shadowsScaling,
 					highlightsScaling
 				)
@@ -1480,7 +1480,14 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		// but user disabled it, use SDR-based fallback
 		if (!HdrDllPluginConstants.StrictLUTApplication)
 		{
-			outputColor = RestorePostProcess(displayMatchedColor, sdrOutputColor, outputColor);
+			if (HdrDllPluginConstants.ToneMapperType == 1) {
+				outputColor = RestorePostProcess(displayMatchedColor, sdrOutputColor, outputColor);
+			} else {
+				// TODO: RestorePostProcess crushes shadows with OpenDRT
+				float hdrY = Luminance(displayMatchedColor);
+				float sdrY = Luminance(sdrOutputColor);
+				outputColor *= safeDivision(hdrY, sdrY);
+			}
 		}
 	#else
 		float hdrY = Luminance(displayMatchedColor);
@@ -1488,6 +1495,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		outputColor *= safeDivision(hdrY, sdrY);
 	#endif
 		outputColor = UserHDRPostProcess(outputColor);
+		// outputColor = sdrOutputColor; // For debugging
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
 		outputColor = max(0, BT709_To_WBT2020(outputColor));
 	} else {

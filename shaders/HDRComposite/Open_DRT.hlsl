@@ -269,7 +269,10 @@ float3 open_drt_transform(
 
   // Adjust to ACES Shadows
   // rgb += 0.001f;
-  rgb = shd_con(rgb, -1.2f * exp2(shadows), 0.097f * exp2(shadows), 0);
+  if (shadows < 1.f) {
+    rgb += (1.f - shadows) * 0.01f;
+  }
+  rgb = shd_con(rgb, -1.2f * exp2(shadows), 0.002f * pow(10.f, shadows), 0);
 
   // Adjust to ACES Highlights
   rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f, 0);
