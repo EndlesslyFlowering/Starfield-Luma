@@ -273,7 +273,7 @@ namespace Settings
 			"Tone Mapper Type",
 			"Sets the tone mapper type."
 				"\n"
-				"\nVanilla+ uses the original SDR tone mapper with enhancements for HDR support."
+				"\nVanilla+ uses a tonemapper inspired by the original SDR one, with enhancements to support HDR."
 				"\nACES is based on ACES 1.3 and supports variable output (SDR/HDR)."
 				"\nOpenDRT an newer tone mapper that supports variable output (SDR/HDR).",
 			"ToneMapperType", "ToneMapper",
@@ -293,7 +293,7 @@ namespace Settings
 		Slider Shadows{
 			SettingID::kToneMapperShadows,
 			"Shadows",
-			"Sets the shadows strength in the tone mapper.\n\nNeutral default at 50\%.",
+			"Sets the shadows strength in the tone mapper (it might not always apply).\n\nNeutral default at 50\%.",
 			"Shadows", "ToneMapper",
 			50.f,
 			0.f,
@@ -323,7 +323,7 @@ namespace Settings
 		Slider   ColorGradingStrength{
 		    SettingID::kColorGradingStrength,
 		    "Color Grading Strength",
-		    "Sets the color grading strength.\nThis setting influences how much the LUTs influence the final image.",
+		    "Sets the color grading strength.\nThis setting determines how much the LUTs influence the final image.",
 		    "ColorGradingStrength", "Main",
 		    100.f,
 		    0.f,
