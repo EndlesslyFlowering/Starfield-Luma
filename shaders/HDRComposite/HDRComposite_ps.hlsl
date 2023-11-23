@@ -257,18 +257,21 @@ float3 Hable(
 
 	// Note that all these variables can vary depending on the level.
 	// The 2.2 pow is so you don't have to input very small numbers, it's not related to gamma.
-	const float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3
-	float toeStrength      =       saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
+	const float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3, but can also be ~0
+	const float toeStrength      =       saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
 	const float shoulderLength   = clamp(saturate(PerSceneConstants[3267u].y), EPSILON, BTHCNST); // Constant is usually 0.8
 	const float shoulderStrength =            max(PerSceneConstants[3267u].x, 0.f); // Constant is usually 9.9
 	const float shoulderAngle    =       saturate(PerSceneConstants[3267u].z); // Constant is usually 0.3
 
- 	//TODO: expose 0-2.5 range? And implement in SDR ACES og versions
-	toeStrength *= lerp(0.f, 2.5f, HdrDllPluginConstants.ToneMapperShadows);
+	// Decent range found empirically. It's very extensive.
+	static const float HableShadowModulationMax = 10.f;
+	static const float HableShadowModulationMin = 0.f;
+	const float shadowModulation = HdrDllPluginConstants.ToneMapperShadows + 0.5f;
+	const float shadowModulationPow = shadowModulation >= 1.f ? linearNormalization(shadowModulation, 1.0f, 1.5f, 1.f, HableShadowModulationMax) : linearNormalization(shadowModulation, 0.5f, 1.0f, HableShadowModulationMin, 1.f);
 
 	//dstParams
 	float dstParams_x0 = toeLength * 0.5f;
-	float dstParams_y0 = (1.f - toeStrength) * dstParams_x0;
+	float dstParams_y0 = (1.f - pow(toeStrength, shadowModulationPow)) * dstParams_x0;
 
 	float remainingY = 1.f - dstParams_y0;
 
