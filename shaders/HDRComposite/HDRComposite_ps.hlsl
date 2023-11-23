@@ -1326,7 +1326,7 @@ void DrawToneMapperEnd(uint toneMapperY, float valueX, inout float3 outputColor)
 	valueY /= WhiteNits_sRGB;
 	float outputY = Luminance(outputColor);
 	if (HdrDllPluginConstants.DisplayMode > 0) {
-		outputY *= WhiteNits_sRGB / 203.f;
+		outputY *= WhiteNits_sRGB / ReferenceWhiteNits_BT2408;
 	}
 	if (outputY > valueY ) {
 		if (outputY < 0.18f) {
@@ -1418,7 +1418,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	// OpenDRT desaturates low peak nits
 	float3 sdrOutputColor = (HdrDllPluginConstants.ToneMapperType == 1)
 			? aces_odt_tone_map(toneMapperInput * highlightsScaling, yMin, ACES_HDR_SDR_NITS * highlightsScaling)
-			: open_drt_transform(toneMapperInput, 203.f * 40.f, 6.666f, shadowsScaling, highlightsScaling);
+			: open_drt_transform(toneMapperInput, ReferenceWhiteNits_BT2408 * 40.f, 6.666f, shadowsScaling, highlightsScaling);
 
 	float3 scaledToneMappedColor = (HdrDllPluginConstants.DisplayMode > 0)
 		? (peakNits / ReferenceWhiteNits_BT2408) *
@@ -1427,16 +1427,11 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 			: open_drt_transform(toneMapperInput, peakNits * 40.f, 6.666f, shadowsScaling, highlightsScaling))
 		: sdrOutputColor;
 
+#if LUT_EXTRAPOLATION_TYPE > 0
+	outputColor = scaledToneMappedColor;
+#else
 	outputColor = saturate(sdrOutputColor);
-
-	outputColor =
-	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
-		GradingLUT(outputColor, psInput.TEXCOORD);
-	#else
-		outputColor;
-	#endif
-
-	// colorGradedColor = min(1.f, colorGradedColor) * max(1.f, sdrOutputColor);
+#endif
 
 	#if defined(APPLY_CINEMATICS)
 	float prePostProcessColorLuminance;
@@ -1444,17 +1439,23 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	outputColor = lerp(outputColor, PostProcess(outputColor, prePostProcessColorLuminance), PostProcessStrength);
 	#endif
 
+	#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
+	outputColor = GradingLUT(outputColor, psInput.TEXCOORD);
+	#endif
+
+	// colorGradedColor = min(1.f, colorGradedColor) * max(1.f, sdrOutputColor);
+
 	#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 	outputColor = PostGradingGammaCorrect(outputColor);
 	#endif
 
 	if (HdrDllPluginConstants.DisplayMode > 0) {
-	#if 1 || !ENABLE_LUT_EXTRAPOLATION
+	#if LUT_EXTRAPOLATION_TYPE <= 0
 		float hdrY = Luminance(scaledToneMappedColor);
 		float sdrY = Luminance(sdrOutputColor);
 		outputColor *= sdrY ? (hdrY / sdrY) : 0.f;
 	#endif
-		outputColor = apply_user_hdr_postprocess(outputColor);
+		outputColor = UserHDRPostProcess(outputColor);
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
 		outputColor = max(0, BT709_To_WBT2020(outputColor));
 	} else {
