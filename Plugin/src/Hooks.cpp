@@ -46,6 +46,10 @@ namespace Hooks
 		if (const auto secondaryBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryBrightness))) {
 			secondaryBrightnessSetting->m_Enabled.SetValue(!a_bGameRenderingHDREnable);
 		}
+
+		if (const auto strictLUTApplicationSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kStrictLUTApplication))) {
+			strictLUTApplicationSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
+		}
     }
 
     void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
@@ -130,6 +134,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
 		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
+		CreateCheckboxSetting(a_settingList, settings->StrictLUTApplication, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
 		CreateSliderSetting(a_settingList, settings->FilmGrainCap, settings->IsFilmGrainTypeImproved());
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
@@ -424,6 +429,9 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kVanillaMenuLUTs):
 			HandleSetting(settings->VanillaMenuLUTs);
+			break;
+		case static_cast<int>(Settings::SettingID::kStrictLUTApplication):
+			HandleSetting(settings->StrictLUTApplication);
 			break;
 		case static_cast<int>(Settings::SettingID::kPostSharpen):
 			HandleSetting(settings->PostSharpen);

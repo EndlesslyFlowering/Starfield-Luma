@@ -117,6 +117,19 @@ float3 gamma_linear_to_sRGB(float3 Color)
 	              gamma_linear_to_sRGB(Color.b));
 }
 
+// Mirroring negative colors makes this closer to gamma 2.2 and perception space in general,
+// it's sometimes easier to work with these values.
+float3 gamma_linear_to_sRGB_mirrored(float3 Color)
+{
+	return gamma_linear_to_sRGB(abs(Color)) * sign(Color);
+}
+
+template<class T>
+T linear_to_gamma_mirrored(T Color, float Gamma = 2.2f)
+{
+	return pow(abs(Color), 1.f / Gamma) * sign(Color);
+}
+
 float gamma_sRGB_to_linear(float channel)
 {
 	[flatten]
@@ -136,6 +149,17 @@ float3 gamma_sRGB_to_linear(float3 Color)
 	return float3(gamma_sRGB_to_linear(Color.r),
 	              gamma_sRGB_to_linear(Color.g),
 	              gamma_sRGB_to_linear(Color.b));
+}
+
+float3 gamma_sRGB_to_linear_mirrored(float3 Color)
+{
+	return gamma_sRGB_to_linear(abs(Color)) * sign(Color);
+}
+
+template<class T>
+T gamma_to_linear_mirrored(T Color, float Gamma = 2.2f)
+{
+	return pow(abs(Color), Gamma) * sign(Color);
 }
 
 // PQ (Perceptual Quantizer - ST.2084) encode/decode used for HDR10 BT.2100

@@ -202,6 +202,7 @@ namespace Settings
 		a_outShaderConstants.Shadows = static_cast<float>(Shadows.value.get_data() * 0.01f);                              // 0-100 to 0-1
 		a_outShaderConstants.Bloom = static_cast<float>(Bloom.value.get_data() * 0.01f);                              // 0-100 to 0-1
 		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.StrictLUTApplication = static_cast<uint32_t>(StrictLUTApplication.value.get_data());
 		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
 		a_outShaderConstants.GammaCorrectionStrength = static_cast<float>(GammaCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
@@ -256,6 +257,7 @@ namespace Settings
 			config->Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
 			config->Bind(GammaCorrectionStrength.value, GammaCorrectionStrength.defaultValue);
 			config->Bind(VanillaMenuLUTs.value, VanillaMenuLUTs.defaultValue);
+			config->Bind(StrictLUTApplication.value, StrictLUTApplication.defaultValue);
 			config->Bind(FilmGrainType.value, FilmGrainType.defaultValue);
 			config->Bind(FilmGrainCap.value, FilmGrainCap.defaultValue);
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
@@ -447,6 +449,9 @@ namespace Settings
 		DrawReshadeSlider(LUTCorrectionStrength);
 		DrawReshadeSlider(ColorGradingStrength);
 		DrawReshadeCheckbox(VanillaMenuLUTs);
+		if (isGameRenderingSetToHDR) {
+			DrawReshadeCheckbox(StrictLUTApplication);
+		}
 		DrawReshadeEnumStepper(FilmGrainType);
 		if (IsFilmGrainTypeImproved()) {
 			DrawReshadeSlider(FilmGrainCap);

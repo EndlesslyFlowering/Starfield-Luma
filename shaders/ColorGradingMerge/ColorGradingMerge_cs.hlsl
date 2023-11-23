@@ -24,6 +24,7 @@
 // Some of these options make LUTs too bright, and some other crush detail around shadow.
 #if !SDR_USE_GAMMA_2_2 // sRGB->linear->LUT normalization
 	// This assumes the game used the sRGB gamma formula and was meant to be viewed on sRGB gamma displays.
+	// No need to run "gamma_sRGB_to_linear_mirrored()" as there's no HDR source colors in LUTs.
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
 #else
@@ -348,7 +349,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 
 // Convert to sRGB gamma after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
 #if LUT_MAPPING_TYPE == 0
-	mixedLUT = gamma_linear_to_sRGB(mixedLUT);
+	mixedLUT = gamma_linear_to_sRGB_mirrored(mixedLUT);
 #elif LUT_MAPPING_TYPE == 2
 	mixedLUT = oklab_to_linear_srgb(mixedLUT);
 #endif // LUT_MAPPINT_TYPE
