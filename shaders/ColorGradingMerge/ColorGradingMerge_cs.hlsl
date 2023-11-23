@@ -39,12 +39,12 @@
 		// A further correction step will be done after that to acknowledge the gamma mismatch baked into the game look.
 		#if GAMMA_CORRECT_SDR_RANGE_ONLY
 			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(lerp(gamma_linear_to_sRGB(saturate(x)), pow(saturate(x), 1.f / 2.2f), HdrDllPluginConstants.GammaCorrection)) + (x - saturate(x)))
-			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x)))
+			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(saturate(x), 1.f / 2.2f)) + (x - saturate(x))) /*Version without "HdrDllPluginConstants.GammaCorrection"*/
 		#else
 			// NOTE: to somehow conserve some HDR colors and not generate NaNs, we are doing inverse pow as gamma on negative numbers.
 			// Alternatively we could try to do this in BT.2020, so there's no negative colors.
 			#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(lerp(gamma_linear_to_sRGB(abs(x)), pow(abs(x), 1.f / 2.2f), HdrDllPluginConstants.GammaCorrection)) * sign(x))
-			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f)) * sign(x))
+			//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear(pow(abs(x), 1.f / 2.2f)) * sign(x)) /*Version without "HdrDllPluginConstants.GammaCorrection"*/
 		#endif // GAMMA_CORRECT_SDR_RANGE_ONLY
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
@@ -114,12 +114,12 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// the values to 0. This will remove the haze and tint giving a fuller chroma
 	// Sample and hold targetChroma
 
-#if 0 // TODO: Expose or delete
-	//TODO: expose these values or find the best defaults. For now we skip these when "HdrDllPluginConstants.GammaCorrection" is on as it's not necessary
+#if 0
+	// TODO: expose these values or find the best defaults. For now we skip these when "HdrDllPluginConstants.GammaCorrection" is on as it's not necessary
 
 	// An additional tweak on top of "HdrDllPluginConstants.LUTCorrectionStrength"
 	float fixRaisedBlacksStrength = 1.f /*- HdrDllPluginConstants.DevSetting01*/; // Values between 0 and 1
-	//TODO: improve the way "fixRaisedBlacksInputSmoothing" is applied, the curve isn't great now
+	// TODO: improve the way "fixRaisedBlacksInputSmoothing" is applied, the curve isn't great now
 	// Modulates how much we fix the raised blacks based on how raised they were.
 	float fixRaisedBlacksInputSmoothing = lerp(1.f, 1.333f, HdrDllPluginConstants.GammaCorrection); // Values from 1 up, greater is smoother
 	float fixRaisedBlacksOutputSmoothing = lerp(1.f, 0.666f, HdrDllPluginConstants.GammaCorrection); // Values from 0 up, smaller than 1 is smoother

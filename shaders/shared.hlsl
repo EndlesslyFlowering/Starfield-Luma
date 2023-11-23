@@ -24,7 +24,9 @@
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
 // 0) sRGB gamma mapping (Vanilla): it makes any intermediary sampled value (that doesn't exactly fall in the center of LUT texel) affected by gamma, and that's not good.
 // 1) Linear mapping: Makes LUTs sampling work in linear space, which is mathematically correct. This possibly shifts colors a lot, but it's correct, it's also necessary for HDR LUTs to work.
-// 2) OKLAB mapping: Blend in OKLab colorspace before returning as Linear SRGB
+// 2) Linear mapping + OKLAB blending: Blend multiple LUTs (by their respective percentage) in OKLab colorspace before returning as Linear SRGB. Identical to index 1 when there's only one LUT applied.
+// 3) REMOVED: OKLAB mapping: this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black,
+//    the problem with this is that near black blending is very different compared to sRGB gamma or linear, crushing blacks without further adjustments.
 #define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE

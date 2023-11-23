@@ -3,8 +3,9 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-// clamp max brightness to 1.05x of the user chosen peak brightness when not developing
-// so it doesn't overshoot too much
+// clamp max brightness to a percentage of the user chosen peak brightness when not developing
+// so it doesn't overshoot too much (film grain can go beyond the limit). Useful in case the user
+// had set a lower peak than their display supports just because they don't want the game too bright.
 #if !DEVELOPMENT
 	#define PEAK_BRIGHTNESS_THRESHOLD       1.05f
 	#define PEAK_BRIGHTNESS_THRESHOLD_SCRGB (PEAK_BRIGHTNESS_THRESHOLD / WhiteNits_sRGB)

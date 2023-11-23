@@ -188,7 +188,6 @@ float3 Saturation(float3 color, float saturation)
 	return lerp(luminance, color, saturation);
 }
 
-
 //RGB linear BT.709/sRGB -> OKLab's LMS
 static const float3x3 srgb_to_oklms = {
 	0.4122214708f, 0.5363325363f, 0.0514459929f,
@@ -196,7 +195,7 @@ static const float3x3 srgb_to_oklms = {
 	0.0883024619f, 0.2817188376f, 0.6299787005f};
 
 //OKLab's L'M'S' -> OKLab
-static const float3x3 oklms__to_oklab = {
+static const float3x3 oklms_to_oklab = {
 	0.2104542553f,  0.7936177850f, -0.0040720468f,
 	1.9779984951f, -2.4285922050f,  0.4505937099f,
 	0.0259040371f,  0.7827717662f, -0.8086757660f};
@@ -214,7 +213,11 @@ static const float3x3 oklms_to_srgb = {
 	-1.2684380046f,  2.6097574011f, -0.3413193965f,
 	-0.0041960863f, -0.7034186147f,  1.7076147010f};
 
-// sRGB/BT.709
+// (in) sRGB/BT.709
+// (out) OKLab:
+// L – perceived lightness
+// a – how green/red the color is
+// b – how blue/yellow the color is
 float3 linear_srgb_to_oklab(float3 rgb) {
 	float3 lms = mul(srgb_to_oklms, rgb);
 
@@ -223,7 +226,7 @@ float3 linear_srgb_to_oklab(float3 rgb) {
 	//L'M'S'
 	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
 
-	return mul(oklms__to_oklab, lms_);
+	return mul(oklms_to_oklab, lms_);
 }
 
 // sRGB/BT.709
@@ -258,15 +261,21 @@ float3 oklch_to_oklab(float3 lch) {
 	);
 }
 
-float3 oklch_to_linear_srgb(float3 lch) {
-	return oklab_to_linear_srgb(
-			oklch_to_oklab(lch)
-	);
-}
-
+// (in) sRGB/BT.709
+// (out) OKLch:
+// L – perceived lightness (identical to OKLAB)
+// c – chroma (saturation)
+// h – hue
 float3 linear_srgb_to_oklch(float3 rgb) {
 	return oklab_to_oklch(
 		linear_srgb_to_oklab(rgb)
+	);
+}
+
+// sRGB/BT.709
+float3 oklch_to_linear_srgb(float3 lch) {
+	return oklab_to_linear_srgb(
+			oklch_to_oklab(lch)
 	);
 }
 
