@@ -1428,7 +1428,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 		: sdrOutputColor;
 
 #if LUT_EXTRAPOLATION_TYPE > 0
-	outputColor = scaledToneMappedColor;
+	outputColor = HdrDllPluginConstants.StrictLUTApplication ? saturate(sdrOutputColor) : scaledToneMappedColor;
 #else
 	outputColor = saturate(sdrOutputColor);
 #endif
@@ -1451,9 +1451,12 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 
 	if (HdrDllPluginConstants.DisplayMode > 0) {
 	#if LUT_EXTRAPOLATION_TYPE <= 0
-		float hdrY = Luminance(scaledToneMappedColor);
-		float sdrY = Luminance(sdrOutputColor);
-		outputColor *= sdrY ? (hdrY / sdrY) : 0.f;
+		if (HdrDllPluginConstants.StrictLUTApplication)
+		{
+			float hdrY = Luminance(scaledToneMappedColor);
+			float sdrY = Luminance(sdrOutputColor);
+			outputColor *= sdrY ? (hdrY / sdrY) : 0.f;
+		}
 	#endif
 		outputColor = UserHDRPostProcess(outputColor);
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
