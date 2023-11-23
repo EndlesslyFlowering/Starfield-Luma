@@ -23,6 +23,10 @@
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
+// 0 Disabled.
+// 1 "Proper" LUT extrapolation done in conservative ways to determine colors outside of the LUT range as accurately as possible. It might look flat compared to other methods.
+// 2 Fast LUT extrapolation that isn't hue conserving (generally looks good and is fairly accurate).
+// 2 Fast and hue conserving LUT extrapolation approach. It just scales the luminance up (it doesn't work LUTs that invert colors/brightness).
 #define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 // 0 Linear space. Gradients look wrong and there's a lot of invalid colors.
 // 1 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
@@ -1153,6 +1157,8 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	// NOTE: this might slightly shift the output hues from what the LUT dictacted depending on how far the input is from the 0-1 range,
 	// though we generally don't care about it as the positives outweight the negatives (edge cases).
 	LUTColor = RestorePostProcess(unclampedNeutralLUTColor, neutralLUTColor, LUTColor);
+#elif LUT_EXTRAPOLATION_TYPE == 3
+	LUTColor *= safeDivision(Luminance(unclampedNeutralLUTColor), Luminance(neutralLUTColor));
 #endif // LUT_EXTRAPOLATION_TYPE
 
 	return LUTColor;
@@ -1433,7 +1439,7 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	#if LUT_EXTRAPOLATION_TYPE > 0
 		// If LUT extrapolation is available, we can skip an SDR pass,
 		// unless requests strict SDR LUTs
-		if (HdrDllPluginConstants.StrictLUTApplication)
+		if (!HdrDllPluginConstants.StrictLUTApplication)
 	#endif
 		{
 		// Already clamped to [0-1]
@@ -1472,13 +1478,15 @@ PSOutput composite_aces_hdr(PSInput psInput, float3 inputColor) {
 	#if LUT_EXTRAPOLATION_TYPE > 0
 		// If LUT extrapolation is available,
 		// but user disabled it, use SDR-based fallback
-		if (HdrDllPluginConstants.StrictLUTApplication)
-	#endif
+		if (!HdrDllPluginConstants.StrictLUTApplication)
 		{
-			float hdrY = Luminance(displayMatchedColor);
-			float sdrY = Luminance(sdrOutputColor);
-			outputColor *= sdrY ? (hdrY / sdrY) : 0.f;
+			outputColor = RestorePostProcess(displayMatchedColor, sdrOutputColor, outputColor);
 		}
+	#else
+		float hdrY = Luminance(displayMatchedColor);
+		float sdrY = Luminance(sdrOutputColor);
+		outputColor *= safeDivision(hdrY, sdrY);
+	#endif
 		outputColor = UserHDRPostProcess(outputColor);
 		outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
 		outputColor = max(0, BT709_To_WBT2020(outputColor));
