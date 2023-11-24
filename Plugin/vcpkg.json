@@ -4,6 +4,8 @@
     "version-string": "1.0.0",
     "description": "Native code plugin that adds native HDR support and other visual improvements to Starfield",
     "dependencies": [
+        "d3dx12",
+        "directxtex",
         "spdlog",
         "nlohmann-json",
         "simpleini",

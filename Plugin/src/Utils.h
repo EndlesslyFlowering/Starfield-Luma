@@ -23,5 +23,6 @@ namespace Utils
 	bool IsHDRSupported(HWND a_hwnd);
 	bool IsHDREnabled(HWND a_hwnd);
 	bool SetHDREnabled(HWND a_hwnd);
-	
+
+	void TakeScreenshot(bool a_bHDR);
 }

@@ -402,6 +402,8 @@ namespace Settings
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
+		RE::BGSSwapChainObject* GetSwapChainObject() const { return swapChainObject; }
+		ID3D12CommandQueue* GetCommandQueue() const { return commandQueue; }
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
 
@@ -428,6 +430,7 @@ namespace Settings
 		std::atomic_bool bIsHDREnabled = false;
 
 		RE::BGSSwapChainObject* swapChainObject = nullptr;
+		ID3D12CommandQueue*     commandQueue = nullptr;
 
 		bool bReshadeSettingsOverlayRegistered = false;
 

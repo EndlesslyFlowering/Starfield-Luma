@@ -363,7 +363,23 @@ namespace RE
 
 	struct BGSSwapChainObject
 	{
+		/*struct UnkStruct
+		{
+			struct UnkInternalStruct
+			{
+				uint64_t			unk00;
+				uint64_t            unk08;
+				uint64_t            unk10;
+				uint64_t            unk18;
+				uint64_t            unk20;
+				ID3D12CommandQueue* commandQueue;
+			};
+
+		    UnkInternalStruct* unkInternalStruct;
+		};*/
+
 		HWND hwnd;
+		//UnkStruct* unkStruct;  // where'd it go? :(
 		uint32_t bufferCount;
 		uint32_t width;
 		uint32_t height;
