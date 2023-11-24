@@ -41,7 +41,7 @@ To uninstall, clear all the files (they are unique to the mod).
 Dependencies:
 -Starfield Script Extender (SFSE): https://www.nexusmods.com/starfield/mods/106
 -Address Library for SFSE: https://www.nexusmods.com/starfield/mods/3256
--ShaderInjector by Nukem (included in the mod)
+-ShaderInjector by Nukem: https://www.nexusmods.com/starfield/mods/5562
 
 Compatibility:
 This mod should work with any other mod, including DLSS Super Resolution and DLSS Frame Generation (scRGB is NOT supported by FG).
