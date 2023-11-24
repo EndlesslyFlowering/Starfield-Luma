@@ -25,6 +25,10 @@ public:
 	static inline UI** uiPtr = nullptr;
 	static inline tUI_IsMenuOpen UI_IsMenuOpen = nullptr;
 
+	using tToggleMenus = void (*)(void* a1, bool a_bDisable);
+	static inline void** unkToggleMenusPtr = nullptr;
+	static inline tToggleMenus ToggleMenus = nullptr;
+
 	static inline float* g_deltaTimeRealTime = nullptr;
 	static inline uint32_t* g_durationOfApplicationRunTimeMS = nullptr;
 
@@ -49,6 +53,9 @@ public:
 
 		uiPtr = reinterpret_cast<UI**>(dku::Hook::IDToAbs(878339));
 		UI_IsMenuOpen = reinterpret_cast<tUI_IsMenuOpen>(dku::Hook::IDToAbs(187049));
+
+		unkToggleMenusPtr = reinterpret_cast<void**>(dku::Hook::IDToAbs(879521));
+		ToggleMenus = reinterpret_cast<tToggleMenus>(dku::Hook::IDToAbs(187200));
 
 		g_deltaTimeRealTime = reinterpret_cast<float*>(dku::Hook::IDToAbs(871870));
 		g_durationOfApplicationRunTimeMS = reinterpret_cast<uint32_t*>(dku::Hook::IDToAbs(871872));

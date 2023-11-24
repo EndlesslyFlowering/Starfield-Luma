@@ -1,6 +1,10 @@
 #include "Utils.h"
 
 #include "Offsets.h"
+#include "Settings.h"
+
+#include <wincodec.h>
+#include <ScreenGrab/ScreenGrab12.h>
 
 namespace Utils
 {
@@ -341,5 +345,32 @@ namespace Utils
 		}
 
 		return false;
+    }
+
+    void TakeScreenshot(bool a_bHDR)
+    {
+		const auto settings = Settings::Main::GetSingleton();
+		auto       swapChainObject = settings->GetSwapChainObject();
+		if (a_bHDR) {
+			DirectX::SaveWICTextureToFile(
+				settings->GetCommandQueue(), swapChainObject->renderTargets[0],
+				GUID_ContainerFormatWmp, L"screenshot.jxr",
+				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PRESENT, &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
+					PROPBAG2 options[1] = { 0 };
+					options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
+
+					VARIANT varValues[1];
+					varValues[0].vt = VT_BOOL;
+					varValues[0].bVal = VARIANT_TRUE;
+
+					std::ignore = props->Write(1, options, varValues);
+				},
+				true);
+		} else {
+			DirectX::SaveWICTextureToFile(
+				settings->GetCommandQueue(), swapChainObject->renderTargets[0],
+				GUID_ContainerFormatPng, L"screenshot.png",
+				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PRESENT, nullptr, nullptr, true);
+		}
     }
 }

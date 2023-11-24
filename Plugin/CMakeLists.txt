@@ -37,6 +37,7 @@ source_group(
 )
 
 # dependencies
+find_package(directxtex CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_dependency_path(DKUtil include/DKUtil/Logger.hpp)
 find_dependency_path(SFSE sfse/sfse.cpp)
@@ -79,6 +80,7 @@ target_link_libraries(
 	${PROJECT_NAME} 
 	PRIVATE
 		DKUtil::DKUtil
+		Microsoft::DirectXTex
 		sfse::sfse_common
 		spdlog::spdlog
 )

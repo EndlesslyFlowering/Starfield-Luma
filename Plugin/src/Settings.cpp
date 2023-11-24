@@ -46,6 +46,7 @@ namespace Settings
 		// It's not called again when we replace swapchain color space or format ourselves.
 
 		swapChainObject = a_swapChainObject;
+		//commandQueue = a_swapChainObject->unkStruct->unkInternalStruct->commandQueue;
 
 		// check for other plugins being present
 		auto isModuleLoaded = [&](LPCWSTR a_moduleName) {
@@ -138,7 +139,7 @@ namespace Settings
 		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR();
     }
 
-	bool Main::IsFilmGrainTypeImproved() const
+    bool Main::IsFilmGrainTypeImproved() const
 	{
 		return FilmGrainType.value.get_data() == 1;
 	}
