@@ -3,8 +3,8 @@
 #include "Offsets.h"
 #include "Settings.h"
 
+#include <DirectXTex.h>
 #include <wincodec.h>
-#include <ScreenGrab/ScreenGrab12.h>
 
 namespace Utils
 {
@@ -347,30 +347,90 @@ namespace Utils
 		return false;
     }
 
-    void TakeScreenshot(bool a_bHDR)
+	std::string GetPhotoModeScreenshotPath()
     {
-		const auto settings = Settings::Main::GetSingleton();
-		auto       swapChainObject = settings->GetSwapChainObject();
-		if (a_bHDR) {
-			DirectX::SaveWICTextureToFile(
-				settings->GetCommandQueue(), swapChainObject->renderTargets[0],
-				GUID_ContainerFormatWmp, L"screenshot.jxr",
-				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PRESENT, &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
-					PROPBAG2 options[1] = { 0 };
-					options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
-
-					VARIANT varValues[1];
-					varValues[0].vt = VT_BOOL;
-					varValues[0].bVal = VARIANT_TRUE;
-
-					std::ignore = props->Write(1, options, varValues);
-				},
-				true);
-		} else {
-			DirectX::SaveWICTextureToFile(
-				settings->GetCommandQueue(), swapChainObject->renderTargets[0],
-				GUID_ContainerFormatPng, L"screenshot.png",
-				D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PRESENT, nullptr, nullptr, true);
-		}
+		SYSTEMTIME systemTime;
+		GetLocalTime(&systemTime);
+		return std::format("{}{}\\Photo_{}-{:02d}-{:02d}-{:02d}{:02d}{:02d}", Offsets::documentsPath, *Offsets::photosPath, systemTime.wYear, systemTime.wMonth, systemTime.wDay, systemTime.wHour, systemTime.wMinute, systemTime.wSecond);
     }
+
+	void TransformColor_HDR(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t a_y)
+	{
+		const auto  settings = Settings::Main::GetSingleton();
+		const float peakBrightness = settings->PeakBrightness.value.get_data();
+		const float max = peakBrightness * (1.05f / 80.f);
+
+		const DirectX::XMMATRIX c_fromWBT2020toBT2020 = {
+			1.02967584133148193359375f, -0.013273007236421108245849609375f, -0.008765391074120998382568359375f, 0.f,
+			-0.01190710626542568206787109375f, 1.032054901123046875f, -0.008311719633638858795166015625f, 0.f,
+			-0.017768688499927520751953125f, -0.01878183521330356597900390625f, 1.01707708835601806640625f, 0.f,
+			0.f, 0.f, 0.f, 1.f
+		};
+
+		const DirectX::XMMATRIX c_fromBT2020toBT709 = {
+			1.6609637737274169921875f, -0.124477200210094451904296875f, -0.0181571580469608306884765625f, 0.f,
+			-0.58811271190643310546875f, 1.1328194141387939453125f, -0.10066641867160797119140625f, 0.f,
+			-0.072851054370403289794921875f, -0.00834227167069911956787109375f, 1.118823528289794921875f, 0.f,
+			0.f, 0.f, 0.f, 1.f
+		};
+
+		for (size_t i = 0; i < a_width; ++i) {
+			// color.rgb = WBT2020_To_BT2020(color.rgb);
+			a_outPixels[i] = DirectX::XMVector3Transform(a_inPixels[i], c_fromWBT2020toBT2020);
+
+			// color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
+			DirectX::XMFLOAT4 tmp;
+			DirectX::XMStoreFloat4(&tmp, a_outPixels[i]);
+			tmp.x = std::clamp(tmp.x, 0.f, max);
+			tmp.y = std::clamp(tmp.y, 0.f, max);
+			tmp.z = std::clamp(tmp.z, 0.f, max);
+			a_outPixels[i] = DirectX::XMLoadFloat4(&tmp);
+
+			// color.rgb = BT2020_To_BT709(color.rgb);
+			a_outPixels[i] = DirectX::XMVector3Transform(a_outPixels[i], c_fromBT2020toBT709);
+		}
+	}
+
+	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path)
+	{
+		auto path = std::format("{}.png", a_path);
+		auto thumbnailPath = std::format("{}-thumbnail.png", a_path);
+
+		std::wstring widePath = std::wstring(path.begin(), path.end());
+		std::wstring wideThumbnailPath = std::wstring(thumbnailPath.begin(), thumbnailPath.end());
+
+		DirectX::ScratchImage scratchImage;
+		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
+
+		// full photo
+		DirectX::SaveToWICFile(scratchImage.GetImages(), scratchImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, widePath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
+
+		// thumbnail
+		DirectX::ScratchImage resizedImage;
+		DirectX::Resize(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), 640, 360, DirectX::TEX_FILTER_DEFAULT, resizedImage);
+		DirectX::SaveToWICFile(resizedImage.GetImages(), resizedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, wideThumbnailPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
+	}
+
+	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path)
+	{
+		auto path = std::format("{}.jxr", a_path);
+		std::wstring widePath = std::wstring(path.begin(), path.end());
+
+		DirectX::ScratchImage scratchImage;
+		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
+		
+		DirectX::ScratchImage transformedImage;
+		DirectX::TransformImage(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), &TransformColor_HDR, transformedImage);
+
+		DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, widePath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
+			PROPBAG2 options[1] = {};
+			options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
+
+			VARIANT varValues[1] = {};
+			varValues[0].vt = VT_BOOL;
+			varValues[0].bVal = VARIANT_TRUE;
+
+			std::ignore = props->Write(1, options, varValues);
+		});
+	}
 }

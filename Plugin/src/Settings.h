@@ -41,6 +41,7 @@ namespace Settings
 		kFilmGrainType,
 		kFilmGrainCap,
 		kPostSharpen,
+		kHDRScreenshots,
 
 		kEND,
 
@@ -380,6 +381,13 @@ namespace Settings
 			"PostSharpen", "Main",
 			true
 		};
+		Checkbox HDRScreenshots{
+			SettingID::kHDRScreenshots,
+			"HDR Screenshots",
+			"Enable to create HDR .jxr screenshots along with SDR .png in Photo Mode while in HDR.",
+			"HDRScreenshots", "HDR",
+			true
+		};
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", "DevSetting01", "Dev", 0.f, 0.f, 100.f };
 		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", "DevSetting02", "Dev", 0.f, 0.f, 100.f };
 		Slider DevSetting03{ SettingID::kDevSetting03, "DevSetting03", "Development setting", "DevSetting03", "Dev", 0.f, 0.f, 100.f };
@@ -399,11 +407,9 @@ namespace Settings
 		bool IsGameRenderingSetToHDR() const;
 		bool IsFilmGrainTypeImproved() const;
 
-
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
 		RE::BGSSwapChainObject* GetSwapChainObject() const { return swapChainObject; }
-		ID3D12CommandQueue* GetCommandQueue() const { return commandQueue; }
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
 
@@ -420,6 +426,9 @@ namespace Settings
 
 		static void DrawReshadeSettings(reshade::api::effect_runtime*);
 
+		std::atomic_bool bRequestedSDRScreenshot = false;
+		std::atomic_bool bRequestedHDRScreenshot = false;
+
     private:
 		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");
 		TomlConfig asiConfig = COMPILE_PROXY("Luma.toml");
@@ -430,7 +439,6 @@ namespace Settings
 		std::atomic_bool bIsHDREnabled = false;
 
 		RE::BGSSwapChainObject* swapChainObject = nullptr;
-		ID3D12CommandQueue*     commandQueue = nullptr;
 
 		bool bReshadeSettingsOverlayRegistered = false;
 

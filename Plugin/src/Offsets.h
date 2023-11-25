@@ -32,7 +32,9 @@ public:
 	static inline float* g_deltaTimeRealTime = nullptr;
 	static inline uint32_t* g_durationOfApplicationRunTimeMS = nullptr;
 
-	//test
+	static inline const char* documentsPath = nullptr;
+	static inline const char** photosPath = nullptr;
+
 	static inline uintptr_t* unkToggleVsyncArg1Ptr = nullptr;
 	using tToggleVsync = void (*)(void* a1, bool a_bEnable);
 	static inline tToggleVsync ToggleVsync = nullptr;
@@ -59,5 +61,8 @@ public:
 
 		g_deltaTimeRealTime = reinterpret_cast<float*>(dku::Hook::IDToAbs(871870));
 		g_durationOfApplicationRunTimeMS = reinterpret_cast<uint32_t*>(dku::Hook::IDToAbs(871872));
+
+		documentsPath = reinterpret_cast<const char*>(dku::Hook::IDToAbs(886315));
+		photosPath = reinterpret_cast<const char**>(dku::Hook::IDToAbs(778159));
 	}
 };
