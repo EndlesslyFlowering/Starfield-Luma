@@ -24,5 +24,7 @@ namespace Utils
 	bool IsHDREnabled(HWND a_hwnd);
 	bool SetHDREnabled(HWND a_hwnd);
 
-	void TakeScreenshot(bool a_bHDR);
+	std::string GetPhotoModeScreenshotPath();
+	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path);
+	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path);
 }

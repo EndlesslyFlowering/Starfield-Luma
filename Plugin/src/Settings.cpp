@@ -125,7 +125,7 @@ namespace Settings
     bool Main::IsSDRForcedOnHDR() const
     {
 		// The game will tonemap to SDR if this is true
-		return ForceSDROnHDR.value.get_data();
+		return ForceSDROnHDR.value.get_data() || (!bRequestedHDRScreenshot && bRequestedSDRScreenshot);
     }
 
     bool Main::IsDisplayModeSetToHDR() const
@@ -262,6 +262,7 @@ namespace Settings
 			config->Bind(FilmGrainType.value, FilmGrainType.defaultValue);
 			config->Bind(FilmGrainCap.value, FilmGrainCap.defaultValue);
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
+			config->Bind(HDRScreenshots.value, HDRScreenshots.defaultValue);
 			config->Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config->Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config->Bind(DevSetting03.value, DevSetting03.defaultValue);
@@ -458,6 +459,7 @@ namespace Settings
 			DrawReshadeSlider(FilmGrainCap);
 		}
 		DrawReshadeCheckbox(PostSharpen);
+		DrawReshadeCheckbox(HDRScreenshots);
 
 #if DEVELOPMENT
 		DrawReshadeSlider(DevSetting01);

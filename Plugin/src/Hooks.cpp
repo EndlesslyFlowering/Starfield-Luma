@@ -1,10 +1,8 @@
 #include <wincodec.h>
-#include <ScreenGrab/ScreenGrab12.h>
 
 #include "Hooks.h"
 #include "Offsets.h"
 #include "Utils.h"
-#include "reshade/reshade.hpp"
 
 namespace Hooks
 {
@@ -145,16 +143,10 @@ namespace Hooks
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
 
-	std::atomic_bool                                          ScreenshotRequested = false;
-	std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES)> ScreenshotCallback;
+	static std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES, std::string_view)> ScreenshotCallback;
+	static std::string screenshotPath;
 
-	void RequestScreenshot(std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES)> a_callback)
-	{
-		ScreenshotCallback = std::move(a_callback); // not thread-safe
-		ScreenshotRequested.store(true);
-	}
-
-	void CheckForScreenshotRequest(ID3D12Device2* a_device, ID3D12CommandQueue* a_queue, ID3D12GraphicsCommandList* a_commandList, ID3D12Resource* a_sourceTexture)
+	bool CheckForScreenshotRequest(ID3D12Device2* a_device, ID3D12CommandQueue* a_queue, ID3D12GraphicsCommandList* a_commandList, ID3D12Resource* a_sourceTexture)
 	{
 		static uint64_t        currentFrameCounter = 0;
 		static uint64_t        lastGpuCaptureFrameIndex = 0;
@@ -162,8 +154,15 @@ namespace Hooks
 
 		currentFrameCounter++;
 
+		const auto settings = Settings::Main::GetSingleton();
+		if (!ScreenshotCallback && settings->bRequestedHDRScreenshot) {
+			ScreenshotCallback = &Utils::TakeHDRPhotoModeScreenshot;
+		} else if (!ScreenshotCallback && settings->bRequestedSDRScreenshot) {
+			ScreenshotCallback = &Utils::TakeSDRPhotoModeScreenshot;
+		}
+
 		// Capture texture data on the GPU side initially
-		if (ScreenshotRequested.exchange(false) && !temporaryStagingTexture) {
+		if (ScreenshotCallback && !temporaryStagingTexture) {
 			auto textureDesc = a_sourceTexture->GetDesc();
 
 			if (textureDesc.Format == DXGI_FORMAT_R10G10B10A2_TYPELESS) {
@@ -207,7 +206,7 @@ namespace Hooks
 		// Allow eight frames to pass before attempting a CPU readback. Ideally a fence would be issued on the
 		// command queue, but that's not possible without a lot of reverse engineering work.
 		if (lastGpuCaptureFrameIndex != 0 && (currentFrameCounter - lastGpuCaptureFrameIndex) >= 8) {
-			ScreenshotCallback(a_queue, temporaryStagingTexture, D3D12_RESOURCE_STATE_COPY_DEST);
+			ScreenshotCallback(a_queue, temporaryStagingTexture, D3D12_RESOURCE_STATE_COPY_DEST, screenshotPath);
 			ScreenshotCallback = nullptr;
 
 			if (temporaryStagingTexture) {
@@ -216,7 +215,11 @@ namespace Hooks
 			}
 
 			lastGpuCaptureFrameIndex = 0;
+
+			return true;
 		}
+
+		return false;
 	}
 
 	struct DescriptorAllocation
@@ -289,7 +292,7 @@ namespace Hooks
 		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(207691));
 
 		// This seems to be the best place to shove our screenshot code in. It's not worth adding new hooks.
-		CheckForScreenshotRequest(device, getCommandQueue(), commandList, ScaleformCompositeRenderTarget->m_Resource);
+		bool bScreenshotMade = CheckForScreenshotRequest(device, getCommandQueue(), commandList, ScaleformCompositeRenderTarget->m_Resource);
 
 		if (Hook_ApplyRenderPassRenderState1(a_arg1, a_arg2)) {
 			// Remove all render targets; we're treating this pixel shader as a compute shader. All RT writes end
@@ -324,6 +327,13 @@ namespace Hooks
 			commandList->DrawInstanced(a_vertexCount, 1, 0, 0);
 			std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
 			commandList->ResourceBarrier(1, &barrier);
+		}
+
+		if (bScreenshotMade) {
+			const auto settings = Settings::Main::GetSingleton();
+			if (!settings->bRequestedHDRScreenshot.exchange(false)) {
+				settings->bRequestedSDRScreenshot.exchange(false);
+			}
 		}
 	}
 
@@ -431,6 +441,8 @@ namespace Hooks
 		}
     }
 
+    
+
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
 		const auto settings = Settings::Main::GetSingleton();
@@ -446,33 +458,18 @@ namespace Hooks
     bool Hooks::Hook_TakeSnapshot(uintptr_t a1)
     {
 		const auto settings = Settings::Main::GetSingleton();
-		//if (settings->IsDisplayModeSetToHDR()) {
-		if (true) {  // actually it's always going to be the case because we're always going to update the image space buffer format
-			RequestScreenshot([](auto a_queue, auto a_resource, auto a_state) {
-				DirectX::SaveWICTextureToFile(
-					a_queue, a_resource,
-					GUID_ContainerFormatWmp, L"screenshot.jxr",
-					a_state, a_state, &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
-						PROPBAG2 options[1] = {};
-						options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
-
-						VARIANT varValues[1] = {};
-						varValues[0].vt = VT_BOOL;
-						varValues[0].bVal = VARIANT_TRUE;
-
-						std::ignore = props->Write(1, options, varValues);
-					},
-					true);
-			});
-
-			// hack to refresh the UI visibility after the snapshot
-			Offsets::PhotoMode_ToggleUI(a1 + 0x8);
-			Offsets::PhotoMode_ToggleUI(a1 + 0x8);
-
-			return true;
+		screenshotPath = Utils::GetPhotoModeScreenshotPath();
+		if (settings->IsDisplayModeSetToHDR() && *settings->HDRScreenshots.value) {
+			settings->bRequestedHDRScreenshot.store(true);
 		}
-		
-        return _TakeSnapshot(a1);
+		settings->bRequestedSDRScreenshot.store(true);
+
+		// hack to refresh the UI visibility after the snapshot
+		Offsets::PhotoMode_ToggleUI(a1 + 0x8);
+		Offsets::PhotoMode_ToggleUI(a1 + 0x8);
+
+		return true;
+        //return _TakeSnapshot(a1);
     }
 
     void Hooks::Hook_RecreateSwapchain(void* a1, RE::BGSSwapChainObject* a_bgsSwapChainObject, uint32_t a_width, uint32_t a_height, uint8_t a5)
