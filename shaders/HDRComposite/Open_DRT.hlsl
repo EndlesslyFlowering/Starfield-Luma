@@ -303,9 +303,9 @@ float3 open_drt_transform(
   // --------------------------------------------------
 
   // Dechroma
-  float vibrancy = 0.20f;
+  float vibrancy = 0.4f;
 
-  float dch = 0.4f * 0.5f;
+  float dch = 0.4f;
 
   // Chroma contrast
   float chc_p = 1.2f * saturation; // amount of contrast
@@ -316,10 +316,19 @@ float3 open_drt_transform(
   float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
-  float3 weights = float3(0.25f, 0.45f, 0.3f) * vibrancy;
+  
+  float3 weights = float3(
+    0.05f, // 0.25
+    0.77f, // 0.45
+    0.18f  // 0.30
+  ) * vibrancy;
 
   // Hue Shift RGB controls
-  float3 hs = float3(0.3f, -0.1f, -0.5f);
+  float3 hs = float3(
+    0.4f,  // 0.3f
+    -0.2f, // -0.1f
+    -0.4f  // -0.5f
+  );
   
   /* Tonescale Parameters 
       ----------------------
