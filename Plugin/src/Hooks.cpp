@@ -1,3 +1,6 @@
+#include <wincodec.h>
+#include <ScreenGrab/ScreenGrab12.h>
+
 #include "Hooks.h"
 #include "Offsets.h"
 #include "Utils.h"
@@ -142,6 +145,80 @@ namespace Hooks
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
 
+	std::atomic_bool                                          ScreenshotRequested = false;
+	std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES)> ScreenshotCallback;
+
+	void RequestScreenshot(std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES)> a_callback)
+	{
+		ScreenshotCallback = std::move(a_callback); // not thread-safe
+		ScreenshotRequested.store(true);
+	}
+
+	void CheckForScreenshotRequest(ID3D12Device2* a_device, ID3D12CommandQueue* a_queue, ID3D12GraphicsCommandList* a_commandList, ID3D12Resource* a_sourceTexture)
+	{
+		static uint64_t        currentFrameCounter = 0;
+		static uint64_t        lastGpuCaptureFrameIndex = 0;
+		static ID3D12Resource* temporaryStagingTexture = nullptr;
+
+		currentFrameCounter++;
+
+		// Capture texture data on the GPU side initially
+		if (ScreenshotRequested.exchange(false) && !temporaryStagingTexture) {
+			auto textureDesc = a_sourceTexture->GetDesc();
+
+			if (textureDesc.Format == DXGI_FORMAT_R10G10B10A2_TYPELESS) {
+				textureDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
+			}
+			else if (textureDesc.Format == DXGI_FORMAT_R16G16B16A16_TYPELESS) {
+				textureDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			}
+
+			const D3D12_HEAP_PROPERTIES heapProperties = {
+				.Type = D3D12_HEAP_TYPE_DEFAULT,
+				.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+				.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
+			};
+
+			if (SUCCEEDED(a_device->CreateCommittedResource(
+					&heapProperties,
+					D3D12_HEAP_FLAG_NONE,
+					&textureDesc,
+					D3D12_RESOURCE_STATE_COPY_DEST,
+					nullptr,
+					IID_PPV_ARGS(&temporaryStagingTexture)))) {
+				// We're assuming the input is always a render target
+				D3D12_RESOURCE_BARRIER barrier = {};
+				barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+				barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+				barrier.Transition.pResource = a_sourceTexture;
+				barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+				barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+				barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+
+				a_commandList->ResourceBarrier(1, &barrier);
+				a_commandList->CopyResource(temporaryStagingTexture, a_sourceTexture);
+				std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+				a_commandList->ResourceBarrier(1, &barrier);
+			}
+
+			lastGpuCaptureFrameIndex = currentFrameCounter;
+		}
+
+		// Allow eight frames to pass before attempting a CPU readback. Ideally a fence would be issued on the
+		// command queue, but that's not possible without a lot of reverse engineering work.
+		if (lastGpuCaptureFrameIndex != 0 && (currentFrameCounter - lastGpuCaptureFrameIndex) >= 8) {
+			ScreenshotCallback(a_queue, temporaryStagingTexture, D3D12_RESOURCE_STATE_COPY_DEST);
+			ScreenshotCallback = nullptr;
+
+			if (temporaryStagingTexture) {
+				temporaryStagingTexture->Release();
+				temporaryStagingTexture = nullptr;
+			}
+
+			lastGpuCaptureFrameIndex = 0;
+		}
+	}
+
 	struct DescriptorAllocation
 	{
 		enum class Type : uint8_t
@@ -191,8 +268,16 @@ namespace Hooks
 
 		auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_arg1) + 0x10);
 
-		auto unknown1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x8);
-		auto descriptorManager = *reinterpret_cast<void**>(unknown1 + 0x18);
+		auto getDescriptorManager = [&]() {
+			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x8);
+			return *reinterpret_cast<void**>(v1 + 0x18);
+		};
+
+		auto getCommandQueue = [&]() {
+			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x8);
+			const auto v2 = *reinterpret_cast<uintptr_t*>(v1 + 0x10);
+			return *reinterpret_cast<ID3D12CommandQueue**>(v2 + 0x28);
+		};
 
 		auto getBoundShaderResource = [&](uint32_t a_index) {
 			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg2) + 0x30);
@@ -202,6 +287,9 @@ namespace Hooks
 
 		using AllocateDescriptors_t = void (*)(void*, DescriptorAllocation&, uint32_t, DescriptorAllocation::Type, uint32_t&);
 		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(207691));
+
+		// This seems to be the best place to shove our screenshot code in. It's not worth adding new hooks.
+		CheckForScreenshotRequest(device, getCommandQueue(), commandList, ScaleformCompositeRenderTarget->m_Resource);
 
 		if (Hook_ApplyRenderPassRenderState1(a_arg1, a_arg2)) {
 			// Remove all render targets; we're treating this pixel shader as a compute shader. All RT writes end
@@ -215,7 +303,7 @@ namespace Hooks
 			// UAVs that can be modified in-place.
 			DescriptorAllocation alloc;
 			uint32_t             handleSizeIncrement;
-			allocateDescriptors(descriptorManager, alloc, 2, DescriptorAllocation::Type::CbvSrvUav, handleSizeIncrement);
+			allocateDescriptors(getDescriptorManager(), alloc, 2, DescriptorAllocation::Type::CbvSrvUav, handleSizeIncrement);
 
 			alloc.CpuHandleBase.ptr += (0 * handleSizeIncrement);
 			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, getBoundShaderResource(0)->m_CpuDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -360,9 +448,22 @@ namespace Hooks
 		const auto settings = Settings::Main::GetSingleton();
 		//if (settings->IsDisplayModeSetToHDR()) {
 		if (true) {  // actually it's always going to be the case because we're always going to update the image space buffer format
-			auto  hack = alloca(sizeof(RE::MessageBoxData));
-			auto& message = *(new (hack) RE::MessageBoxData("Photo Mode", "Taking screenshots with Photo Mode is not supported with Starfield Luma. Use an external tool (e.g. Xbox Game Bar) to take a screenshot.", nullptr, 0));
-			Offsets::ShowMessageBox(*Offsets::MessageMenuManagerPtr, message, false);
+			RequestScreenshot([](auto a_queue, auto a_resource, auto a_state) {
+				DirectX::SaveWICTextureToFile(
+					a_queue, a_resource,
+					GUID_ContainerFormatWmp, L"screenshot.jxr",
+					a_state, a_state, &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
+						PROPBAG2 options[1] = {};
+						options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
+
+						VARIANT varValues[1] = {};
+						varValues[0].vt = VT_BOOL;
+						varValues[0].bVal = VARIANT_TRUE;
+
+						std::ignore = props->Write(1, options, varValues);
+					},
+					true);
+			});
 
 			// hack to refresh the UI visibility after the snapshot
 			Offsets::PhotoMode_ToggleUI(a1 + 0x8);
