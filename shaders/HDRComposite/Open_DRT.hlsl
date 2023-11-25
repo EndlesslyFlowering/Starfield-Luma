@@ -267,6 +267,9 @@ float3 open_drt_transform(
   )
 {
 
+  // More visibility in shadows
+  rgb = shd_con(rgb, 0.35f, 0.35f, 0);
+
   // Adjust to ACES Shadows
   // rgb += 0.001f;
   if (shadows < 1.f) {
@@ -372,7 +375,7 @@ float3 open_drt_transform(
   // s0 and s are input x scale for middle grey intersection constraint
   // m0 and m are output y scale for peak white intersection constraint
   float s0 = flare(gy, fl, 1);
-  float m0 = flare(py * highlights * vibrancy, fl, 1);
+  float m0 = flare(py * highlights * 0.45f, fl, 1);
   float ip = 1.0f/c;
   float s = (px*gx*(pow(m0, ip) - pow(s0, ip)))/(px*pow(s0, ip) - gx*pow(m0, ip));
   float m = pow(m0, ip)*(s + px)/px;
