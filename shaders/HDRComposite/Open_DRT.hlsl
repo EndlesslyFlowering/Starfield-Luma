@@ -379,9 +379,9 @@ float3 open_drt_transform(
 
   // Hue Shift RGB controls
   float3 hs = float3(
-    0.3f,   // 0.3f
-    -0.25f, // -0.1f
-    -0.40f  // -0.5f
+    0.3f,  // 0.3f
+    1.4f,  // -0.1f
+    -0.30f // -0.5f
   );
   
   /* Tonescale Parameters 
