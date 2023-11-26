@@ -54,21 +54,21 @@ float3 narrow_hue_angles(float3 v) {
     min(2.0f, max(0.0f, v.z - (v.x + v.y))));
 }
 
-float tonescale(float x, float m, float s, float c, int invert) {
-  if (invert == 0) {
-    return spowf(m*x/(x + s), c);
-  } else {
-    float ip = 1.0f/c;
-    return spowf(s*x, ip)/(m - spowf(x, ip));
-  }
+float tonescale(float x, float m, float s, float c) {
+  return spowf(m*x/(x + s), c);
 }
 
-float flare(float x, float fl, int invert) {
-  if (invert == 0) {
-    return spowf(x, 2.0f)/(x+fl);
-  } else {
-    return (x + sqrt(x*(4.0f*fl + x)))/2.0f;
-  }
+float tonescale_invert(float x, float m, float s, float c) {
+  float ip = 1.0f/c;
+  return spowf(s*x, ip)/(m - spowf(x, ip));
+}
+
+float flare(float x, float fl) {
+  return spowf(x, 2.0f)/(x+fl);
+}
+
+float flare_invert(float x, float fl) {
+  return (x + sqrt(x*(4.0f*fl + x)))/2.0f;
 }
 
 // https://www.desmos.com/calculator/gfubm2kvlu
@@ -88,7 +88,7 @@ float powerptoe(float x, float p, float m, float t0) {
     https://www.desmos.com/calculator/ubgteikoke
     https://colab.research.google.com/drive/1JT_-S96RZyfHPkZ620QUPIRfxmS_rKlx
 */
-float3 shd_con(float3 rgb, float ex, float str, int invert) {
+float3 shd_con(float3 rgb, float ex, float str) {
   // Parameter setup
   const float m = pow(2.0f, ex);
   const float w = pow(str, 3.0f);
@@ -96,16 +96,67 @@ float3 shd_con(float3 rgb, float ex, float str, int invert) {
   float n = max(rgb.x, max(rgb.y, rgb.z));
   float n2 = n*n;
   float s;
-  if (invert == 0) {
-    s = (n2 + m*w)/(n2 + w); // Implicit divide by n
-  } else {
-    float p0 = n2 - 3.0f*m*w;
-    float p1 = 2.0f*n2 + 27.0f*w - 9.0f*m*w;
-    float p2 = pow(sqrt(n2*p1*p1 - 4*p0*p0*p0)/2.0f + n*p1/2.0f,1.0f/3.0f);
-    s = (p0/(3.0f*p2) + p2/3.0f + n/3.0f) / n;
-  }
+  s = (n2 + m*w)/(n2 + w); // Implicit divide by n
   rgb *= s;
   return rgb;
+}
+
+float3 shd_con_invert(float3 rgb, float ex, float str) {
+  // Parameter setup
+  const float m = pow(2.0f, ex);
+  const float w = pow(str, 3.0f);
+
+  float n = max(rgb.x, max(rgb.y, rgb.z));
+  float n2 = n*n;
+  float s;
+  float p0 = n2 - 3.0f*m*w;
+  float p1 = 2.0f*n2 + 27.0f*w - 9.0f*m*w;
+  float p2 = pow(sqrt(n2*p1*p1 - 4*p0*p0*p0)/2.0f + n*p1/2.0f,1.0f/3.0f);
+  s = (p0/(3.0f*p2) + p2/3.0f + n/3.0f) / n;
+  rgb *= s;
+  return rgb;
+}
+
+/* Highlight Contrast
+    Invertible quadratic highlight contrast function. Same as ex_high without lin ext
+    https://www.desmos.com/calculator/p7j4udnwkm
+*/
+float3 hl_con(float3 rgb, float ex, float th) {
+  // Parameter setup
+  float p = pow(2.0f, -ex);
+  float t0 = 0.18f*pow(2.0f, th);
+  float a = pow(t0, 1.0f - p)/p;
+  float b = t0*(1.0f - 1.0f/p);
+
+  float n = max(rgb.x, max(rgb.y, rgb.z));
+  float s;
+  if (n == 0.0f || n < t0) {
+    s = 1.0f;
+  } else {
+    s = pow((n - b)/a, 1.0f/p)/n;
+  }
+  return rgb * s;
+}
+
+/* Highlight Contrast
+    Invertible quadratic highlight contrast function. Same as ex_high without lin ext
+    https://www.desmos.com/calculator/p7j4udnwkm
+*/
+float3 hl_con_invert(float3 rgb, float ex, float th) {
+  // Parameter setup
+  float p = pow(2.0f, -ex);
+  float t0 = 0.18f*pow(2.0f, th);
+  float a = pow(t0, 1.0f - p)/p;
+  float b = t0*(1.0f - 1.0f/p);
+
+  float n = max(rgb.x, max(rgb.y, rgb.z));
+  float s;
+  if (n == 0.0f || n < t0) {
+    s = 1.0f;
+  } else {
+    s = (a*pow(n, p) + b)/n;
+  }
+  return rgb * s;
 }
 
 float3 zone_extract(float3 input, float3 rgb, float zp, int zr) {
@@ -118,7 +169,7 @@ float3 zone_extract(float3 input, float3 rgb, float zp, int zr) {
   return input * (1.0f - f) + rgb * f;
 }
 
-float3 ex_high(float3 rgb, float ex, float pv, float fa, int inv) {
+float3 ex_high(float3 rgb, float ex, float pv, float fa) {
   // Zoned highlight exposure with falloff : https://www.desmos.com/calculator/ylq5yvkhoq
 
   // Parameter setup
@@ -134,10 +185,27 @@ float3 ex_high(float3 rgb, float ex, float pv, float fa, int inv) {
   // Calculate scale factor for rgb
   float n = max(rgb.x, max(rgb.y, rgb.z));
   float s;
-  if (inv == 1)
-    s = n < t0 ? 1.0f : n > y1 ? ((m * x1 - y1 + n) / m) / n : pow((n - b) / a, 1.0f / p) / n;
-  else
-    s = n < t0 ? 1.0f : n > x1 ? (m * (n - x1) + y1) / n : (a * pow(n, p) + b) / n;
+  s = n < t0 ? 1.0f : n > x1 ? (m * (n - x1) + y1) / n : (a * pow(n, p) + b) / n;
+  return rgb * s;
+}
+
+float3 ex_high_invert(float3 rgb, float ex, float pv, float fa) {
+  // Zoned highlight exposure with falloff : https://www.desmos.com/calculator/ylq5yvkhoq
+
+  // Parameter setup
+  const float f = 5.0f * pow(fa, 1.6f) + 1.0f;
+  const float p = abs(ex + f) < 1e-8f ? 1e-8f : (ex + f) / f;
+  const float m = pow(2.0f, ex);
+  const float t0 = 0.18f * pow(2.0f, pv);
+  const float a = pow(t0, 1.0f - p) / p;
+  const float b = t0 * (1.0f - 1.0f / p);
+  const float x1 = t0 * pow(2.0f, f);
+  const float y1 = a * pow(x1, p) + b;
+
+  // Calculate scale factor for rgb
+  float n = max(rgb.x, max(rgb.y, rgb.z));
+  float s;
+  s = n < t0 ? 1.0f : n > y1 ? ((m * x1 - y1 + n) / m) / n : pow((n - b) / a, 1.0f / p) / n;
   return rgb * s;
 }
 
@@ -268,37 +336,19 @@ float3 open_drt_transform(
 {
 
   // More visibility in shadows
-  rgb = shd_con(rgb, 0.35f, 0.35f, 0);
+  rgb = shd_con(rgb, 0.35f * lerp(4.f, -4.f, shadows / 2.f), 0.35f);
 
   // Adjust to ACES Shadows
-  // rgb += 0.001f;
-  if (shadows < 1.f) {
-    rgb += (1.f - shadows) * 0.01f;
-  }
-  rgb = shd_con(rgb, -1.2f * exp2(shadows), 0.002f * pow(10.f, shadows), 0);
+  rgb += 0.001f;
+  rgb = shd_con(rgb, -1.2f, 0.097f);
 
   // Adjust to ACES Highlights
-  rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f, 0);
-  rgb = ex_high(rgb, 0.5f, -3.0f, 0.5f, 0);
-  rgb = ex_high(rgb, 0.924f, -1.0f, 0.5f, 0);
-  rgb = ex_high(rgb, -0.15f, 2.68f, 0.19f, 0);
-  // orange highlights hueshift to magenta (only with high vibrancy)
-  // rgb = rgb; = n6_hueshift(rgb = rgb;,
-  //   0, // red
-  //   0, // yellow
-  //   0, // magenta
-  //   0, // blue
-  //   0, // cyan
-  //   0, // green
-  //   20.f, // custom strength
-  //   0.31f * 360.f, // custom hue
-  //   0.09f, // custom width
-  //   0.0015f, // strength
-  //   0.25f, // chroma limit
-  //   1.f, // zone extract?
-  //   2.16f, // zone range [-4,4]
-  //   1.f // low/high?
-  // );
+  rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f);
+  rgb = ex_high(rgb, 0.5f, -3.0f, 0.5f);
+  rgb = ex_high(rgb, 0.924f, -1.0f, 0.5f);
+  rgb = ex_high(rgb, -0.15f, 2.68f, 0.19f);
+
+  rgb = hl_con(rgb, highlights - 1.f, 203.f / 100.f);
 
   
   // **************************************************
@@ -306,12 +356,11 @@ float3 open_drt_transform(
   // --------------------------------------------------
 
   // Dechroma
-  float vibrancy = 0.4f;
 
   float dch = 0.4f;
 
   // Chroma contrast
-  float chc_p = 1.2f * saturation; // amount of contrast
+  float chc_p = 1.2f; // amount of contrast
   float chc_m = 0.5f; // pivot of contrast curve
 
   // Tonescale parameters
@@ -321,16 +370,18 @@ float3 open_drt_transform(
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
   float3 weights = float3(
-    0.05f, // 0.25
-    0.77f, // 0.45
-    0.18f  // 0.30
-  ) * vibrancy;
+    0.001f, // 0.25
+    0.359f, // 0.45
+    0.11f   // 0.30
+  );
+
+  float vibrancy = weights.r + weights.g + weights.b;
 
   // Hue Shift RGB controls
   float3 hs = float3(
-    0.4f,  // 0.3f
-    -0.2f, // -0.1f
-    -0.4f  // -0.5f
+    0.3f,   // 0.3f
+    -0.25f, // -0.1f
+    -0.40f  // -0.5f
   );
   
   /* Tonescale Parameters 
@@ -367,15 +418,15 @@ float3 open_drt_transform(
   // input scene-linear peak x intercept
   float px = 256.0*log(Lp)/log(100.0) - 128.0f;
   // output display-linear peak y intercept
-  float py = Lp/100.0f;
+  float py = vibrancy * Lp/100.0f;
   // input scene-linear middle grey x intercept
   float gx = 0.18f;
   // output display-linear middle grey y intercept
   float gy = 11.696f/100.0f*(1.0f + gb*log(py)/log(2.0f));
   // s0 and s are input x scale for middle grey intersection constraint
   // m0 and m are output y scale for peak white intersection constraint
-  float s0 = flare(gy, fl, 1);
-  float m0 = flare(py * highlights * 0.45f, fl, 1);
+  float s0 = flare_invert(gy, fl);
+  float m0 = flare_invert(py, fl);
   float ip = 1.0f/c;
   float s = (px*gx*(pow(m0, ip) - pow(s0, ip)))/(px*pow(s0, ip) - gx*pow(m0, ip));
   float m = pow(m0, ip)*(s + px)/px;
@@ -400,8 +451,8 @@ float3 open_drt_transform(
 
   // Apply tonescale function to lum
   float ts;
-  ts = tonescale(lum, m, s, c, 0);
-  ts = flare(ts, fl, 0);
+  ts = tonescale(lum, m, s, c);
+  ts = flare(ts, fl);
 
   // Normalize so peak luminance is at 1.0
   ts *= 100.0f/Lp;
