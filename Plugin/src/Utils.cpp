@@ -354,7 +354,13 @@ namespace Utils
 		return std::format("{}{}\\Photo_{}-{:02d}-{:02d}-{:02d}{:02d}{:02d}", Offsets::documentsPath, *Offsets::photosPath, systemTime.wYear, systemTime.wMonth, systemTime.wDay, systemTime.wHour, systemTime.wMinute, systemTime.wSecond);
     }
 
-	void TransformColor_HDR(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t a_y)
+    void CreatePhotoModeDirectories()
+    {
+		const auto path = std::format("{}{}", Offsets::documentsPath, *Offsets::photosPath);
+		std::filesystem::create_directories(path);
+    }
+
+    void TransformColor_HDR(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t a_y)
 	{
 		const auto  settings = Settings::Main::GetSingleton();
 		const float peakBrightness = settings->PeakBrightness.value.get_data();
@@ -393,6 +399,8 @@ namespace Utils
 
 	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path)
 	{
+		CreatePhotoModeDirectories();
+
 		auto path = std::format("{}.png", a_path);
 		auto thumbnailPath = std::format("{}-thumbnail.png", a_path);
 
@@ -413,6 +421,8 @@ namespace Utils
 
 	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path)
 	{
+		CreatePhotoModeDirectories();
+
 		auto path = std::format("{}.jxr", a_path);
 		std::wstring widePath = std::wstring(path.begin(), path.end());
 
