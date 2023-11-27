@@ -336,11 +336,10 @@ float3 open_drt_transform(
 {
 
   // More visibility in shadows
-  rgb = shd_con(rgb, 0.35f * lerp(4.f, -4.f, shadows / 2.f), 0.35f);
+  rgb = shd_con(rgb, 0.35f * lerp(4.f, -4.f, 0.9f * shadows / 2.f), 0.35);
 
   // Adjust to ACES Shadows
-  rgb += 0.001f;
-  rgb = shd_con(rgb, -1.2f, 0.097f);
+  rgb = shd_con(rgb, -1.8f, 0.15f * shadows);
 
   // Adjust to ACES Highlights
   rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f);
@@ -348,7 +347,7 @@ float3 open_drt_transform(
   rgb = ex_high(rgb, 0.924f, -1.0f, 0.5f);
   rgb = ex_high(rgb, -0.15f, 2.68f, 0.19f);
 
-  rgb = hl_con(rgb, highlights - 1.f, 203.f / 100.f);
+  rgb = hl_con(rgb, (1.2f * highlights) - 1.f, 203.f / 100.f);
 
   
   // **************************************************
@@ -360,11 +359,11 @@ float3 open_drt_transform(
   float dch = 0.4f;
 
   // Chroma contrast
-  float chc_p = 1.2f; // amount of contrast
-  float chc_m = 0.5f; // pivot of contrast curve
+  float chc_p = 1.1f; // 1.2 // amount of contrast
+  float chc_m = 0.6f; // 0.5 // pivot of contrast curve
 
   // Tonescale parameters
-  float c = 1.1f * contrast; // contrast
+  float c = 0.8f * contrast; // 1.1 contrast
   float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
@@ -375,13 +374,11 @@ float3 open_drt_transform(
     0.11f   // 0.30
   );
 
-  float vibrancy = weights.r + weights.g + weights.b;
-
   // Hue Shift RGB controls
   float3 hs = float3(
-    0.3f,  // 0.3f
-    1.4f,  // -0.1f
-    -0.30f // -0.5f
+    0.3f,   // 0.3f
+    -0.25f, // -0.1f
+    -0.40f  // -0.5f
   );
   
   /* Tonescale Parameters 
@@ -418,7 +415,7 @@ float3 open_drt_transform(
   // input scene-linear peak x intercept
   float px = 256.0*log(Lp)/log(100.0) - 128.0f;
   // output display-linear peak y intercept
-  float py = vibrancy * Lp/100.0f;
+  float py = Lp/100.0f;
   // input scene-linear middle grey x intercept
   float gx = 0.18f;
   // output display-linear middle grey y intercept
