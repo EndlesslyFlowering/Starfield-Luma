@@ -1526,17 +1526,14 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 		? HdrDllPluginConstants.HDRGamePaperWhiteNits
 		: ReferenceWhiteNits_BT2408; // 203
 
-	float exposure = whiteNits / ReferenceWhiteNits_BT2408;
-	// TODO: Use curve instead of linear
+	float paperWhiteScaling = whiteNits / ReferenceWhiteNits_BT2408;
 	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
 	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
-	float3 toneMapperInput = tmParams.inputColor * exposure;
-
 
 	float contrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
 	// Compute ungraded tone map for exact nits
 	tmParams.outputHDRColor = open_drt_transform(
-		toneMapperInput,
+		tmParams.inputColor * paperWhiteScaling,
 		peakNits,
 		0.f,
 		shadowsScaling,
@@ -1559,13 +1556,13 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 			if (HdrDllPluginConstants.DisplayMode > 0)
 			{
 				tmParams.outputSDRColor = open_drt_transform(
-					toneMapperInput,
-					ReferenceWhiteNits_BT2408,
-					0.f,
-					shadowsScaling,
-					highlightsScaling,
+					tmParams.inputColor,
+					400.f, // HDR 400 minimum for better BT2020 colors
+					0.10f, // Adjust exposure to match Vanilla SDR
+					0,     // Ignore user shadows
+					1.f,   // Ignore user highlights
 					1.f,
-					contrast
+					1.f    // Ignore user contrast
 				);
 			}
 		}
