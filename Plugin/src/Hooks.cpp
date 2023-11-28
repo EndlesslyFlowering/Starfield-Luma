@@ -36,14 +36,6 @@ namespace Hooks
 			extendGamut->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
-		if (const auto saturation = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Saturation))) {
-			saturation->m_Enabled.SetValue(a_bGameRenderingHDREnable);
-		}
-
-		if (const auto contrast = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_Contrast))) {
-			contrast->m_Enabled.SetValue(a_bGameRenderingHDREnable);
-		}
-
 		if (const auto secondaryBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryBrightness))) {
 			secondaryBrightnessSetting->m_Enabled.SetValue(!a_bGameRenderingHDREnable);
 		}
@@ -52,6 +44,18 @@ namespace Hooks
 			strictLUTApplicationSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
     }
+
+		void Hooks::CheckCustomToneMapperSettings(RE::SettingsDataModel* a_model, bool a_bIsCustomToneMapper)
+		{
+			if (const auto toneMapperHighlights = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperHighlights)))
+			{
+				toneMapperHighlights->m_Enabled.SetValue(a_bIsCustomToneMapper);
+			}
+			if (const auto toneMapperShadows = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperShadows)))
+			{
+				toneMapperShadows->m_Enabled.SetValue(a_bIsCustomToneMapper);
+			}
+		}
 
     void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
     {
@@ -124,12 +128,12 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
-		CreateSliderSetting(a_settingList, settings->Saturation, settings->IsGameRenderingSetToHDR());
-		CreateSliderSetting(a_settingList, settings->Contrast, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
-		CreateSliderSetting(a_settingList, settings->Highlights, true);
-		CreateSliderSetting(a_settingList, settings->Shadows, true);
+		CreateSliderSetting(a_settingList, settings->Saturation, true);
+		CreateSliderSetting(a_settingList, settings->Contrast, true);
+		CreateSliderSetting(a_settingList, settings->Highlights, settings->IsCustomToneMapper());
+		CreateSliderSetting(a_settingList, settings->Shadows, settings->IsCustomToneMapper());
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
@@ -137,7 +141,7 @@ namespace Hooks
 		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
 		CreateCheckboxSetting(a_settingList, settings->StrictLUTApplication, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
-		CreateSliderSetting(a_settingList, settings->FilmGrainCap, settings->IsFilmGrainTypeImproved());
+		CreateSliderSetting(a_settingList, settings->FilmGrainFPSLimit, settings->IsFilmGrainTypeImproved());
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
 
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
@@ -517,6 +521,7 @@ namespace Hooks
 					// We probably don't need all these checks, but we are being extra sure
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
+						CheckCustomToneMapperSettings(a_eventData.m_Model, settings->IsCustomToneMapper());
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
 						displayModeSetting->m_Enabled.SetValue(settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
@@ -567,6 +572,7 @@ namespace Hooks
 					// We probably don't need all these checks, but we are being extra sure
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
 						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
+						CheckCustomToneMapperSettings(a_eventData.m_Model, settings->IsCustomToneMapper());
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
 						displayModeSetting->m_Enabled.SetValue(settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
@@ -586,11 +592,12 @@ namespace Hooks
 			break;
 		case static_cast<int>(Settings::SettingID::kToneMapperType):
 			HandleSetting(settings->ToneMapperType);
+			CheckCustomToneMapperSettings(a_eventData.m_Model, settings->IsCustomToneMapper());
 			break;
 		case static_cast<int>(Settings::SettingID::kFilmGrainType):
 			HandleSetting(settings->FilmGrainType);
-			if (const auto filmGrainCap = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kFilmGrainCap))) {
-				filmGrainCap->m_Enabled.SetValue(settings->IsFilmGrainTypeImproved());
+			if (const auto filmGrainFPSLimit = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kFilmGrainFPSLimit))) {
+				filmGrainFPSLimit->m_Enabled.SetValue(settings->IsFilmGrainTypeImproved());
 			}
 			break;
 		}
@@ -638,10 +645,10 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kHDR_ExtendGamut):
 			HandleSetting(settings->ExtendGamut);
 			return true;
-		case static_cast<int>(Settings::SettingID::kHDR_Saturation):
+		case static_cast<int>(Settings::SettingID::kToneMapperSaturation):
 			HandleSetting(settings->Saturation);
 			return true;
-		case static_cast<int>(Settings::SettingID::kHDR_Contrast):
+		case static_cast<int>(Settings::SettingID::kToneMapperContrast):
 			HandleSetting(settings->Contrast);
 			return true;
 		case static_cast<int>(Settings::SettingID::kToneMapperHighlights):
@@ -665,8 +672,8 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kSecondaryBrightness):
 			HandleSetting(settings->SecondaryBrightness);
 			return true;
-		case static_cast<int>(Settings::SettingID::kFilmGrainCap):
-			HandleSetting(settings->FilmGrainCap);
+		case static_cast<int>(Settings::SettingID::kFilmGrainFPSLimit):
+			HandleSetting(settings->FilmGrainFPSLimit);
 			return true;
 		}
 

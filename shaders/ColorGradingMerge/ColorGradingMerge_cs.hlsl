@@ -160,8 +160,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float detintedChroma = linear_srgb_to_oklch(detintedLinear)[1];
-	const float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
-	const float targetChroma = detintedChroma * (SDRRange ? 1.f : saturation);
+	const float saturation = linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
+	const float targetChroma = detintedChroma * saturation;
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold "targetL"
