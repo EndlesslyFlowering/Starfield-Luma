@@ -1,7 +1,6 @@
 #include "../shared.hlsl"
 #include "../color.hlsl"
 #include "../math.hlsl"
-#include "ACES.hlsl"
 #include "Open_DRT.hlsl"
 #include "RootSignature.hlsl"
 
@@ -64,8 +63,7 @@
 #define DRAW_TONEMAPPER 0
 
 #define HDR_TONE_MAPPER_ENABLED 1
-#define ACES_HDR_SDR_NITS 108.f
-#define ACES_HDR_HABLE_RATIO 3.5f
+#define HDR_HABLE_RATIO 3.5f
 
 // 0 Ignored, 1 ACES Reference, 2 ACES Parametric, 3 Hable, 4+ Disable tonemapper
 #define FORCE_TONE_MAPPER 0
@@ -840,10 +838,10 @@ void ApplyUserSettingExtendGamut(inout CompositeParams params)
 }
 
 // Secondary user driven saturation.
-// This is already placed in LUTs but it's only applied on LUTs normalization (in HDR).
+// This is already placed in LUTs but it's only applied on LUTs normalization.
 void ApplyUserSettingSaturation(inout CompositeParams params)
 {
-	float saturation = linearNormalization(HdrDllPluginConstants.HDRSaturation, 0.f, 2.f, 0.5f, 1.5f);
+	float saturation = linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
 	saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
 #endif
@@ -853,7 +851,7 @@ void ApplyUserSettingSaturation(inout CompositeParams params)
 // Secondary user driven contrast
 void ApplyUserSettingContrast(inout CompositeParams params)
 {
-	const float secondaryContrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
+	const float secondaryContrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
 #if 0 // By luminance (no hue shift) (looks off)
 	float outputColorLuminance = Luminance(params.outputColor);
 	params.outputColor *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
@@ -1433,7 +1431,7 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 		case 1: // ACESFitted
 		case 2: // ACESParametric (not supported - same as fitted)
 			// Menu or some interior (Robotics Science Facilities)
-			inputScaling *= ACES_HDR_HABLE_RATIO;
+			inputScaling *= HDR_HABLE_RATIO;
 			break;
 		case 3:
 		{
@@ -1442,7 +1440,7 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 			float toeStrength      =       saturate(PerSceneConstants[3266u].z);
 			if (toeStrength == 0 || toeLength == 0 )
 			{
-				inputScaling *= ACES_HDR_HABLE_RATIO;
+				inputScaling *= HDR_HABLE_RATIO;
 			}
 			break;
 		}
@@ -1454,67 +1452,6 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 	tmParams.inputLuminance *= inputScaling;
 }
 
-void ApplyACESReferenceToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)
-{
-	ApplyHDRToneMapperScaling(params, tmParams);
-	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
-		? HdrDllPluginConstants.HDRPeakBrightnessNits
-		: ReferenceWhiteNits_BT2408; // 203
-	const float whiteNits = (HdrDllPluginConstants.DisplayMode > 0)
-		? HdrDllPluginConstants.HDRGamePaperWhiteNits
-		: ReferenceWhiteNits_BT2408; // 203
-	float exposure = whiteNits / ReferenceWhiteNits_BT2408;
-	float yMin = pow(10.0f, lerp(0.f, -12.f, HdrDllPluginConstants.ToneMapperShadows));
-	float yMax = ACES_HDR_SDR_NITS
-		* exposure
-		* peakNits / whiteNits
-		;
-
-	float3 inputColor = tmParams.inputColor;
-	// TODO: Use curve instead of linear
-	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;	
-	float maxY = PQMaxNits / WhiteNits_sRGB;
-	float newY = linearNormalization(tmParams.inputLuminance, 0.90f, maxY, 0.90f, maxY * highlightsScaling);
-	inputColor *= newY / (tmParams.inputLuminance > 0.90f ? tmParams.inputLuminance : newY);
-
-	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
-	float3 toneMapperInput = inputColor * exposure;
-
-	// Compute ungraded tone map for exact nits
-	tmParams.outputHDRColor = aces_odt_tone_map(
-		toneMapperInput * highlightsScaling,
-		yMin,
-		yMax * highlightsScaling
-	);
-
-	// Boost by peakNits/white to exceed SDR range (when in HDR)
-	tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
-	
-	// Default to single-pass with HDR colors
-	tmParams.outputSDRColor = tmParams.outputHDRColor;
-	#if LUT_EXTRAPOLATION_TYPE > 0
-		// If LUT extrapolation is available, we can skip an SDR pass,
-		// unless requests strict SDR LUTs
-		if (!HdrDllPluginConstants.StrictLUTApplication)
-	#endif
-		{
-			// Already clamped to [0-1]
-			if (HdrDllPluginConstants.DisplayMode > 0)
-			{
-				tmParams.outputSDRColor = aces_odt_tone_map(
-					toneMapperInput * highlightsScaling,
-					yMin,
-					ACES_HDR_SDR_NITS * highlightsScaling
-				);
-			}
-		}
-
-	tmParams.outputSDRLuminance = Luminance(tmParams.outputSDRColor);
-	tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
-
-	params.outputColor = tmParams.outputSDRColor;
-
-}
 
 void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
@@ -1530,7 +1467,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
 	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
 
-	float contrast = linearNormalization(HdrDllPluginConstants.HDRSecondaryContrast, 0.f, 2.f, 0.5f, 1.5f);
+	float contrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
 	// Compute ungraded tone map for exact nits
 	tmParams.outputHDRColor = open_drt_transform(
 		tmParams.inputColor * paperWhiteScaling,
@@ -1573,25 +1510,6 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 	params.outputColor = tmParams.outputSDRColor;
 }
 
-void ApplyACESReferenceHDRUpgrade(inout CompositeParams params, inout ToneMapperParams tmParams)
-{
-#if LUT_EXTRAPOLATION_TYPE > 0
-		// If LUT extrapolation is available,
-		// but user disabled it, use SDR-based fallback
-		if (!HdrDllPluginConstants.StrictLUTApplication)
-		{
-			params.outputColor = RestorePostProcess(tmParams.outputHDRColor, tmParams.outputSDRColor, params.outputColor);
-		}
-#else
-		params.outputColor *= safeDivision(tmParams.outputHDRLuminance, tmParams.outputSDRLuminance);
-#endif
-
-	ApplyUserSettingExtendGamut(params);
-	ApplyUserSettingSaturation(params);
-	ApplyUserSettingContrast(params);
-
-	params.outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
-}
 
 void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
@@ -2044,8 +1962,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 			}
 			break;
 		#if HDR_TONE_MAPPER_ENABLED
-		case 1: ApplyACESReferenceToneMap(params, tmParams); break;
-		case 2:       ApplyOpenDRTToneMap(params, tmParams); break;
+		case 1:     ApplyOpenDRTToneMap(params, tmParams); break;
 		#endif
 	}
 #endif
@@ -2068,8 +1985,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 			default:
 			case 0: ApplySDRToneMapperHDRUpgrade(params, tmParams); break;
 			#if HDR_TONE_MAPPER_ENABLED
-			case 1: ApplyACESReferenceHDRUpgrade(params, tmParams); break;
-			case 2:       ApplyOpenDRTHDRUpgrade(params, tmParams); break;
+			case 1:       ApplyOpenDRTHDRUpgrade(params, tmParams); break;
 			#endif
 		}
 #endif
@@ -2079,6 +1995,14 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 	else
 	{
 		ApplyBrightness(params);
+		ApplyUserSettingSaturation(params);
+#if HDR_TONE_MAPPER_ENABLED
+		if (HdrDllPluginConstants.ToneMapperType == 0)
+#endif
+		{
+		
+			ApplyUserSettingContrast(params);
+		}
 		ApplySDROutputTransforms(params);
 	}
 

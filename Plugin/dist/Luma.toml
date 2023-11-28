@@ -7,12 +7,10 @@ DevSetting04 = 0.0
 DevSetting05 = 0.0
 
 [HDR]
-Contrast = 50.0
 GamePaperWhite = 200
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
 ExtendGamut = 33.333
-Saturation = 50.0
 UIPaperWhite = 200
 StrictLUTApplication = false
 
@@ -20,7 +18,7 @@ StrictLUTApplication = false
 ColorGradingStrength = 100.0
 DisplayMode = 0
 FilmGrainType = 1
-FilmGrainCap = 0.0
+FilmGrainFPSLimit = 0.0
 GammaCorrectionStrength = 100.0
 LUTCorrectionStrength = 100.0
 PostSharpen = true
@@ -29,6 +27,8 @@ VanillaMenuLUTs = true
 
 [ToneMapper]
 ToneMapperType = 0
+Saturation = 50.0
+Contrast = 50.0
 Highlights = 50.0
 Shadows = 50.0
 Bloom = 50.0

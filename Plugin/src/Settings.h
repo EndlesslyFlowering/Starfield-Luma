@@ -26,10 +26,10 @@ namespace Settings
 		kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
 		kHDR_ExtendGamut,
-		kHDR_Saturation,
-		kHDR_Contrast,
 		kSecondaryBrightness,
 		kToneMapperType,
+		kToneMapperSaturation,
+		kToneMapperContrast,
 		kToneMapperHighlights,
 		kToneMapperShadows,
 		kToneMapperBloom,
@@ -39,7 +39,7 @@ namespace Settings
 		kVanillaMenuLUTs,
 		kStrictLUTApplication,
 		kFilmGrainType,
-		kFilmGrainCap,
+		kFilmGrainFPSLimit,
 		kPostSharpen,
 		kHDRScreenshots,
 
@@ -159,10 +159,10 @@ namespace Settings
 		float    GamePaperWhite;
 		float    UIPaperWhite;
 		float    ExtendGamut;
-		float    Saturation;
-		float    Contrast;
 		float    SDRSecondaryBrightness;
 		uint32_t ToneMapperType;
+		float    Saturation;
+		float    Contrast;
 		float    Highlights;
 		float    Shadows;
 		float    Bloom;
@@ -171,7 +171,7 @@ namespace Settings
 		float    ColorGradingStrength;
 		float    GammaCorrectionStrength;
 		uint32_t FilmGrainType;
-		float    FilmGrainCap;
+		float    FilmGrainFPSLimit;
 		uint32_t PostSharpen;
 		uint32_t bIsAtEndOfFrame;
 		uint32_t RuntimeMS;
@@ -241,26 +241,6 @@ namespace Settings
 		    100.f,
 			"%"
 		};
-		Slider   Saturation{
-		    SettingID::kHDR_Saturation,
-		    "Saturation",
-		    "Sets the saturation strength in HDR modes.\n\nNeutral default at 50\%.",
-		    "Saturation", "HDR",
-		    50.f,
-		    0.f,
-		    100.f,
-			"%"
-		};
-		Slider   Contrast{
-		    SettingID::kHDR_Contrast,
-		    "Contrast",
-		    "Sets the contrast strength in HDR modes.\n\nNeutral default at 50\%.",
-		    "Contrast", "HDR",
-		    50.f,
-		    0.f,
-		    100.f,
-			"%"
-		};
 		Slider   SecondaryBrightness{
 		    SettingID::kSecondaryBrightness,
 		    "Brightness",
@@ -276,17 +256,36 @@ namespace Settings
 			"Tone Mapper Type",
 			"Sets the tone mapper type."
 				"\n"
-				"\nVanilla+ uses a tonemapper inspired by the original SDR one, with enhancements to support HDR."
-				"\nACES is based on ACES 1.3 and supports variable output (SDR/HDR)."
-				"\nOpenDRT an newer tone mapper that supports variable output (SDR/HDR).",
+				"\nVanilla+ uses a tone mapper inspired by the original SDR one, with enhancements to support HDR."
+				"\nOpenDRT an open-source tone mapper that supports variable output (SDR/HDR).",
 			"ToneMapperType", "ToneMapper",
 			0,
-			{ "Vanilla+", "ACES", "OpenDRT" }
+			{ "Vanilla+", "OpenDRT" }
+		};
+		Slider   Saturation{
+		    SettingID::kToneMapperSaturation,
+		    "Saturation",
+		    "Sets the saturation strength in the tone mapper.\n\nNeutral default at 50\%.",
+		    "Saturation", "ToneMapper",
+		    50.f,
+		    0.f,
+		    100.f,
+			"%"
+		};
+		Slider   Contrast{
+		    SettingID::kToneMapperContrast,
+		    "Contrast",
+		    "Sets the contrast strength in the tone mapper.\n\nNeutral default at 50\%.",
+		    "Contrast", "ToneMapper",
+		    50.f,
+		    0.f,
+		    100.f,
+			"%"
 		};
 		Slider Highlights{
 			SettingID::kToneMapperHighlights,
 			"Highlights",
-			"Sets the highlights strength in the tone mapper modes.\n\nNeutral default at 50\%.",
+			"Sets the highlights strength in the tone mapper.\n\nNeutral default at 50\%.",
 			"Highlights", "ToneMapper",
 			50.f,
 			0.f,
@@ -296,7 +295,7 @@ namespace Settings
 		Slider Shadows{
 			SettingID::kToneMapperShadows,
 			"Shadows",
-			"Sets the shadows strength in the tone mapper (it might not always apply).\n\nNeutral default at 50\%.",
+			"Sets the shadows strength in the tone mapper.\n\nNeutral default at 50\%.",
 			"Shadows", "ToneMapper",
 			50.f,
 			0.f,
@@ -365,11 +364,11 @@ namespace Settings
 		    1,
 		    { "Vanilla", "Improved" }
 		};
-		Slider FilmGrainCap{
-			SettingID::kFilmGrainCap,
-			"Film Grain Framerate",
-			"Sets a framerate cap on the improved film grain.\nSet to 0 for uncapped film grain framerate.",
-			"FilmGrainCap", "Main",
+		Slider FilmGrainFPSLimit{
+			SettingID::kFilmGrainFPSLimit,
+			"Film Grain FPS Limit",
+			"Sets a frame limit on the improved film grain.\nSet to 0 for uncapped film grain framerate.",
+			"FilmGrainFPSLimit", "Main",
 			0.f,
 			0.f,
 			100.f
@@ -405,6 +404,7 @@ namespace Settings
 		bool IsSDRForcedOnHDR() const;
 		bool IsDisplayModeSetToHDR() const;
 		bool IsGameRenderingSetToHDR() const;
+		bool IsCustomToneMapper() const;
 		bool IsFilmGrainTypeImproved() const;
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
