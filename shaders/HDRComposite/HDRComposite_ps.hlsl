@@ -63,7 +63,6 @@
 #define DRAW_TONEMAPPER 0
 
 #define HDR_TONE_MAPPER_ENABLED 1
-#define HDR_HABLE_RATIO 3.5f
 
 // 0 Ignored, 1 ACES Reference, 2 ACES Parametric, 3 Hable, 4+ Disable tonemapper
 #define FORCE_TONE_MAPPER 0
@@ -1423,33 +1422,17 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 #if HDR_TONE_MAPPER_ENABLED
 void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	float inputScaling = 1.2f; // Base exposure to closely match Vanilla
-	
-	
-	switch(TONE_MAPPER_ENUM)
-	{
-		case 1: // ACESFitted
-		case 2: // ACESParametric (not supported - same as fitted)
-			// Menu or some interior (Robotics Science Facilities)
-			inputScaling *= HDR_HABLE_RATIO;
-			break;
-		case 3:
-		{
-			// Titan Science Facility
-			float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f);
-			float toeStrength      =       saturate(PerSceneConstants[3266u].z);
-			if (toeStrength == 0 || toeLength == 0 )
-			{
-				inputScaling *= HDR_HABLE_RATIO;
-			}
-			break;
-		}
-		default:
-			break;
+	if (TONE_MAPPER_ENUM != 3) { // ACESFitted/Parametric
+		params.outputColor *= 3.5f; 
+		tmParams.inputColor *= 3.5f;
+		tmParams.inputLuminance *= 3.5f;
 	}
-	params.outputColor *= inputScaling; // Likely unneeded
-	tmParams.inputColor *= inputScaling;
-	tmParams.inputLuminance *= inputScaling;
+	else if (PerSceneConstants[3266u].w == 0 || PerSceneConstants[3266u].z == 0) // 0-Toe Hable
+	{
+		params.outputColor *= 2.8f;
+		tmParams.inputColor *= 2.8f;
+		tmParams.inputLuminance *= 2.8f;
+	}
 }
 
 
@@ -1496,7 +1479,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 					tmParams.inputColor,
 					400.f, // HDR 400 minimum for better BT2020 colors
 					0.10f, // Adjust exposure to match Vanilla SDR
-					0,     // Ignore user shadows
+					2.f,   // Raise shadows
 					1.f,   // Ignore user highlights
 					1.f,
 					1.f    // Ignore user contrast
