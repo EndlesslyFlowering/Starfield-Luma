@@ -347,17 +347,16 @@ namespace Utils
 		return false;
     }
 
-	std::string GetPhotoModeScreenshotPath()
+	std::filesystem::path GetPhotoModeScreenshotDirectory()
+	{
+		return std::format("{}{}", Offsets::documentsPath, *Offsets::photosPath);
+	}
+
+	std::string GetPhotoModeScreenshotName()
     {
 		SYSTEMTIME systemTime;
 		GetLocalTime(&systemTime);
-		return std::format("{}{}\\Photo_{}-{:02d}-{:02d}-{:02d}{:02d}{:02d}", Offsets::documentsPath, *Offsets::photosPath, systemTime.wYear, systemTime.wMonth, systemTime.wDay, systemTime.wHour, systemTime.wMinute, systemTime.wSecond);
-    }
-
-    void CreatePhotoModeDirectories()
-    {
-		const auto path = std::format("{}{}", Offsets::documentsPath, *Offsets::photosPath);
-		std::filesystem::create_directories(path);
+		return std::format("Photo_{}-{:02d}-{:02d}-{:02d}{:02d}{:02d}", systemTime.wYear, systemTime.wMonth, systemTime.wDay, systemTime.wHour, systemTime.wMinute, systemTime.wSecond);
     }
 
     void TransformColor_HDR(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t a_y)
@@ -395,36 +394,32 @@ namespace Utils
 		}
 	}
 
-	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_path)
+	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_name)
 	{
-		CreatePhotoModeDirectories();
+		const auto fullPath = GetPhotoModeScreenshotDirectory() / std::format("{}.png", a_name);
+		const auto thumbnailPath = GetPhotoModeScreenshotDirectory() / std::format("{}-thumbnail.png", a_name);
 
-		auto path = std::format("{}.png", a_path);
-		auto thumbnailPath = std::format("{}-thumbnail.png", a_path);
-
-		std::wstring widePath = std::wstring(path.begin(), path.end());
-		std::wstring wideThumbnailPath = std::wstring(thumbnailPath.begin(), thumbnailPath.end());
+		std::filesystem::create_directories(fullPath.parent_path());
+		std::filesystem::create_directories(thumbnailPath.parent_path());
 
 		DirectX::ScratchImage scratchImage;
 		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
 
 		// full photo
-		DirectX::SaveToWICFile(scratchImage.GetImages(), scratchImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, widePath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
+		DirectX::SaveToWICFile(scratchImage.GetImages(), scratchImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, fullPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
 
 		// thumbnail
 		DirectX::ScratchImage resizedImage;
 		DirectX::Resize(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), 640, 360, DirectX::TEX_FILTER_DEFAULT, resizedImage);
-		DirectX::SaveToWICFile(resizedImage.GetImages(), resizedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, wideThumbnailPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
+		DirectX::SaveToWICFile(resizedImage.GetImages(), resizedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, thumbnailPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
 
 		a_resource->Release();
 	}
 
-	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_path)
+	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_name)
 	{
-		CreatePhotoModeDirectories();
-
-		auto path = std::format("{}.jxr", a_path);
-		std::wstring widePath = std::wstring(path.begin(), path.end());
+		const auto fullPath = GetPhotoModeScreenshotDirectory() / "HDR" / std::format("{}.jxr", a_name);
+		std::filesystem::create_directories(fullPath.parent_path());
 
 		DirectX::ScratchImage scratchImage;
 		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
@@ -432,7 +427,7 @@ namespace Utils
 		DirectX::ScratchImage transformedImage;
 		DirectX::TransformImage(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), &TransformColor_HDR, transformedImage);
 
-		DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, widePath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
+		DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, fullPath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
 			PROPBAG2 options[1] = {};
 			options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
 
