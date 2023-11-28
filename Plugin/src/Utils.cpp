@@ -364,7 +364,7 @@ namespace Utils
 	{
 		const auto  settings = Settings::Main::GetSingleton();
 		const float peakBrightness = settings->PeakBrightness.value.get_data();
-		const float max = peakBrightness * (1.05f / 80.f);
+		const auto  peakBrightnessThreshold = DirectX::XMVectorReplicate(peakBrightness * (1.05f / 80.f));
 
 		const DirectX::XMMATRIX c_fromWBT2020toBT2020 = {
 			1.02967584133148193359375f, -0.013273007236421108245849609375f, -0.008765391074120998382568359375f, 0.f,
@@ -382,22 +382,20 @@ namespace Utils
 
 		for (size_t i = 0; i < a_width; ++i) {
 			// color.rgb = WBT2020_To_BT2020(color.rgb);
-			a_outPixels[i] = DirectX::XMVector3Transform(a_inPixels[i], c_fromWBT2020toBT2020);
+			const auto bt2020Color = DirectX::XMVector4Transform(a_inPixels[i], c_fromWBT2020toBT2020);
 
 			// color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
-			DirectX::XMFLOAT4 tmp;
-			DirectX::XMStoreFloat4(&tmp, a_outPixels[i]);
-			tmp.x = std::clamp(tmp.x, 0.f, max);
-			tmp.y = std::clamp(tmp.y, 0.f, max);
-			tmp.z = std::clamp(tmp.z, 0.f, max);
-			a_outPixels[i] = DirectX::XMLoadFloat4(&tmp);
+			const auto bt2020ColorClamped = DirectX::XMVectorClamp(bt2020Color, DirectX::XMVectorZero(), peakBrightnessThreshold);
 
 			// color.rgb = BT2020_To_BT709(color.rgb);
-			a_outPixels[i] = DirectX::XMVector3Transform(a_outPixels[i], c_fromBT2020toBT709);
+			const auto bt709Color = DirectX::XMVector4Transform(bt2020ColorClamped, c_fromBT2020toBT709);
+
+			// Discard alpha channel writes
+			DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&a_outPixels[i]), bt709Color);
 		}
 	}
 
-	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path)
+	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_path)
 	{
 		CreatePhotoModeDirectories();
 
@@ -417,9 +415,11 @@ namespace Utils
 		DirectX::ScratchImage resizedImage;
 		DirectX::Resize(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), 640, 360, DirectX::TEX_FILTER_DEFAULT, resizedImage);
 		DirectX::SaveToWICFile(resizedImage.GetImages(), resizedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, wideThumbnailPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
+
+		a_resource->Release();
 	}
 
-	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string_view a_path)
+	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_path)
 	{
 		CreatePhotoModeDirectories();
 
@@ -442,5 +442,7 @@ namespace Utils
 
 			std::ignore = props->Write(1, options, varValues);
 		});
+
+		a_resource->Release();
 	}
 }

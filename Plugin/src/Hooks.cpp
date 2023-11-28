@@ -147,26 +147,35 @@ namespace Hooks
 		CreateSeparator(a_settingList, Settings::SettingID::kEND);
     }
 
-	static std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES, std::string_view)> ScreenshotCallback;
-	static std::string screenshotPath;
+	struct ScreenshotData
+	{
+		std::string                                                                                   Path;
+		std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES, std::string)> Callback;
+		ID3D12Resource*                                                                               TextureCopy;
+		uint64_t                                                                                      CaptureFrameIndex;
+	};
+
+	static std::string                 screenshotPath;
+	static std::vector<ScreenshotData> pendingScreenshots;
 
 	bool CheckForScreenshotRequest(ID3D12Device2* a_device, ID3D12CommandQueue* a_queue, ID3D12GraphicsCommandList* a_commandList, ID3D12Resource* a_sourceTexture)
 	{
-		static uint64_t        currentFrameCounter = 0;
-		static uint64_t        lastGpuCaptureFrameIndex = 0;
-		static ID3D12Resource* temporaryStagingTexture = nullptr;
-
+		static uint64_t currentFrameCounter = 0;
 		currentFrameCounter++;
 
-		const auto settings = Settings::Main::GetSingleton();
-		if (!ScreenshotCallback && settings->bRequestedHDRScreenshot) {
-			ScreenshotCallback = &Utils::TakeHDRPhotoModeScreenshot;
-		} else if (!ScreenshotCallback && settings->bRequestedSDRScreenshot) {
-			ScreenshotCallback = &Utils::TakeSDRPhotoModeScreenshot;
+		decltype(ScreenshotData::Callback) screenshotCallback;
+		bool                               screenshotEnqueued = false;
+		const auto                         settings = Settings::Main::GetSingleton();
+
+		if (settings->bRequestedHDRScreenshot) {
+				screenshotCallback = &Utils::TakeHDRPhotoModeScreenshot;
+		} else if (settings->bRequestedSDRScreenshot) {
+				screenshotCallback = &Utils::TakeSDRPhotoModeScreenshot;
 		}
 
 		// Capture texture data on the GPU side initially
-		if (ScreenshotCallback && !temporaryStagingTexture) {
+		if (screenshotCallback) {
+			ID3D12Resource* texture = nullptr;
 			auto textureDesc = a_sourceTexture->GetDesc();
 
 			if (textureDesc.Format == DXGI_FORMAT_R10G10B10A2_TYPELESS) {
@@ -188,7 +197,7 @@ namespace Hooks
 					&textureDesc,
 					D3D12_RESOURCE_STATE_COPY_DEST,
 					nullptr,
-					IID_PPV_ARGS(&temporaryStagingTexture)))) {
+					IID_PPV_ARGS(&texture)))) {
 				// We're assuming the input is always a render target
 				D3D12_RESOURCE_BARRIER barrier = {};
 				barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -199,31 +208,34 @@ namespace Hooks
 				barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
 
 				a_commandList->ResourceBarrier(1, &barrier);
-				a_commandList->CopyResource(temporaryStagingTexture, a_sourceTexture);
+				a_commandList->CopyResource(texture, a_sourceTexture);
 				std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
 				a_commandList->ResourceBarrier(1, &barrier);
 			}
 
-			lastGpuCaptureFrameIndex = currentFrameCounter;
+			pendingScreenshots.emplace_back(ScreenshotData{
+				screenshotPath,
+				screenshotCallback,
+				texture,
+				currentFrameCounter });
+
+			screenshotEnqueued = true;
 		}
 
 		// Allow eight frames to pass before attempting a CPU readback. Ideally a fence would be issued on the
 		// command queue, but that's not possible without a lot of reverse engineering work.
-		if (lastGpuCaptureFrameIndex != 0 && (currentFrameCounter - lastGpuCaptureFrameIndex) >= 8) {
-			ScreenshotCallback(a_queue, temporaryStagingTexture, D3D12_RESOURCE_STATE_COPY_DEST, screenshotPath);
-			ScreenshotCallback = nullptr;
+		for (auto itr = pendingScreenshots.begin(); itr != pendingScreenshots.end();) {
+			if ((currentFrameCounter - itr->CaptureFrameIndex) >= 8) {
+				// Callback releases the texture
+				std::thread(itr->Callback, a_queue, itr->TextureCopy, D3D12_RESOURCE_STATE_COPY_DEST, itr->Path).detach();
 
-			if (temporaryStagingTexture) {
-				temporaryStagingTexture->Release();
-				temporaryStagingTexture = nullptr;
+				itr = pendingScreenshots.erase(itr);
+			} else {
+				itr++;
 			}
-
-			lastGpuCaptureFrameIndex = 0;
-
-			return true;
 		}
 
-		return false;
+		return screenshotEnqueued;
 	}
 
 	struct DescriptorAllocation
