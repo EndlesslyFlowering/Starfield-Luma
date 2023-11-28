@@ -149,13 +149,13 @@ namespace Hooks
 
 	struct ScreenshotData
 	{
-		std::string                                                                                   Path;
+		std::string                                                                                   FileName;
 		std::function<void(ID3D12CommandQueue*, ID3D12Resource*, D3D12_RESOURCE_STATES, std::string)> Callback;
 		ID3D12Resource*                                                                               TextureCopy;
 		uint64_t                                                                                      CaptureFrameIndex;
 	};
 
-	static std::string                 screenshotPath;
+	static std::string                 screenshotName;
 	static std::vector<ScreenshotData> pendingScreenshots;
 
 	bool CheckForScreenshotRequest(ID3D12Device2* a_device, ID3D12CommandQueue* a_queue, ID3D12GraphicsCommandList* a_commandList, ID3D12Resource* a_sourceTexture)
@@ -214,7 +214,7 @@ namespace Hooks
 			}
 
 			pendingScreenshots.emplace_back(ScreenshotData{
-				screenshotPath,
+				screenshotName,
 				screenshotCallback,
 				texture,
 				currentFrameCounter });
@@ -227,7 +227,7 @@ namespace Hooks
 		for (auto itr = pendingScreenshots.begin(); itr != pendingScreenshots.end();) {
 			if ((currentFrameCounter - itr->CaptureFrameIndex) >= 8) {
 				// Callback releases the texture
-				std::thread(itr->Callback, a_queue, itr->TextureCopy, D3D12_RESOURCE_STATE_COPY_DEST, itr->Path).detach();
+				std::thread(itr->Callback, a_queue, itr->TextureCopy, D3D12_RESOURCE_STATE_COPY_DEST, itr->FileName).detach();
 
 				itr = pendingScreenshots.erase(itr);
 			} else {
@@ -457,8 +457,6 @@ namespace Hooks
 		}
     }
 
-    
-
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
 		const auto settings = Settings::Main::GetSingleton();
@@ -474,7 +472,7 @@ namespace Hooks
     bool Hooks::Hook_TakeSnapshot(uintptr_t a1)
     {
 		const auto settings = Settings::Main::GetSingleton();
-		screenshotPath = Utils::GetPhotoModeScreenshotPath();
+		screenshotName = Utils::GetPhotoModeScreenshotName();
 		if (settings->IsDisplayModeSetToHDR() && *settings->HDRScreenshots.value) {
 			settings->bRequestedHDRScreenshot.store(true);
 		}
