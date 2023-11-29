@@ -69,6 +69,7 @@ PSOutput PS(PSInput psInput)
 			if (HdrDllPluginConstants.DisplayMode > 0)
 			{
 				inColor /= PQMaxWhitePoint;
+				inColor = BT709_To_WBT2020(inColor);
 			}
 			else
 			{
@@ -168,6 +169,7 @@ PSOutput PS(PSInput psInput)
 			if (HdrDllPluginConstants.DisplayMode > 0)
 			{
 				outColor = max(outColor, 0.f);
+				outColor = WBT2020_To_BT709(outColor);
 				outColor *= PQMaxWhitePoint;
 			}
 			else
