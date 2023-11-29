@@ -75,11 +75,11 @@ float4 PS(PSInputs inputs) : SV_Target
 
 		if (HdrDllPluginConstants.DisplayMode > 0)
 		{
-			color = BT709_To_WBT2020(color);
-
 			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			if (BinkVideosAutoHDR)
+			{
 				color = PumboAutoHDR(color, HdrDllPluginConstants.HDRPeakBrightnessNits, paperWhite);
+			}
 
 			color *= paperWhite; // Use the game brightness, not the UI one, as these are usually videos that are seamless with gameplay
 		}
