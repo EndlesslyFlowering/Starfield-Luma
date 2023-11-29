@@ -38,7 +38,11 @@ public:
 	static inline uintptr_t* unkToggleVsyncArg1Ptr = nullptr;
 	using tToggleVsync = void (*)(void* a1, bool a_bEnable);
 	static inline tToggleVsync ToggleVsync = nullptr;
+
 	static inline bool* bEnableVsync = nullptr;
+	static inline float* fGamma = nullptr;
+	static inline float* fGammaUI = nullptr;
+	static inline uint32_t* uiFrameGenerationTech = nullptr;
 
 	static void Initialize()
 	{
@@ -64,5 +68,9 @@ public:
 
 		documentsPath = reinterpret_cast<const char*>(dku::Hook::IDToAbs(886315));
 		photosPath = reinterpret_cast<const char**>(dku::Hook::IDToAbs(778159));
+
+		fGamma = reinterpret_cast<float*>(dku::Hook::IDToAbs(1171814));
+		fGammaUI = reinterpret_cast<float*>(dku::Hook::IDToAbs(1171816));
+		uiFrameGenerationTech = reinterpret_cast<uint32_t*>(dku::Hook::IDToAbs(1171831));
 	}
 };

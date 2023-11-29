@@ -46,7 +46,12 @@ namespace Settings
 		// It's not called again when we replace swapchain color space or format ourselves.
 
 		swapChainObject = a_swapChainObject;
-		//commandQueue = a_swapChainObject->unkStruct->unkInternalStruct->commandQueue;
+
+		// force fGamma and fGammaUI to 2.4 just in case, even though we ignore it anyway
+        *Offsets::fGamma = 2.4f;
+        *Offsets::fGammaUI = 2.4f;
+
+		bFramegenOn = *Offsets::uiFrameGenerationTech > 0;
 
 		// check for other plugins being present
 		auto isModuleLoaded = [&](LPCWSTR a_moduleName) {
@@ -149,15 +154,32 @@ namespace Settings
 		return FilmGrainType.value.get_data() == 1;
 	}
 
+    int32_t Main::GetActualDisplayMode() const
+	{
+		if (IsSDRForcedOnHDR()) {
+		    return -1;
+		}
+
+		const auto value = DisplayMode.value.get_data();
+
+		if (value == 2) {
+			// fallback to HDR10 with framegen
+			if (bFramegenOn) {
+			    return 1;
+			}
+		}
+
+		return value;
+	}
+
     RE::BS_DXGI_FORMAT Main::GetDisplayModeFormat() const
     {
-		if (IsSDRForcedOnHDR())
-			return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT;
-		switch (DisplayMode.value.get_data()) {
+		switch (GetActualDisplayMode()) {
+		default:
 		case 0:
 		case 1:
-		default:
 			return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM;
+		case -1:
 		case 2:
 			return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT;
 		}
@@ -165,28 +187,32 @@ namespace Settings
 
     DXGI_COLOR_SPACE_TYPE Main::GetDisplayModeColorSpaceType() const
     {
-		if (IsSDRForcedOnHDR())
-			return DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
-		switch (DisplayMode.value.get_data()) {
-		case 0:
+		switch (GetActualDisplayMode()) {
 		default:
+		case 0:
 			return DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
 		case 1:
 			return DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+		case -1:
 		case 2:
 			return DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
 		}
     }
+
+    void Main::RefreshSwapchainFormat()
+	{
+		const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
+		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
+
+		swapChainObject->format = newFormat;
+	}
 
     void Main::OnDisplayModeChanged()
 	{
 		RefreshHDRDisplaySupportState();
 		RefreshHDRDisplayEnableState();
 
-		const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
-		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
-
-		swapChainObject->format = newFormat;
+		RefreshSwapchainFormat();
 
 		// toggle vsync to force a swapchain recreation
 		Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
@@ -194,7 +220,7 @@ namespace Settings
 
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
     {
-		a_outShaderConstants.DisplayMode = IsSDRForcedOnHDR() ? -1 : static_cast<int32_t>(DisplayMode.value.get_data());
+		a_outShaderConstants.DisplayMode = GetActualDisplayMode();
 		a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
