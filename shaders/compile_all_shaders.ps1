@@ -40,7 +40,7 @@ $main =
 	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "1FEAB"
 
 	#BinkMovie
-	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAC"
+	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAC" -AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 
 	#LensFlare
 	Compile-Shader -Type "ps" -TechniqueName "LensFlare" -TechniqueId "5FE83" -Entry "main"
