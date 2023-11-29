@@ -55,12 +55,13 @@ struct CSInput
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
 #endif
 
-
 half3 PrepareForProcessing(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
-		return saturate(Color / PQMaxWhitePoint);
+		Color /= PQMaxWhitePoint;
+		Color = BT709_To_WBT2020(Color);
+		return saturate(Color);
 	}
 	else
 	{
@@ -72,6 +73,7 @@ half3 PrepareForOutput(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
+		Color = WBT2020_To_BT709(Color);
 		return Color * PQMaxWhitePoint;
 	}
 	else

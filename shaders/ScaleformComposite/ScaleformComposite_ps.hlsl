@@ -108,7 +108,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 		return 0;
 	}
 	// This is always in linear unless "SDR_LINEAR_INTERMEDIARY" was false and we were in SDR
-	float3 backgroundColor = FinalColorTexture[psInputs.pos.xy].rgb;
+	const float3 backgroundColor = FinalColorTexture[psInputs.pos.xy].rgb;
 	float3 outputColor;
 #if !OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 	// Do this even if "UIColor.a" is 1, as we still need to tonemap the HDR background
@@ -118,8 +118,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		if (isHDR)
 		{
-			backgroundColor = WBT2020_To_BT709(backgroundColor);
-			GamePaperWhite = (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB);
+			GamePaperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 		}
 		else
 		{
@@ -157,12 +156,6 @@ float4 PS(PSInputs psInputs) : SV_Target
 		tonemappedBackgroundColor = 0.f;
 #endif // !CLIP_HDR_BACKGROUND
 		outputColor += lerp(tonemappedBackgroundColor, excessBackgroundColor, 1.f - UIColor.a) * (1.f - UIColor.a);
-
-		if (isHDR)
-		{
-			outputColor = BT709_To_WBT2020(outputColor);
-			outputColor = max(outputColor, 0.f);
-		}
 	}
 	else
 #endif // !OPTIMIZE_REPLACED_COMPOSITION_BLENDS

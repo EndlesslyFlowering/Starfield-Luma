@@ -49,7 +49,9 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
-			color.rgb = WBT2020_To_BT2020(color.rgb);
+			// safety clamp to BT.2020 as Windows may turn pixels that are low brightness and outside of BT.2020 into black pixels
+			// this only happens in software composition though (Composed Flip)
+			color.rgb = BT709_To_BT2020(color.rgb);
 			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
 			color.rgb = BT2020_To_BT709(color.rgb);
 		}
@@ -71,10 +73,9 @@ float4 PS(PSInputs inputs) : SV_Target
 		if (HdrDllPluginConstants.DisplayMode == 1) // HDR10 PQ BT.2020
 		{
 			// There is no need to clamp values above 1 here as the output buffer is unorm10 so it will clip anything beyond 0-1.
-			// Negative values need to be clamped though to avoid doing pow on a negative values.
+			// Negative values need to be clamped though to avoid doing pow on a negative values -> Linear_to_PQ does this.
 			color.rgb /= PQMaxWhitePoint;
-			color.rgb = WBT2020_To_BT2020(color.rgb);
-			// Linear_to_PQ does max(x, 0.f)
+			color.rgb = BT709_To_BT2020(color.rgb);
 			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_HDR10);
 			color.rgb = Linear_to_PQ(color.rgb);
 		}

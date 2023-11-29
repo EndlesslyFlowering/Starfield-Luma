@@ -1087,7 +1087,7 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 		LUTColor = LUTTexture.Sample(Sampler0, (LUTCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
 #endif // ENABLE_LUT_TETRAHEDRAL_INTERPOLATION
 	}
-	
+
 #if LUT_MAPPING_TYPE == 0
 	// We always work in linear space so convert to it.
 	// We never acknowledge the original wrong gamma function here (we don't really care).
@@ -1100,7 +1100,7 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	// This is the only way to make sure we extrapolate colors that reliably work with all types of LUTs,
 	// for example, the "night vision" LUT, which changes all colors to green and white (we can't allow any other hue to come out of it),
 	// or any LUT that clips highlights to 1 beyond the input color is 1 (in that case, we'd need input colors beyond 1 to also map to 1).
-	// 
+	//
 	// We keep the LUT coordinates in sRGB gamma, which should roughly work even outside the 0-1 range (especially beyond 1, not as much below 0).
 	if (LUTCoordinatesClamped && LUTExtrapolationColorSpace >= 0) // Theoretically an optimization. The result should be valid nonetheless.
 	{
@@ -1166,7 +1166,7 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 				// Avoid negative luminance. This can happen in case "derivedLUTColorChangeOffset" intensity/luminance was negative, even if we were at a bright/colorful LUT edge,
 				// especially if the input color is extremely bright. We can't really fix the color from ending up as black though, unless we find a way to auto detect it.
 				extrapolatedDerivedLUTColor.x = max(extrapolatedDerivedLUTColor.x, 0.f);
-				
+
 				if (LUTExtrapolationColorSpace == 3)
 				{
 					LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(float3(extrapolatedDerivedLUTColor.x, derivedLUTColor.yz), LUTExtrapolationColorSpace);
@@ -1234,7 +1234,7 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 	// Shift the LUT coordinates generation to account for 50% of extra area beyond 1 and 50% below 0,
 	// so "LUTPixelPosition3D" would represent the LUT from -0.5 to 1.5 before being normalized.
 	// The bottom and top 25% squares (cube sections) will be completely outside of the valid cube range and be completely extrapolated,
-	// while for the middle 50% squares, only their outer half would be extrapolated. 
+	// while for the middle 50% squares, only their outer half would be extrapolated.
 	LUTMax += LUT_SIZE_UINT * (LUTSizeMultiplier - 1);
 #endif
 	PixelScale = pow(PixelScale, 1.f / LUTSizeMultiplier);
@@ -1245,12 +1245,12 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 	{
 		DrawnLUT = true;
 		const int3 normalizedLUTPixelPosition3D = (int3)LUTPixelPosition3D - (int3)((LUTSizeMultiplier - 1) * LUT_SIZE_UINT / 2);
-		
+
 		const float2 LUTPixelPosition2DFloat = PixelPosition / (float)PixelScale;
 		float3 LUTPixelPosition3DFloat = float3(fmod(LUTPixelPosition2DFloat.x, LUT_SIZE_UINT * LUTSizeMultiplier), LUTPixelPosition2DFloat.y, (uint)(LUTPixelPosition2DFloat.x / (LUT_SIZE_UINT * LUTSizeMultiplier)));
 		LUTPixelPosition3DFloat.xy -= 0.5f; // Normalize the coordinates (haven't fully understood why this is needed yet)
 		const float3 normalizedLUTPixelPosition3DFloat = LUTPixelPosition3DFloat - (int3)((LUTSizeMultiplier - 1) * LUT_SIZE_UINT / 2);
-	
+
 		const bool NearestNeighbor = false;
 		// The color the neutral LUT would have, in sRGB gamma space
 		const float3 LUTCoordinates = (NearestNeighbor ? normalizedLUTPixelPosition3D : normalizedLUTPixelPosition3DFloat) / float(LUT_MAX_UINT);
@@ -1423,7 +1423,7 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
 	if (TONE_MAPPER_ENUM != 3) { // ACESFitted/Parametric
-		params.outputColor *= 3.5f; 
+		params.outputColor *= 3.5f;
 		tmParams.inputColor *= 3.5f;
 		tmParams.inputLuminance *= 3.5f;
 	}
@@ -1865,6 +1865,7 @@ void ApplyHDROutputTransforms(inout CompositeParams params)
 	// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
 	params.outputColor = BT709_To_WBT2020(params.outputColor);
 	params.outputColor = max(params.outputColor, 0.f);
+	params.outputColor = WBT2020_To_BT709(params.outputColor);
 }
 
 void ApplySDROutputTransforms(inout CompositeParams params)
@@ -1983,7 +1984,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 		if (HdrDllPluginConstants.ToneMapperType == 0)
 #endif
 		{
-		
+
 			ApplyUserSettingContrast(params);
 		}
 		ApplySDROutputTransforms(params);
