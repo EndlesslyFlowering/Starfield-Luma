@@ -365,10 +365,10 @@ namespace Utils
 		const float peakBrightness = settings->PeakBrightness.value.get_data();
 		const auto  peakBrightnessThreshold = DirectX::XMVectorReplicate(peakBrightness * (1.05f / 80.f));
 
-		const DirectX::XMMATRIX c_fromWBT2020toBT2020 = {
-			1.02967584133148193359375f, -0.013273007236421108245849609375f, -0.008765391074120998382568359375f, 0.f,
-			-0.01190710626542568206787109375f, 1.032054901123046875f, -0.008311719633638858795166015625f, 0.f,
-			-0.017768688499927520751953125f, -0.01878183521330356597900390625f, 1.01707708835601806640625f, 0.f,
+		const DirectX::XMMATRIX c_fromBT709toBT2020 = {
+			0.62722527980804443359375f, 0.329476892948150634765625f, 0.04329781234264373779296875f, 0.f,
+			0.0690418779850006103515625f, 0.919605672359466552734375f, 0.011352437548339366912841796875f, 0.f,
+			0.01639117114245891571044921875f, 0.0880887508392333984375f, 0.89552009105682373046875f, 0.f,
 			0.f, 0.f, 0.f, 1.f
 		};
 
@@ -380,8 +380,8 @@ namespace Utils
 		};
 
 		for (size_t i = 0; i < a_width; ++i) {
-			// color.rgb = WBT2020_To_BT2020(color.rgb);
-			auto color = DirectX::XMVector4Transform(a_inPixels[i], c_fromWBT2020toBT2020);
+			// color.rgb = BT709_To_BT2020(color.rgb);
+			auto color = DirectX::XMVector4Transform(a_inPixels[i], c_fromBT709toBT2020);
 
 			// color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
 			color = DirectX::XMVectorClamp(color, DirectX::XMVectorZero(), peakBrightnessThreshold);
@@ -425,7 +425,7 @@ namespace Utils
 
 		DirectX::ScratchImage scratchImage;
 		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
-		
+
 		DirectX::ScratchImage transformedImage;
 		DirectX::TransformImage(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), &TransformColor_HDR, transformedImage);
 
