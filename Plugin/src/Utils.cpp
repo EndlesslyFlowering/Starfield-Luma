@@ -381,16 +381,18 @@ namespace Utils
 
 		for (size_t i = 0; i < a_width; ++i) {
 			// color.rgb = WBT2020_To_BT2020(color.rgb);
-			const auto bt2020Color = DirectX::XMVector4Transform(a_inPixels[i], c_fromWBT2020toBT2020);
+			auto color = DirectX::XMVector4Transform(a_inPixels[i], c_fromWBT2020toBT2020);
 
 			// color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
-			const auto bt2020ColorClamped = DirectX::XMVectorClamp(bt2020Color, DirectX::XMVectorZero(), peakBrightnessThreshold);
+			color = DirectX::XMVectorClamp(color, DirectX::XMVectorZero(), peakBrightnessThreshold);
 
 			// color.rgb = BT2020_To_BT709(color.rgb);
-			const auto bt709Color = DirectX::XMVector4Transform(bt2020ColorClamped, c_fromBT2020toBT709);
+			color = DirectX::XMVector4Transform(color, c_fromBT2020toBT709);
 
-			// Discard alpha channel writes
-			DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&a_outPixels[i]), bt709Color);
+			// color.a = 1.0f;
+			color = DirectX::XMVectorSetW(color, 1.0f);
+
+			a_outPixels[i] = color;
 		}
 	}
 

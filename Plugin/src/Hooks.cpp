@@ -469,6 +469,16 @@ namespace Hooks
 		return _UnkFunc(a1, a_bgsSwapchainObject);		
     }
 
+    void Hooks::Hook_UnkFunc2(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4)
+	{
+		_UnkFunc2(a1, a2, a3, a4);
+
+		const auto settings = Settings::Main::GetSingleton();
+		settings->bFramegenOn = *Offsets::uiFrameGenerationTech > 0;
+
+		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, settings->GetDisplayModeFormat());
+	}
+
     bool Hooks::Hook_TakeSnapshot(uintptr_t a1)
     {
 		const auto settings = Settings::Main::GetSingleton();
@@ -608,6 +618,16 @@ namespace Hooks
 			HandleSetting(settings->FilmGrainType);
 			if (const auto filmGrainFPSLimit = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kFilmGrainFPSLimit))) {
 				filmGrainFPSLimit->m_Enabled.SetValue(settings->IsFilmGrainTypeImproved());
+			}
+			break;
+		case 24: // Frame Generation
+		    const auto prevFramegenValue = *Offsets::uiFrameGenerationTech;
+			const auto newFramegenValue = a_eventData.m_Value.Int;
+			if (prevFramegenValue != newFramegenValue) {
+				settings->bFramegenOn.store(a_eventData.m_Value.Int > 0);
+				if (prevFramegenValue == 0 || newFramegenValue == 0) {
+					settings->RefreshSwapchainFormat();
+				}
 			}
 			break;
 		}

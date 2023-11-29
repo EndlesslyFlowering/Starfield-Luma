@@ -189,7 +189,7 @@ namespace Settings
 		EnumStepper DisplayMode {
 		    SettingID::kDisplayMode,
 		    "Display Mode",
-		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation.",
+		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation.\n\nIn case Frame Generation is on, scRGB will internally fall back to HDR10 regardless of this setting.",
 		    "DisplayMode", "Main",
 		    0,
 		    { "SDR", "HDR10", "HDR scRGB" }
@@ -410,9 +410,11 @@ namespace Settings
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
 		RE::BGSSwapChainObject* GetSwapChainObject() const { return swapChainObject; }
+		int32_t GetActualDisplayMode() const;
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
 
+		void RefreshSwapchainFormat();
 		void OnDisplayModeChanged();
 
 		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
@@ -428,6 +430,7 @@ namespace Settings
 
 		std::atomic_bool bRequestedSDRScreenshot = false;
 		std::atomic_bool bRequestedHDRScreenshot = false;
+		std::atomic_bool bFramegenOn = false;
 
     private:
 		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");

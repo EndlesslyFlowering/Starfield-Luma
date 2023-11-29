@@ -37,6 +37,9 @@ namespace Hooks
 			// set color space and save swapchain object pointer
 			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x42C), Hook_UnkFunc);  // 0x3EA pre 1.8
 
+			// just after loading ini settings; deal with initial framegen setting value
+			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(149040, 0x543), Hook_UnkFunc2);
+
 			// disable photo mode screenshots with HDR
 			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(415473);
 			auto       _Hook_TakeSnapshot = dku::Hook::AddVMTHook(&takeSnapshotVtbl, 1, FUNC_INFO(Hook_TakeSnapshot));
@@ -45,6 +48,13 @@ namespace Hooks
 
 			// Settings UI
 			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x63A), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8
+
+			// Hide vanilla brightness, contrast and hdr brightness
+			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xA94), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBEB), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD6E), nop5, 5);
+
 			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
 			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
 			_SettingsDataModelSliderChanged1 = dku::Hook::write_branch<5>(dku::Hook::IDToAbs(135739, 0xA3), Hook_SettingsDataModelSliderChanged1);
@@ -78,6 +88,9 @@ namespace Hooks
 
 		static void Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;
+
+		static void Hook_UnkFunc2(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
+		static inline std::add_pointer_t<decltype(Hook_UnkFunc2)> _UnkFunc2;
 
 		static bool Hook_TakeSnapshot(uintptr_t a1);
 		static inline std::add_pointer_t<decltype(Hook_TakeSnapshot)> _TakeSnapshot;
