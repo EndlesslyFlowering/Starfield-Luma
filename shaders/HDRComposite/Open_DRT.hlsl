@@ -13,8 +13,9 @@
 
 // Safe division of float a by float b
 float sdivf(float a, float b) {
-  if (b == 0.0f) return 0.0f;
-  else return b ? a/b : 0;
+  return b
+    ? (a / b)
+    : 0;
 }
 
 // Safe division of float3 a by float b
@@ -29,29 +30,18 @@ float3 sdivf3f3(float3 a, float3 b) {
 
 // Safe power function raising float a to power float b
 float spowf(float a, float b) {
-  if (a <= 0.0f) return a;
-  else return pow(a, b);
+  return (a <= 0)
+    ? a
+    : pow(a, b);
 }
 
-// Safe power function raising float3 a to power float b
-float3 spowf3(float3 a, float b) {
-  return float3(pow(a.x, b), pow(a.y, b), pow(a.z, b));
-}
-
-// Return max of float3 a and float mn
-float3 maxf3(float mn, float3 a) { return float3(max(a.x, mn), max(a.y, mn), max(a.z, mn)); }
-
-// Return min of float3 a and float mx
-float3 minf3(float mx, float3 a) { return float3(min(a.x, mx), min(a.y, mx), min(a.z, mx)); }
-
-// Return the hypot or length of float3 a
-float hypotf3(float3 a) { return  sqrt(spowf(a.x, 2.0f) + spowf(a.y, 2.0f) + spowf(a.z, 2.0f)); }
 
 float3 narrow_hue_angles(float3 v) {
   return float3(
     min(2.0f, max(0.0f, v.x - (v.y + v.z))),
     min(2.0f, max(0.0f, v.y - (v.x + v.z))),
-    min(2.0f, max(0.0f, v.z - (v.x + v.y))));
+    min(2.0f, max(0.0f, v.z - (v.x + v.y)))
+  );
 }
 
 float tonescale(float x, float m, float s, float c) {
@@ -60,27 +50,29 @@ float tonescale(float x, float m, float s, float c) {
 
 float tonescale_invert(float x, float m, float s, float c) {
   float ip = 1.0f/c;
-  return spowf(s*x, ip)/(m - spowf(x, ip));
+  return spowf(s*x, ip) / (m - spowf(x, ip));
 }
 
 float flare(float x, float fl) {
-  return spowf(x, 2.0f)/(x+fl);
+  return spowf(x, 2.0f) / (x+fl);
 }
 
 float flare_invert(float x, float fl) {
-  return (x + sqrt(x*(4.0f*fl + x)))/2.0f;
+  return (x + sqrt(x * ((4.0f * fl) + x))) / 2.0f;
 }
 
 // https://www.desmos.com/calculator/gfubm2kvlu
 float powerp(float x, float p, float m) {
-  float y = x <= 0.0f ? x : x*spowf(spowf(x/m, 1.0f/p) + 1.0f, -p);
-  return y;
+  return (x <= 0.0f)
+    ? x
+    : (x * spowf(spowf(x / m, 1.0f / p) + 1.0f, -p));
 }
 
 // https://www.desmos.com/calculator/jrff9lrztn
 float powerptoe(float x, float p, float m, float t0) {
-  float y = x > t0 ? x : (x-t0)*spowf(spowf((t0-x)/(t0-m), 1.0f/p) + 1.0f, -p) + t0;
-  return y;
+  return (x > t0)
+    ? x
+    : ((x - t0) * spowf(spowf((t0 - x) / (t0 - m), 1.0f / p) + 1.0f, -p) + t0);
 }
 
 /* Shadow Contrast
@@ -93,12 +85,10 @@ float3 shd_con(float3 rgb, float ex, float str) {
   const float m = pow(2.0f, ex);
   const float w = pow(str, 3.0f);
 
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  float n2 = n*n;
-  float s;
-  s = (n2 + m*w)/(n2 + w); // Implicit divide by n
-  rgb *= s;
-  return rgb;
+  const float n = max(rgb.x, max(rgb.y, rgb.z));
+  const float n2 = n*n;
+  const float s = (n2 + m*w)/(n2 + w); // Implicit divide by n
+  return rgb * s;
 }
 
 float3 shd_con_invert(float3 rgb, float ex, float str) {
@@ -106,15 +96,13 @@ float3 shd_con_invert(float3 rgb, float ex, float str) {
   const float m = pow(2.0f, ex);
   const float w = pow(str, 3.0f);
 
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  float n2 = n*n;
-  float s;
-  float p0 = n2 - 3.0f*m*w;
-  float p1 = 2.0f*n2 + 27.0f*w - 9.0f*m*w;
-  float p2 = pow(sqrt(n2*p1*p1 - 4*p0*p0*p0)/2.0f + n*p1/2.0f,1.0f/3.0f);
-  s = (p0/(3.0f*p2) + p2/3.0f + n/3.0f) / n;
-  rgb *= s;
-  return rgb;
+  const float n = max(rgb.x, max(rgb.y, rgb.z));
+  const float n2 = n*n;
+  const float p0 = n2 - 3.0f*m*w;
+  const float p1 = 2.0f*n2 + 27.0f*w - 9.0f*m*w;
+  const float p2 = pow(sqrt(n2*p1*p1 - 4*p0*p0*p0)/2.0f + n*p1/2.0f,1.0f/3.0f);
+  const float s = (p0/(3.0f*p2) + p2/3.0f + n/3.0f) / n;
+  return rgb * s;
 }
 
 /* Highlight Contrast
@@ -123,18 +111,15 @@ float3 shd_con_invert(float3 rgb, float ex, float str) {
 */
 float3 hl_con(float3 rgb, float ex, float th) {
   // Parameter setup
-  float p = pow(2.0f, -ex);
-  float t0 = 0.18f*pow(2.0f, th);
-  float a = pow(t0, 1.0f - p)/p;
-  float b = t0*(1.0f - 1.0f/p);
+  const float p = pow(2.0f, -ex);
+  const float t0 = 0.18f*pow(2.0f, th);
+  const float a = pow(t0, 1.0f - p)/p;
+  const float b = t0*(1.0f - 1.0f/p);
 
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  float s;
-  if (n == 0.0f || n < t0) {
-    s = 1.0f;
-  } else {
-    s = pow((n - b)/a, 1.0f/p)/n;
-  }
+  const float n = max(rgb.x, max(rgb.y, rgb.z));
+  const float s = (n == 0.0f || n < t0)
+    ? 1.f
+    : (pow((n - b)/a, 1.0f/p) / n);
   return rgb * s;
 }
 
@@ -144,29 +129,16 @@ float3 hl_con(float3 rgb, float ex, float th) {
 */
 float3 hl_con_invert(float3 rgb, float ex, float th) {
   // Parameter setup
-  float p = pow(2.0f, -ex);
-  float t0 = 0.18f*pow(2.0f, th);
-  float a = pow(t0, 1.0f - p)/p;
-  float b = t0*(1.0f - 1.0f/p);
+  const float p = pow(2.0f, -ex);
+  const float t0 = 0.18f*pow(2.0f, th);
+  const float a = pow(t0, 1.0f - p)/p;
+  const float b = t0*(1.0f - 1.0f/p);
 
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  float s;
-  if (n == 0.0f || n < t0) {
-    s = 1.0f;
-  } else {
-    s = (a*pow(n, p) + b)/n;
-  }
+  const float n = max(rgb.x, max(rgb.y, rgb.z));
+  const float s = (n == 0.0f || n < t0)
+    ? 1.f
+    : ((a*pow(n, p) + b) / n);
   return rgb * s;
-}
-
-float3 zone_extract(float3 input, float3 rgb, float zp, int zr) {
-  float n = max(1e-12f, max(rgb.x, max(rgb.y, rgb.z)));
-  const float fl = 0.01f;
-  float zpow = pow(2.0f, -zp + 1.0f);
-  float toe = (n * n / (n + fl));
-  float f = pow((toe / (toe + 1.0f)) / n, zpow);
-  if (zr == 1) f = 1.0f - pow((n / (n + 1.0f)) / n, zpow);
-  return input * (1.0f - f) + rgb * f;
 }
 
 float3 ex_high(float3 rgb, float ex, float pv, float fa) {
@@ -183,44 +155,28 @@ float3 ex_high(float3 rgb, float ex, float pv, float fa) {
   const float y1 = a * pow(x1, p) + b;
 
   // Calculate scale factor for rgb
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  float s;
-  s = n < t0 ? 1.0f : n > x1 ? (m * (n - x1) + y1) / n : (a * pow(n, p) + b) / n;
+  const float n = max(rgb.x, max(rgb.y, rgb.z));
+  const float s = (n < t0)
+    ? 1.0f
+    : (n > x1)
+      ? (m * (n - x1) + y1) / n
+      : (a * pow(n, p) + b) / n;
   return rgb * s;
 }
 
-float3 ex_high_invert(float3 rgb, float ex, float pv, float fa) {
-  // Zoned highlight exposure with falloff : https://www.desmos.com/calculator/ylq5yvkhoq
-
-  // Parameter setup
-  const float f = 5.0f * pow(fa, 1.6f) + 1.0f;
-  const float p = abs(ex + f) < 1e-8f ? 1e-8f : (ex + f) / f;
-  const float m = pow(2.0f, ex);
-  const float t0 = 0.18f * pow(2.0f, pv);
-  const float a = pow(t0, 1.0f - p) / p;
-  const float b = t0 * (1.0f - 1.0f / p);
-  const float x1 = t0 * pow(2.0f, f);
-  const float y1 = a * pow(x1, p) + b;
-
-  // Calculate scale factor for rgb
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  float s;
-  s = n < t0 ? 1.0f : n > y1 ? ((m * x1 - y1 + n) / m) / n : pow((n - b) / a, 1.0f / p) / n;
-  return rgb * s;
-}
 
 // Calculate classical HSV-style "chroma"
 float calc_chroma(float3 rgb) {
-  float mx = max(rgb.x, max(rgb.y, rgb.z));
-  float mn = min(rgb.x, min(rgb.y, rgb.z));
-  float ch = mx - mn;
+  const float mx = max(rgb.x, max(rgb.y, rgb.z));
+  const float mn = min(rgb.x, min(rgb.y, rgb.z));
+  const float ch = mx - mn;
   return sdivf(ch, mx);
 }
 
 float calc_hue(float3 rgb) {
-  float mx = max(rgb.x, max(rgb.y, rgb.z));
-  float mn = min(rgb.x, min(rgb.y, rgb.z));
-  float ch = mx - mn;
+  const float mx = max(rgb.x, max(rgb.y, rgb.z));
+  const float mn = min(rgb.x, min(rgb.y, rgb.z));
+  const float ch = mx - mn;
   float h;
   if (ch == 0.0f) h = 0.0f;
   else if (mx == rgb.x) h = ((rgb.y - rgb.z) / ch + 6.0f) % 6.0f;
@@ -246,81 +202,27 @@ float extract_hue_angle(float h, float o, float w, int sm) {
   return hc;
 }
 
-float3 n6_hueshift(float3 rgb, 
-    float sy, float sr, float sm, float sb, float sc, float sg,
-    float scu, float cuh, float cuw,
-    float str, float chl, int ze, float zp, int zr) {
-  
-  float3 input = rgb;
+// Adjust to ACES Highlights
+float3 apply_aces_highlights(float3 rgb) {
+  rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f);
+  rgb = ex_high(rgb, 0.5f, -3.0f, 0.5f);
+  rgb = ex_high(rgb, 0.924f, -1.0f, 0.5f);
+  rgb = ex_high(rgb, -0.15f, 2.68f, 0.19f);
+  return rgb;
+}
 
-  // max(r,g,b) norm
-  float n = max(rgb.x, max(rgb.y, rgb.z));
-  
-  // RGB Ratios
-  float3 r;
-  if (n == 0.0f) r = float3(0.0f, 0.0f, 0.0f);
-  else r = rgb / n;
- 
-  // Chroma
-  // Strength controls a lerp between min(r,g,b) and max(r,g,b) for the calculation of chroma
-  float ch = min(r.x, min(r.y, r.z)) * (1.0f - str) + str;
-  ch = ch == 0.0f ? 0.0f : min(1.0f, 1.0f - min(r.x / ch, min(r.y / ch, r.z / ch)));
-  
-  // Chroma limit: reduces effect on more saturated colors, depending on chroma limit strength
-  // 0.5 < chl < 1 : power function on limit
-  // 0 < chl < 0.5 : mix back limit (better handles out of gamut colorimetry)
-  float f0 = chl < 0.5f ? max(0.0f, 0.5f - chl) * 2.0f : 1.0f / max(1e-3f, (1.0f - chl) * 2.0f);
-  ch = chl < 0.5f ? ch * f0 + ch * (1.0f - ch) * (1.0f - f0) : ch * pow(max(0.0f, 1.0f - ch), f0);
+float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
+  rgb = shd_con(rgb, -1.8f, 0.15f * (2.f - shadows));
 
-  // Hue
-  float hue = calc_hue(r);
+  // More visibility in shadows
+  rgb = shd_con(rgb, 0.25f * lerp(4.f, -4.f, 0.90f * (2.f - shadows) / 2.f), 0.35);
 
-  // Hue extraction for primaries (RGB)
-  float3 hp = float3(
-    extract_hue_angle(hue, 2.0f, 1.0f, 0),
-    extract_hue_angle(hue, 6.0f, 1.0f, 0),
-    extract_hue_angle(hue, 4.0f, 1.0f, 0));
-  hp = hp * ch;
+  return rgb;
+}
 
-  // Hue extraction for secondaries (CMY)
-  float3 hs = float3(
-    extract_hue_angle(hue, 5.0f, 1.0f, 0),
-    extract_hue_angle(hue, 3.0f, 1.0f, 0),
-    extract_hue_angle(hue, 1.0f, 1.0f, 0));
-  hs = hs * ch;
+float3 apply_user_highlights(float3 rgb, float highlights = 1.f) {
 
-  // Hue shift primaries
-  r.x = r.x + sb*hp.z - sg*hp.y;
-  r.y = r.y + sr*hp.x - sb*hp.z;
-  r.z = r.z + sg*hp.y - sr*hp.x;
-  
-  // Hue shift secondaries
-  r.x = r.x + sy*hs.z - sm*hs.y;
-  r.y = r.y + sc*hs.x - sy*hs.z;
-  r.z = r.z + sm*hs.y - sc*hs.x;
-
-  // Hue extraction for custom
-  float hc = extract_hue_angle(hue, cuh / 60.0f, cuw, 0);
-  hc = hc * ch;
-  
-  // Calculate params for custom hue angle shift
-  float h = cuh / 60.0f; // Convert degrees to 0-6 hue angle
-  float s = scu * cuw; // Rotate only as much as the custom width
-  // Calculate per-channel shift values based on hue angle
-  float sc0 = h < 3.0f ? s - s*min(1, abs(h - 2.0f)) : s*min(1.0f, abs(h - 5.0f)) - s;
-  float sc1 = h < 1.0f ? s - s*min(1.0f, abs(h)) : h < 5.0f ? s*min(1.0f, abs(h - 3.0f)) - s : s - s*min(1.0f, abs(h - 6.0f));
-  float sc2 = h < 2.0f ? s*min(1.0f, abs(h - 1.0f)) - s : s - s*min(1.0f, abs(h - 4.0f));
-
-  // Hue shift custom
-  r.x = r.x + hc*(sc2-sc1);
-  r.y = r.y + hc*(sc0-sc2);
-  r.z = r.z + hc*(sc1-sc0);
-  
-  rgb = r * n;
-
-  // Zone extract
-  if (ze == 1) rgb = zone_extract(input, rgb, zp, zr);
-
+  rgb = hl_con(rgb, highlights - 1.f, 203.f / 100.f);
   return rgb;
 }
 
@@ -328,28 +230,10 @@ float3 open_drt_transform(
   float3 rgb,
   float Lp = 100.f,
   float gb = 0.12,
-  float shadows = 1.f,
-  float highlights = 1.f,
-  float saturation = 1.f,
   float contrast = 1.f
   )
 {
 
-  // More visibility in shadows
-  rgb = shd_con(rgb, 0.35f * lerp(4.f, -4.f, 0.9f * (2.f - shadows) / 2.f), 0.35);
-
-  // Adjust to ACES Shadows
-  rgb = shd_con(rgb, -1.8f, 0.15f * (2.f - shadows));
-
-  // Adjust to ACES Highlights
-  rgb = ex_high(rgb, -0.55f, -6.0f, 0.5f);
-  rgb = ex_high(rgb, 0.5f, -3.0f, 0.5f);
-  rgb = ex_high(rgb, 0.924f, -1.0f, 0.5f);
-  rgb = ex_high(rgb, -0.15f, 2.68f, 0.19f);
-
-  rgb = hl_con(rgb, highlights - 1.f, 203.f / 100.f);
-
-  
   // **************************************************
   // Parameter Setup
   // --------------------------------------------------
@@ -488,8 +372,8 @@ float3 open_drt_transform(
     and then "narrow down" the hue angle for each with channel subtraction (see narrow_hue_angles() function).
   */
   
-  float mx = max(rats.x, max(rats.y, rats.z));
-  float mn = min(rats.x, min(rats.y, rats.z));
+  const float mx = max(rats.x, max(rats.y, rats.z));
+  const float mn = min(rats.x, min(rats.y, rats.z));
 
   float3 rats_h = sdivf3f(rats - mn, mx);
   rats_h = narrow_hue_angles(rats_h);
@@ -513,7 +397,7 @@ float3 open_drt_transform(
   chf = 1.0f - spowf(spowf(chf/chf_m, 1.0f/chf_p)+1.0f, -chf_p);
 
   // Max of rgb ratios
-  float rats_mx = max(rats.x, max(rats.y, rats.z));
+  float rats_mx = mx; // max(rats.x, max(rats.y, rats.z));
 
   // Normalized rgb ratios
   float3 rats_n = sdivf3f(rats, rats_mx);
@@ -583,3 +467,50 @@ float3 open_drt_transform(
 
   return rgb;
 }
+
+float3 open_drt_transform_single(
+  float3 rgb,
+  float peakNits = 1000.f,
+  float shadows = 1.f,
+  float highlights = 1.f,
+  float contrast = 1.f
+  )
+{
+  rgb = apply_aces_highlights(rgb);
+  
+  rgb = apply_user_shadows(rgb, shadows);
+  rgb = apply_user_highlights(rgb, highlights);
+
+  rgb = open_drt_transform(rgb, peakNits, 0, contrast);
+
+  return rgb;
+}
+
+void open_drt_transform_dual(
+  float3 rgb,
+  inout float3 sdrOutput,
+  inout float3 hdrOutput,
+  float hdrPeakNits = 1000.f,
+  float peakScaling = 1.f,
+  float shadows = 1.f,
+  float highlights = 1.f,
+  float contrast = 1.f
+  )
+{
+
+  rgb = apply_aces_highlights(rgb);
+
+  sdrOutput = rgb;
+  hdrOutput = rgb;
+
+  sdrOutput = apply_user_shadows(sdrOutput, 1.4f);
+  hdrOutput = apply_user_shadows(hdrOutput, shadows);
+  
+  sdrOutput = apply_user_highlights(sdrOutput, 0.20f);
+  hdrOutput = apply_user_highlights(hdrOutput, highlights);
+
+  // TODO: Mulithread
+  sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.35f, 1.f);
+  hdrOutput = open_drt_transform(hdrOutput * peakScaling, hdrPeakNits, 0, contrast);
+}
+

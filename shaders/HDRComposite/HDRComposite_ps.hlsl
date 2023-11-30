@@ -1452,40 +1452,40 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 
 	float contrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
 	// Compute ungraded tone map for exact nits
-	tmParams.outputHDRColor = open_drt_transform(
-		tmParams.inputColor * paperWhiteScaling,
-		peakNits,
-		0.f,
-		shadowsScaling,
-		highlightsScaling,
-		1.f,
-		contrast
-	);
-	// Boost by peakNits/white to exceed SDR range (when in HDR)
-	tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
 
-	// Default to single-pass with HDR colors
-	tmParams.outputSDRColor = tmParams.outputHDRColor;
-	#if LUT_EXTRAPOLATION_TYPE > 0
-		// If LUT extrapolation is available, we can skip an SDR pass,
-		// unless requests strict SDR LUTs
-		if (!HdrDllPluginConstants.StrictLUTApplication)
-	#endif
-		{
-			// Already clamped to [0-1]
-			if (HdrDllPluginConstants.DisplayMode > 0)
-			{
-				tmParams.outputSDRColor = open_drt_transform(
-					tmParams.inputColor,
-					400.f, // HDR 400 minimum for better BT2020 colors
-					0.10f, // Adjust exposure to match Vanilla SDR
-					2.f,   // Raise shadows
-					1.f,   // Ignore user highlights
-					1.f,
-					1.f    // Ignore user contrast
-				);
-			}
-		}
+
+	if (
+		HdrDllPluginConstants.DisplayMode <= 0 // If SDR
+		|| !HdrDllPluginConstants.ColorGradingStrength // No LUTs
+#if LUT_EXTRAPOLATION_TYPE > 0
+		|| HdrDllPluginConstants.StrictLUTApplication // Use LUT Extrapolation
+#endif
+	)
+	{
+		tmParams.outputHDRColor = open_drt_transform_single(
+			tmParams.inputColor * paperWhiteScaling,
+			peakNits,
+			shadowsScaling,
+			highlightsScaling,
+			contrast
+		);
+		tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
+		tmParams.outputSDRColor = tmParams.outputHDRColor;
+	}
+	else
+	{
+		open_drt_transform_dual(
+			tmParams.inputColor,
+			tmParams.outputSDRColor,
+			tmParams.outputHDRColor,
+			peakNits,
+			paperWhiteScaling,
+			shadowsScaling,
+			highlightsScaling,
+			contrast
+		);
+		tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
+	}
 
 	tmParams.outputSDRLuminance = Luminance(tmParams.outputSDRColor);
 	tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
@@ -1496,7 +1496,6 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 
 void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	// Not compatible with RestorePostProcess yet
 	params.outputColor *= safeDivision(tmParams.outputHDRLuminance, tmParams.outputSDRLuminance);
 
 	ApplyUserSettingExtendGamut(params);
