@@ -212,10 +212,10 @@ float3 apply_aces_highlights(float3 rgb) {
 }
 
 float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
-  rgb = shd_con(rgb, -1.8f, 0.15f * (2.f - shadows));
+  rgb = shd_con(rgb, -1.8f, 0.13f * (2.f - shadows));
 
   // More visibility in shadows
-  rgb = shd_con(rgb, 0.25f * lerp(4.f, -4.f, 0.90f * (2.f - shadows) / 2.f), 0.35);
+  rgb = shd_con(rgb, 0.18f * lerp(4.f, -4.f, 0.21f * (2.f - shadows) / 2.f), 0.20f * shadows);
 
   return rgb;
 }
@@ -503,14 +503,14 @@ void open_drt_transform_dual(
   sdrOutput = rgb;
   hdrOutput = rgb;
 
-  sdrOutput = apply_user_shadows(sdrOutput, 1.4f);
+  sdrOutput = apply_user_shadows(sdrOutput, 1.f);
   hdrOutput = apply_user_shadows(hdrOutput, shadows);
   
-  sdrOutput = apply_user_highlights(sdrOutput, 0.20f);
+  sdrOutput = apply_user_highlights(sdrOutput, 0.45f);
   hdrOutput = apply_user_highlights(hdrOutput, highlights);
 
   // TODO: Mulithread
-  sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.35f, 1.f);
+  sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.20f, 1.f);
   hdrOutput = open_drt_transform(hdrOutput * peakScaling, hdrPeakNits, 0, contrast);
 }
 
