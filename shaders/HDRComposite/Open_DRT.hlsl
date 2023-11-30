@@ -506,11 +506,11 @@ void open_drt_transform_dual(
   sdrOutput = apply_user_shadows(sdrOutput, 1.f);
   hdrOutput = apply_user_shadows(hdrOutput, shadows);
   
-  sdrOutput = apply_user_highlights(sdrOutput, 0.45f);
+  sdrOutput = apply_user_highlights(sdrOutput, 0.42f);
   hdrOutput = apply_user_highlights(hdrOutput, highlights);
 
   // TODO: Mulithread
-  sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.20f, 1.f);
+  sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.25f, 1.f);
   hdrOutput = open_drt_transform(hdrOutput * peakScaling, hdrPeakNits, 0, contrast);
 }
 
