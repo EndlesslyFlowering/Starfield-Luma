@@ -25,8 +25,9 @@
 // 0 Disabled.
 // 1 "Proper" LUT extrapolation done in conservative ways to determine colors outside of the LUT range as accurately as possible. It might look flat compared to other methods.
 // 2 Fast LUT extrapolation that isn't hue conserving (generally looks good and is fairly accurate).
-// 2 Fast and hue conserving LUT extrapolation approach. It just scales the luminance up (it doesn't work LUTs that invert colors/brightness).
-#define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
+// 3 Fast and hue conserving LUT extrapolation approach. It just scales the luminance up (it doesn't work LUTs that invert colors/brightness).
+// 4 Gamut compression before sampling and decompression after
+#define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 4)
 // 0 Linear space. Gradients look wrong and there's a lot of invalid colors.
 // 1 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
 // 2 Oklab. Gradients look okish but there's a lot of invalid colors.
@@ -1066,6 +1067,9 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	// as a LUT cube with linear coordinates mapping is extremely complicated and non appropriate for other reasons.
 	LUTCoordinates = clampCubeCoordinates(LUTCoordinates, LUTCoordinatesClamped);
 	const float3 neutralLUTColor = gamma_sRGB_to_linear_mirrored(LUTCoordinates); // We can't use "originalColor" here
+#elif LUT_EXTRAPOLATION_TYPE == 4
+	float maxChannel = max(1.f, max(originalColor.r, max(originalColor.g, originalColor.b)));
+	LUTCoordinates = gamma_linear_to_sRGB_mirrored(originalColor / maxChannel);
 #else
 	LUTCoordinates = saturate(LUTCoordinates);
 	const bool LUTCoordinatesClamped = length(unclampedLUTCoordinates - LUTCoordinates) > FLT_MIN; // Some threshold is needed here
@@ -1195,6 +1199,8 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	LUTColor = RestorePostProcess(unclampedNeutralLUTColor, neutralLUTColor, LUTColor);
 #elif LUT_EXTRAPOLATION_TYPE == 3
 	LUTColor *= safeDivision(Luminance(unclampedNeutralLUTColor), Luminance(neutralLUTColor));
+#elif LUT_EXTRAPOLATION_TYPE == 4
+	LUTColor *= maxChannel;
 #endif // LUT_EXTRAPOLATION_TYPE
 
 	return LUTColor;
