@@ -159,7 +159,9 @@ void frag_main()
 
 		float randomNumber = rand(seed);
 
-		float3 linearColor = (isInOutColorLinear)
+		float3 linearColor = (isHDR)
+			? BT709_To_WBT2020(inputColor)
+			: (isInOutColorLinear)
 			? inputColor
 			: GAMMA_TO_LINEAR(inputColor);
 		// Film grain is based on film density
@@ -196,14 +198,17 @@ void frag_main()
 		outputColor = abs(yChange);
 #endif
 
-		if (!isInOutColorLinear) {
+		if (isHDR) {
+			outputColor = max(outputColor, 0.f);
+			outputColor = WBT2020_To_BT709(outputColor);
+		}
+		else if (!isInOutColorLinear) {
+			outputColor = saturate(outputColor);
 			outputColor = LINEAR_TO_GAMMA(outputColor);
 		}
 	}
 
-	outputColor = max(outputColor, 0.f);
-
-	SV_Target.rgb = isHDR ? outputColor : saturate(outputColor);
+	SV_Target.rgb = outputColor;
 
 	SV_Target.w = 1.0f;
 }
