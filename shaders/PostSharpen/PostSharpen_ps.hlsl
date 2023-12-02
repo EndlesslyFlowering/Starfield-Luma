@@ -148,6 +148,10 @@ PSOutput PS(PSInput psInput)
 				_157 /= PQMaxWhitePoint;
 				_162 /= PQMaxWhitePoint;
 				_167 /= PQMaxWhitePoint;
+				_152 = BT709_To_WBT2020(inColor);
+				_157 = BT709_To_WBT2020(inColor);
+				_162 = BT709_To_WBT2020(inColor);
+				_167 = BT709_To_WBT2020(inColor);
 			}
 			else
 			{
