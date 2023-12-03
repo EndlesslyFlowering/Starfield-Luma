@@ -559,7 +559,7 @@ float3 DICETonemap(
 	float  HighlightsShoulderStart = 0.f,
 	float  HighlightsModulationPow = 1.f)
 {
-#if DEVELOPMENT
+#if DEVELOPMENT && 0
 	HighlightsModulationPow = linearNormalization(HdrDllPluginConstants.DevSetting04, 0.f, 1.f, 0.5f, 1.5f);
 #endif
 
@@ -622,14 +622,15 @@ float3 DICETonemap(
 // don't set this above 1 as it will break the curve (turns into a double S curve instead of a single one)
 // below 1 it increases the amount of additional contrast being applied
 // only change this for testing
-#define C 1
+#define LOG_2_ADJUST_C 1
 
-static const float den = log2(C + 1.f);
 
 // bias towards smaller numbers
 void Log2Adjust(inout float Channel)
 {
-#if (C != 1)
+	static const float den = log2(LOG_2_ADJUST_C + 1.f);
+
+#if (LOG_2_ADJUST_C != 1)
 	Channel = log2(max(Channel * c + 1.f, FLT_MIN)) / den;
 #else
 	Channel = log2(max(Channel + 1.f, FLT_MIN));
@@ -1563,7 +1564,7 @@ void ApplySDRToneMapperHDRUpgrade(inout CompositeParams params, inout ToneMapper
 		float minHighlightsColorIn = MaxShadowsColor; // We consider shadow the first ~33% of perception SDR space
 #endif
 		float minHighlightsColorOut = minHighlightsColorIn;
-#if DEVELOPMENT
+#if DEVELOPMENT && 0
 		const float localSDRTonemapHDRStrength = 1.f - HdrDllPluginConstants.DevSetting01;
 #else
 		const float localSDRTonemapHDRStrength = SDRTonemapHDRStrength;
