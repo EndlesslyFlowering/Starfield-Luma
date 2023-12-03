@@ -190,18 +190,8 @@ namespace Utils
 	bool ShouldCorrectLUTs()
 	{
 		const auto ui = *Offsets::uiPtr;
-		// make sure we do indeed correct luts in these menus, even though DataMenu is in the menu stack
-		if (Offsets::UI_IsMenuOpen(ui, "GalaxyStarMapMenu")) {
-			return true;
-		}
-		if (Offsets::UI_IsMenuOpen(ui, "SpaceshipEditorMenu")) {
-			return true;
-		}
 
-		// don't correct luts while we're in menus that have a LUT
-		if (Offsets::UI_IsMenuOpen(ui, "DataMenu")) {
-			return false;
-		}
+		// make sure we don't correct luts in inventory/container menus
 		if (Offsets::UI_IsMenuOpen(ui, "InventoryMenu")) {
 			return false;
 		}
@@ -209,6 +199,19 @@ namespace Utils
 			return false;
 		}
 		if (Offsets::UI_IsMenuOpen(ui, "BarterMenu")) {
+			return false;
+		}
+
+		// make sure we do correct luts in galaxy and starship menus, even though DataMenu is in the menu stack
+		if (Offsets::UI_IsMenuOpen(ui, "GalaxyStarMapMenu")) {
+			return true;
+		}
+		if (Offsets::UI_IsMenuOpen(ui, "SpaceshipEditorMenu")) {
+			return true;
+		}
+
+		// fallback to not correcting luts generally while data menu is in the stack
+		if (Offsets::UI_IsMenuOpen(ui, "DataMenu")) {
 			return false;
 		}
 
