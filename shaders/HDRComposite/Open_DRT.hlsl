@@ -261,7 +261,7 @@ float3 open_drt_transform(
   // Hue Shift RGB controls
   float3 hs = float3(
     0.3f,   // 0.3f
-    0.6f,   // -0.1f
+    0.1f,   // -0.1f
     -0.2f   // -0.5f
   );
   
