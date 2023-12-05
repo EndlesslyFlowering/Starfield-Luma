@@ -647,7 +647,6 @@ float SigmoidalContrastAdjustment(
 	float normalizationFactorLower,
 	float normalizationFactorUpper)
 {
-	[flatten]
 	if (Channel <= contrastMidPoint)
 	{
 		Channel *= normalizationFactorLower;

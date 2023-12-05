@@ -98,7 +98,6 @@ float3 WBT2020_To_BT2020(float3 color)
 
 float gamma_linear_to_sRGB(float channel)
 {
-	[flatten]
 	if (channel <= 0.0031308f)
 	{
 		channel = channel * 12.92f;
@@ -132,7 +131,6 @@ T linear_to_gamma_mirrored(T Color, float Gamma = 2.2f)
 
 float gamma_sRGB_to_linear(float channel)
 {
-	[flatten]
 	if (channel <= 0.04045f)
 	{
 		channel = channel / 12.92f;
@@ -433,7 +431,7 @@ float3 bt2446_hdr_to_sdr(float3 linRGB, float lHDR, float lSDR) {
 	const float pSDR = 1.f + (32.f * pow(lSDR / 10000.0f, 1.f / 2.4f));
 
 	const float Y = Luminance(rgb); // Luma
-	
+
 	const float Yp = log(1.f + (pHDR - 1.0) * Y) / log(pHDR);
 
 	const float Yc = (Yp < 0.7399f) ? 1.0770f * max(0, Yp)
