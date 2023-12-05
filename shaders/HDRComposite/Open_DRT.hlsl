@@ -187,7 +187,7 @@ float3 open_drt_transform(
   const static float chc_m = 0.6f; // 0.5 // pivot of contrast curve
 
   // Tonescale parameters
-  const static float c = 0.8f; // 1.1 contrast
+  const float c = 0.8f * contrast; // 1.1 contrast
   const static float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
@@ -248,7 +248,7 @@ float3 open_drt_transform(
   // m0 and m are output y scale for peak white intersection constraint
   float s0 = flare_invert(gy, fl); // [0+]
   float m0 = flare_invert(py, fl); // [0+]
-  const float ip = 1.0f/(c * contrast);
+  const float ip = 1.0f/c;
   float m0_ip = pow(m0, ip); // [0+]
   float s0_ip = pow(s0, ip); // [0+]
   // Perf: Store pow(m0, ip) and pow(s0, ip)
