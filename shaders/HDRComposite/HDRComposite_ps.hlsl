@@ -1381,16 +1381,12 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 		const float yMax = log10(PQMaxNits);
 		const float yRange = yMax - yMin;
 		float valueY = (float(dtmParams.toneMapperY) / float(ToneMapperBins)) * (yRange) + yMin;
-		float peakNits = HdrDllPluginConstants.DisplayMode
+		float peakNits = HdrDllPluginConstants.DisplayMode >=0
 			? HdrDllPluginConstants.HDRPeakBrightnessNits
 			: WhiteNits_sRGB;
 		valueY = pow(10.f, valueY);
 		valueY /= WhiteNits_sRGB;
 		float outputY = Luminance(params.outputColor);
-		if (HdrDllPluginConstants.DisplayMode > 0)
-		{
-			outputY *= WhiteNits_sRGB / ReferenceWhiteNits_BT2408;
-		}
 		if (outputY > valueY )
 		{
 			if (outputY < 0.18f)
@@ -1412,7 +1408,7 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 			{
 				params.outputColor = float3(0,0.3f,0);
 			}
-			else if (dtmParams.valueX >= peakNits / WhiteNits_sRGB)
+			else if (valueY >= peakNits / WhiteNits_sRGB)
 			{
 				params.outputColor = float3(0,0,0.3f);
 			}
