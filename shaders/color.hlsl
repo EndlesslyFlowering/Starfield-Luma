@@ -239,9 +239,9 @@ static const float3x3 oklms_to_srgb = {
 
 // (in) sRGB/BT.709
 // (out) OKLab:
-// L – perceived lightness
-// a – how green/red the color is
-// b – how blue/yellow the color is
+// L - perceived lightness
+// a - how green/red the color is
+// b - how blue/yellow the color is
 float3 linear_srgb_to_oklab(float3 rgb) {
 	float3 lms = mul(srgb_to_oklms, rgb);
 

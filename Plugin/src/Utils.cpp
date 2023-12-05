@@ -254,6 +254,8 @@ namespace Utils
 		    return false;
 		}
 
+		// Note: this might end up being outdated if a new display is added/removed,
+		// or if HDR is toggled on them after swapchain creation.
 		a_outMaxLuminance = desc1.MaxLuminance;
 		return true;
     }
@@ -410,7 +412,9 @@ namespace Utils
 		DirectX::ScratchImage scratchImage;
 		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
 
-		// full photo
+		// full photo.
+		// We save it with the sRGB gamma as that's what PNG and other formats would expect on PC.
+		// LUMA might interpret any UI buffer as gamma 2.2 though, so this isn't entirely correct, but it's good enough.
 		DirectX::SaveToWICFile(scratchImage.GetImages(), scratchImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, fullPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
 
 		// thumbnail

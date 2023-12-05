@@ -501,6 +501,7 @@ namespace Hooks
 		_RecreateSwapchain(a1, a_bgsSwapChainObject, a_width, a_height, a5);
 
 		const auto settings = Settings::Main::GetSingleton();
+		// Note: this might actually engage HDR on the display automatically on AMD GPUs
 		a_bgsSwapChainObject->swapChainInterface->SetColorSpace1(settings->GetDisplayModeColorSpaceType());
     }
 

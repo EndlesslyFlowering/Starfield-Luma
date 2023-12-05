@@ -54,9 +54,9 @@ struct StructHdrDllPluginConstants
 	uint ToneMapperType; // Overrides tonemapper type. 0 is default (not overridden)
 	float ToneMapperSaturation; // 0-2. 1 is neutral
 	float ToneMapperContrast; // 0-2. 1 is neutral
-	float ToneMapperHighlights; // 0-1 0.5 is "neutral"
-	float ToneMapperShadows; // 0-1 0.5 is neutral
-	float ToneMapperBloom; // 0-1 0.5 is neutral
+	float ToneMapperHighlights; // 0-1. 0.5 is "neutral"
+	float ToneMapperShadows; // 0-1. 0.5 is neutral
+	float ToneMapperBloom; // 0-1. 0.5 is neutral
 	float LUTCorrectionStrength; // 1 is full strength
 	uint StrictLUTApplication; // false is default (true looks more like vanilla SDR)
 	float ColorGradingStrength; // 1 is full strength
