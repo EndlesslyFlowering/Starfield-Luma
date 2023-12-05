@@ -13,21 +13,21 @@
 #define LOG_OF_2 0.6931471805599453f
 #define LOG_OF_100 4.605170185988092f
 
-// Safe division of float a by float b
-float sdivf(float a, float b) {
-  if (b == 0.0f) return 0.0f;
-  else return a/b;
-}
+// // Safe division of float a by float b
+// float sdivf(float a, float b) {
+//   if (b == 0.0f) return 0.0f;
+//   else return a/b;
+// }
 
-// Safe division of float3 a by float b
-float3 sdivf3f(float3 a, float b) {
-  return float3(sdivf(a.x, b), sdivf(a.y, b), sdivf(a.z, b));
-}
+// // Safe division of float3 a by float b
+// float3 sdivf3f(float3 a, float b) {
+//   return float3(sdivf(a.x, b), sdivf(a.y, b), sdivf(a.z, b));
+// }
 
-// Safe division of float3 a by float3 b
-float3 sdivf3f3(float3 a, float3 b) {
-  return float3(sdivf(a.x, b.x), sdivf(a.y, b.y), sdivf(a.z, b.z));
-}
+// // Safe division of float3 a by float3 b
+// float3 sdivf3f3(float3 a, float3 b) {
+//   return float3(sdivf(a.x, b.x), sdivf(a.y, b.y), sdivf(a.z, b.z));
+// }
 
 // Safe power function raising float a to power float b
 // Never returns negative [0+]
@@ -62,14 +62,15 @@ float flare_invert(float x, float fl) {
 }
 
 
-// https://www.desmos.com/calculator/jrff9lrztn
-float powerptoe(float x, float p, float m, float t0) {
-  return (x > t0)
-    ? x
-    : ((x - t0) * spowf(spowf((t0 - x) / (t0 - m), 1.0f / p) + 1.0f, -p) + t0);
-}
+// // https://www.desmos.com/calculator/jrff9lrztn
+// float powerptoe(float x, float p, float m, float t0) {
+//   return (x > t0)
+//     ? x
+//     : ((x - t0) * spowf(spowf((t0 - x) / (t0 - m), 1.0f / p) + 1.0f, -p) + t0);
+// }
 
 // p = 0.05, m = -0.05, t0 = 1.f
+// [0.01586+]
 float powerptoe_fixed(float x) {
   if (x > 1.f) return x;
   return ((x - 1.f) * pow(pow((1.f - x) / (1.05f), 1.0f / 0.05f) + 1.0f, -0.05f) + 1.f);
@@ -179,26 +180,26 @@ float3 open_drt_transform(
 
   // Dechroma
 
-  const float dch = 0.4f;
+  const static float dch = 0.4f;
 
   // Chroma contrast
-  const float chc_p = 1.1f; // 1.2 // amount of contrast
-  const float chc_m = 0.6f; // 0.5 // pivot of contrast curve
+  const static float chc_p = 1.1f; // 1.2 // amount of contrast
+  const static float chc_m = 0.6f; // 0.5 // pivot of contrast curve
 
   // Tonescale parameters
-  const float c = 0.8f * contrast; // 1.1 contrast
-  const float fl = 0.01f; // flare/glare compensation
+  const static float c = 0.8f; // 1.1 contrast
+  const static float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
-  float3 weights = float3(
+  float3 static weights = float3(
     0.001f, // 0.25
     0.359f, // 0.45
     0.11f   // 0.30
   );
 
   // Hue Shift RGB controls
-  float3 hs = float3(
+  float3 static hs = float3(
     0.3f,   // 0.3f
     0.1f,   // -0.1f
     -0.2f   // -0.5f
@@ -247,7 +248,7 @@ float3 open_drt_transform(
   // m0 and m are output y scale for peak white intersection constraint
   float s0 = flare_invert(gy, fl); // [0+]
   float m0 = flare_invert(py, fl); // [0+]
-  const float ip = 1.0f/c;
+  const float ip = 1.0f/(c * contrast);
   float m0_ip = pow(m0, ip); // [0+]
   float s0_ip = pow(s0, ip); // [0+]
   // Perf: Store pow(m0, ip) and pow(s0, ip)
@@ -267,8 +268,11 @@ float3 open_drt_transform(
       scale the vector of each color channel, controlling the "vibrancy".
       We use this as a vector norm for separating color and intensity.
   */ 
-  weights *= rgb; // multiply rgb by weights
-  float lum = max(1e-8f, weights.x + weights.y + weights.z); // take the norm
+  
+  // Perf: Use dot for mult+add
+  // weights *= rgb; // multiply rgb by weights
+  // float lum = max(1e-8f, weights.x + weights.y + weights.z); // take the norm
+  float lum = max(1e-8f, dot(rgb, weights)); // take the norm
 
   // RGB Ratios
   // Perf: lum is > 0 (1e-8f)
@@ -324,11 +328,15 @@ float3 open_drt_transform(
   const float mx = max(rats.x, max(rats.y, rats.z));
   const float mn = min(rats.x, min(rats.y, rats.z));
 
-  float3 rats_h = sdivf3f(rats - mn, mx);
+  // Perf: rats > 0.01
+  // float3 rats_h = sdivf3f(rats - mn, mx);
+  float3 rats_h = (rats - mn) / mx;
   rats_h = narrow_hue_angles(rats_h);
 
   // Calculate "Chroma" (the normalized distance from achromatic).
-  float rats_ch = 1.0f - sdivf(mn, mx);
+  // Perf: rats > 0.01
+  // float rats_ch = 1.0f - sdivf(mn, mx);
+  float rats_ch = 1.0f - (mn / mx);
 
 
   /* Chroma Value Compression ------------------------------------------ *
@@ -354,12 +362,14 @@ float3 open_drt_transform(
   chf = 1.0f - pow(pow(chf/chf_m, 1.0f/chf_p)+1.0f, -chf_p);
 
   // Max of rgb ratios
-  // Perf: rats is unchanged, used mx
+  // Perf: rats is unchanged, use mx
   // float rats_mx = max(rats.x, max(rats.y, rats.z));
   float rats_mx = mx;
 
   // Normalized rgb ratios
-  float3 rats_n = sdivf3f(rats, rats_mx);
+  // Perf: rats is > 0.01
+  // float3 rats_n = sdivf3f(rats, rats_mx);
+  float3 rats_n = (rats / rats_mx);
 
   // Mix based on chf
   rats = rats_n*chf + rats*(1.0f - chf);
@@ -421,8 +431,11 @@ float3 open_drt_transform(
   // float chc_sa = min(2.0f, sdivf(lum, chc_m*spowf(lum / chc_m, chc_p)*chc_f + lum*(1.0f - chc_f)));
   // Perf: lum is > 0 && chc_f < 1
   float chc_sa = min(2.0f, lum / (chc_m * pow(lum / chc_m, chc_p)*chc_f + lum*(1.0f - chc_f)));
-  float chc_L = 0.23f*rats.x + 0.69f*rats.y + 0.08f*rats.z; // Roughly P3 weights, doesn't matter
-  
+  // Perf: use dot for mult+add
+  // float chc_L = 0.23f*rats.x + 0.69f*rats.y + 0.08f*rats.z; // Roughly P3 weights, doesn't matter
+  const static float3 chc_L_weights = float3(0.23f, 0.69f, 0.08f); // Roughly P3 weights, doesn't matter
+  float chc_L = dot(rats, chc_L_weights);
+
   // Apply mid-range chroma contrast saturation boost
   rats = chc_L*(1.0f - chc_sa) + rats*chc_sa;
 
