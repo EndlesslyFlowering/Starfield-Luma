@@ -1336,11 +1336,11 @@ struct DrawToneMapperParams
 	float valueX;
 };
 
-void DrawToneMapperStart(inout CompositeParams params, inout DrawToneMapperParams dtmParams)
+DrawToneMapperParams DrawToneMapperStart(inout CompositeParams params)
 {
+	DrawToneMapperParams dtmParams = { false, -1u, 0 };
 	float width;
 	float height;
-	dtmParams.toneMapperY = -1u;
 	InputColorTexture.GetDimensions(width, height);
 	int2 offset = int2(
 		params.psInput.SV_Position.x - (width - DrawToneMapperSize),
@@ -1369,6 +1369,7 @@ void DrawToneMapperStart(inout CompositeParams params, inout DrawToneMapperParam
 			params.outputColor = float3(dtmParams.valueX,dtmParams.valueX,dtmParams.valueX);
 		}
 	}
+	return dtmParams;
 }
 
 void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams dtmParams)
@@ -1921,8 +1922,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 	ApplyBloom(params);
 
 #if DRAW_TONEMAPPER
-	DrawToneMapperParams dtmParams = { false, -1u, 0 };
-	DrawToneMapperStart(params, dtmParams);
+	DrawToneMapperParams dtmParams = DrawToneMapperStart(params);
 #endif
 
 	float tmParamsInputColorLuminance = Luminance(params.outputColor);
