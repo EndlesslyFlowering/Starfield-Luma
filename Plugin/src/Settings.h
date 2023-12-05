@@ -236,7 +236,7 @@ namespace Settings
 		    "Extend Gamut",
 		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation.\n\nNeutral at 0\%.",
 		    "ExtendGamut", "HDR",
-		    0.f,
+		    33.333f,
 		    0.f,
 		    100.f,
 			"%"
