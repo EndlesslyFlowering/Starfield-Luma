@@ -362,9 +362,9 @@ namespace Hooks
 			auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
 
 			if (!a_bCompute)
-				commandList->SetGraphicsRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsSize, &a_shaderConstants, 0);
+				commandList->SetGraphicsRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsCount, &a_shaderConstants, 0);
 			else
-				commandList->SetComputeRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsSize, &a_shaderConstants, 0);
+				commandList->SetComputeRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsCount, &a_shaderConstants, 0);
 		};
 
 		// Note: The following switch statement may be called several thousand times per frame. Additionally, it'll be called from multiple

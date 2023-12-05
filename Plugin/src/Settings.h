@@ -181,7 +181,7 @@ namespace Settings
 		float    DevSetting04;
 		float    DevSetting05;
 	};
-	static inline uint32_t shaderConstantsSize = sizeof(ShaderConstants);
+	constexpr static uint32_t shaderConstantsCount = sizeof(ShaderConstants) / sizeof(uint32_t); // Number of dwords
 
     class Main : public DKUtil::model::Singleton<Main>
     {
