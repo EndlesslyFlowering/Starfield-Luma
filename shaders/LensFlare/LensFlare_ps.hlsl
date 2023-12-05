@@ -73,7 +73,7 @@ void frag_main()
 	texHandle.GetDimensions(heapTextureWidth,
 	                        heapTextureHeight);
 
-	// there is probably another textre that is white here?
+	// there is probably another texture that is white here?
 	// the one that gets applied first?
 	float3 testIfSun = texHandle.Load(int3(127, 127, 0)).rgb;
 
@@ -81,20 +81,20 @@ void frag_main()
 	 && all(testIfSun == 1.f)) // sun texture is 256x256 and the middle is RGB(1,1,1)
 	{
 		// values have been tuned so that the sun has a blurry outer line that is not too defined
-		// targets 80000+ nits for the sun so that it is the brightest part of the image
+		// targets 80000+/100000+ nits for the sun so that it is the brightest part of the image
 		// so that the tone mapper doesn't decrease it
-		// with targeting 100000+ nits making the outer line blurry is harder
-		// 80000 nits seems to be a good choice
 
-#if 0
+#if 0 // targets 100000+ nits
 		_116 = (pow(51.f, _116) - 1.f) * 10.f;
-#elif 1
+#elif 1 // targets 100000+ nits
 		// exactly tuned as to not decrease the input value
 		static const float adj = 3.8395f;
 		// keeps the output = input for input <= 0.001
-		// for input = 0.01 output is still 0.0185
+		// for input = 0.01 output is 0.0185
 		_116 = (pow(51.f, _116) - (1.f + _116 * adj)) * (500.f / (50.f - adj));
-#else
+#else // targets 80000+ nits
+		// with targeting 100000+ nits making the outer line blurry is harder with this method
+		// 80000 nits seems to be a good choice
 		// only increase the bright parts of the texture
 		// after 3 slight banding starts appearing
 		_116 = _116 * _116 * _116;
@@ -115,8 +115,6 @@ void frag_main()
 		_158 = _25_m0[_151].rgb;
 	}
 	float _164 = (1.f - ((1.f - saturate((SpriteData.f3 + log2(min(max((_20_m0[316u].y > 1e-10f) ? _20_m0[316u].y : (_20_m0[316u].z / max(_20_m0[316u].x * 1.2f, 0.000099999999f)), _20_m0[317u].y), _20_m0[317u].z) * 1.2f)) / (SpriteData.f3 - SpriteData.f2))) * SpriteData.f1)) * _60;
-
-	float3 o = ((_164 * _116) * _158) * SpriteData.f3_0.rgb;
 
 	SV_Target.rgb = ((_164 * _116) * _158) * SpriteData.f3_0.rgb;
 	SV_Target.a = 0.f;
