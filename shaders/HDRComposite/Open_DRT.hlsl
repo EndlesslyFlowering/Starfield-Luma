@@ -28,8 +28,10 @@ float3 sdivf3f3(float3 a, float3 b) {
 }
 
 // Safe power function raising float a to power float b
+// Never returns negative
 float spowf(float a, float b) {
-  return pow(abs(a), b) * sign(a);
+  if (a <= 0) return a;
+  return pow(a, b);
 }
 
 
