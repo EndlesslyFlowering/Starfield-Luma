@@ -13,9 +13,8 @@
 
 // Safe division of float a by float b
 float sdivf(float a, float b) {
-  return b
-    ? (a / b)
-    : 0;
+  if (b == 0.0f) return 0.0f;
+  else return a/b;
 }
 
 // Safe division of float3 a by float b
@@ -30,9 +29,7 @@ float3 sdivf3f3(float3 a, float3 b) {
 
 // Safe power function raising float a to power float b
 float spowf(float a, float b) {
-  return (a <= 0)
-    ? a
-    : pow(a, b);
+  return pow(abs(a), b) * sign(a);
 }
 
 
