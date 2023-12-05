@@ -14,7 +14,7 @@ List of features:
 -Native HDR (HDR10 and scRGB)
 -Increased buffers accuracy in SDR and HDR, reducing banding all around (SDR is now 10bit instead of 8bit)
 -Normalized LUTs, the grey/flat look is mostly gone, but the color tint is still there
--New filmic tone mapper based on ACES
+-New filmic tone mapper based on OpenDRT
 -Fixed bink fullscreen videos playing back with the wrong colors (BT.601 instead of BT.709) and made them use AutoHDR
 -Improved the sharpening passes
 -Improved film grain to be more realistic and nice to look at (e.g. rebalancing the grain size and strength on dark/bright colors)
@@ -41,7 +41,7 @@ To uninstall, clear all the files (they are unique to the mod).
 Dependencies:
 -Starfield Script Extender (SFSE): https://www.nexusmods.com/starfield/mods/106
 -Address Library for SFSE: https://www.nexusmods.com/starfield/mods/3256
--ShaderInjector by Nukem: https://www.nexusmods.com/starfield/mods/5562
+-ShaderInjector by Nukem: https://www.nexusmods.com/starfield/mods/5562 (source code: https://github.com/Nukem9/sf-shader-injector)
 
 Compatibility:
 This mod should work with any other mod, including DLSS Super Resolution and DLSS Frame Generation (scRGB is NOT supported by FG).
@@ -54,7 +54,6 @@ If you find the playabla character flashlight too intense, you can use this mod 
 
 Issues and limitations:
 -scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)
--You can not take screenshots directly from Starfield in photo mode
 
 Comparison with other "HDR" methods:
 -Starfield "official" HDR: Starfield does not officially support HDR, both the Xbox Series and Windows 11 versions rely on the OS AutoHDR, meaning that the game still outputs 8bit SDR, and its visual quality is still bottlenecked by that (no proper highlights, no BT.2020 colors, banding).
