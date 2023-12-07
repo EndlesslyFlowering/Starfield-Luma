@@ -376,7 +376,7 @@ namespace Settings
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
-			"Toggles the game's default post-sharpen pass.\nBy default, this pass runs after other sharpening or upscaling methods, and it is always forced on.",
+			"Toggles the game's default post-sharpen pass.\nBy default, this pass always runs (forced on) after some sharpening/upscaling methods.",
 			"PostSharpen", "Main",
 			true
 		};
