@@ -1,5 +1,7 @@
 #pragma once
 
+#include "math.hlsl"
+
 // sRGB SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_sRGB = 80.f;
 static const float ReferenceWhiteNits_BT2408 = 203.f;
@@ -116,7 +118,7 @@ float3 gamma_linear_to_sRGB(float3 Color)
 	              gamma_linear_to_sRGB(Color.b));
 }
 
-// Mirroring negative colors makes this closer to gamma 2.2 and perception space in general,
+// Mirroring gamma on negative colors makes this closer to gamma 2.2 and perception space in general,
 // it's sometimes easier to work with these values.
 float3 gamma_linear_to_sRGB_mirrored(float3 Color)
 {
@@ -248,7 +250,7 @@ static const float3x3 oklms_to_bt2020 = {
 	-0.0486083738505840301513671875f, -0.45476520061492919921875f,  1.503262996673583984375f};
 
 // (in) linear sRGB/BT.709
-// (out) OKLab:
+// (out) OKLab
 // L - perceived lightness
 // a - how green/red the color is
 // b - how blue/yellow the color is
@@ -256,6 +258,8 @@ float3 linear_srgb_to_oklab(float3 rgb) {
 	//LMS
 	float3 lms = mul(srgb_to_oklms, rgb);
 
+	// Not sure whether the pow(abs())*sign() is technically correct, but if we pass in scRGB negative colors (or better, colors outside the Oklab gamut),
+	// this might break, and we think this might work fine
 	//L'M'S'
 	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
 
@@ -433,7 +437,6 @@ float3 ICtCp_to_BT709(float3 Colour)
 	return RGB * PQMaxWhitePoint;
 }
 
-
 static const float3x3 BT709_2_AP1D65 = {
 	0.61685097217559814453125,     0.33406293392181396484375,     0.049086071550846099853515625,
 	0.069866396486759185791015625, 0.91741669178009033203125,     0.012716926634311676025390625,
@@ -455,7 +458,7 @@ static const float3x3 WIDE_2_AP1D65 = {
 	0.001925828866660594940185546875, 0.03037279658019542694091796875, 0.967701375484466552734375};
 
 // Expand bright saturated BT.709 colors onto BT.2020 to achieve a fake HDR look.
-// Input (and output) needs to be in sRGB linear space.
+// Input (and output) needs to be in sRGB linear space. The white point (paper white) is expected to be ~80-100 nits.
 // Calling this with a value of 0 still results in changes (avoid doing so, it might produce invalid colors).
 // Calling this with values above 1 yields diminishing returns.
 float3 ExtendGamut(float3 Color, float ExtendGamutAmount = 1.f)
@@ -542,4 +545,236 @@ float3 bt2446_bt709(float3 linRGB, float lHDR, float lSDR) {
                       toneMapGainBT2446a(tonemap_input.b, lHDR, lSDR));
 	tonemap_input *= gain;
 	return BT2020_To_BT709(tonemap_input);
+}
+
+// Finds the maximum saturation possible for a given hue that fits in sRGB/BT.2020
+// Saturation here is defined as S = C/L
+// a and b must be normalized so a^2 + b^2 == 1
+float oklab_compute_max_saturation(float a, float b, bool BT2020)
+{
+    // Max saturation will be when one of r, g or b goes below zero.
+
+	const float3x3 oklms_to_rgb = BT2020 ? oklms_to_bt2020 : oklms_to_srgb;
+
+    // Select different coefficients depending on which component goes below zero first
+    float k0, k1, k2, k3, k4, wl, wm, ws;
+
+    if (-1.88170328f * a - 0.80936493f * b > 1)
+    {
+        // Red component
+        k0 = +1.19086277f; k1 = +1.76576728f; k2 = +0.59662641f; k3 = +0.75515197f; k4 = +0.56771245f; //TODO: find k components for BT.2020 (these are for sRGB?)
+        wl = oklms_to_rgb[0][0]; wm = oklms_to_rgb[0][1]; ws = oklms_to_rgb[0][2];
+    }
+    else if (1.81444104f * a - 1.19445276f * b > 1)
+    {
+        // Green component
+        k0 = +0.73956515f; k1 = -0.45954404f; k2 = +0.08285427f; k3 = +0.12541070f; k4 = +0.14503204f;
+        wl = oklms_to_rgb[1][0]; wm = oklms_to_rgb[1][1]; ws = oklms_to_rgb[1][2];
+    }
+    else
+    {
+        // Blue component
+        k0 = +1.35733652f; k1 = -0.00915799f; k2 = -1.15130210f; k3 = -0.50559606f; k4 = +0.00692167f;
+        wl = oklms_to_rgb[2][0]; wm = oklms_to_rgb[2][1]; ws = oklms_to_rgb[2][2];
+    }
+
+    // Approximate max saturation using a polynomial:
+    float S = k0 + k1 * a + k2 * b + k3 * a * a + k4 * a * b;
+
+    // Do one step Halley's method to get closer
+    // this gives an error less than 10e6, except for some blue hues where the dS/dh is close to infinite
+    // this should be sufficient for most applications, otherwise do two/three steps 
+
+    float k_l = oklab_to_oklms_[0][0] * a + oklab_to_oklms_[0][1] * b;
+    float k_m = oklab_to_oklms_[1][0] * a + oklab_to_oklms_[1][1] * b;
+    float k_s = oklab_to_oklms_[2][0] * a + oklab_to_oklms_[2][1] * b;
+
+    {
+        float l_ = 1.f + S * k_l;
+        float m_ = 1.f + S * k_m;
+        float s_ = 1.f + S * k_s;
+
+        float l = l_ * l_ * l_;
+        float m = m_ * m_ * m_;
+        float s = s_ * s_ * s_;
+
+        float l_dS = 3.f * k_l * l_ * l_;
+        float m_dS = 3.f * k_m * m_ * m_;
+        float s_dS = 3.f * k_s * s_ * s_;
+
+        float l_dS2 = 6.f * k_l * k_l * l_;
+        float m_dS2 = 6.f * k_m * k_m * m_;
+        float s_dS2 = 6.f * k_s * k_s * s_;
+
+        float f  = wl * l     + wm * m     + ws * s;
+        float f1 = wl * l_dS  + wm * m_dS  + ws * s_dS;
+        float f2 = wl * l_dS2 + wm * m_dS2 + ws * s_dS2;
+
+        S = S - f * f1 / (f1*f1 - 0.5f * f * f2);
+    }
+
+    return S;
+}
+
+// finds L_cusp and C_cusp for a given hue
+// a and b must be normalized so a^2 + b^2 == 1
+struct LC { float L; float C; };
+LC oklab_find_cusp(float a, float b, bool BT2020)
+{
+	// First, find the maximum saturation (saturation S = C/L)
+	float S_cusp = oklab_compute_max_saturation(a, b, BT2020);
+
+	// Convert to linear sRGB/BT.2020 to find the first point where at least one of r,g or b >= 1:
+	float3 lab = float3(1.f, S_cusp * a, S_cusp * b);
+	float3 rgb_at_max = BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
+	float L_cusp = pow(1.f / max(max(rgb_at_max.r, rgb_at_max.g), rgb_at_max.b), 1.f / 3.f);
+	float C_cusp = L_cusp * S_cusp;
+
+	LC cusp;
+	cusp.L = L_cusp;
+	cusp.C = C_cusp;
+	return cusp;
+}
+
+// Finds intersection of the line defined by 
+// L = L0 * (1 - t) + t * L1;
+// C = t * C1;
+// a and b must be normalized so a^2 + b^2 == 1
+float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float L0, bool BT2020)
+{
+	const float3x3 oklms_to_rgb = BT2020 ? oklms_to_bt2020 : oklms_to_srgb;
+
+	// Find the cusp of the gamut triangle
+	LC cusp = oklab_find_cusp(a, b, BT2020);
+
+	// Find the intersection for upper and lower half seprately
+	float t;
+	if (((L1 - L0) * cusp.C - (cusp.L - L0) * C1) <= 0.f)
+	{
+		// Lower half
+
+		t = cusp.C * L0 / (C1 * cusp.L + cusp.C * (L0 - L1));
+	}
+	else
+	{
+		// Upper half
+
+		// First intersect with triangle
+		t = cusp.C * (L0 - 1.f) / (C1 * (cusp.L - 1.f) + cusp.C * (L0 - L1));
+
+		// Then one step Halley's method
+		{
+			float dL = L1 - L0;
+			float dC = C1;
+
+			float k_l = oklab_to_oklms_[0][0] * a + oklab_to_oklms_[0][1] * b;
+			float k_m = oklab_to_oklms_[1][0] * a + oklab_to_oklms_[1][1] * b;
+			float k_s = oklab_to_oklms_[1][0] * a + oklab_to_oklms_[2][1] * b;
+
+			float l_dt = dL + dC * k_l;
+			float m_dt = dL + dC * k_m;
+			float s_dt = dL + dC * k_s;
+
+			
+			// If higher accuracy is required, 2 or 3 iterations of the following block can be used:
+			{
+				float L = L0 * (1.f - t) + t * L1;
+				float C = t * C1;
+
+				float l_ = L + C * k_l;
+				float m_ = L + C * k_m;
+				float s_ = L + C * k_s;
+
+				float l = l_ * l_ * l_;
+				float m = m_ * m_ * m_;
+				float s = s_ * s_ * s_;
+
+				float ldt = 3 * l_dt * l_ * l_;
+				float mdt = 3 * m_dt * m_ * m_;
+				float sdt = 3 * s_dt * s_ * s_;
+
+				float ldt2 = 6 * l_dt * l_dt * l_;
+				float mdt2 = 6 * m_dt * m_dt * m_;
+				float sdt2 = 6 * s_dt * s_dt * s_;
+
+				//TODO: optimize all matrix multiplications (and verify them)
+				float r = oklms_to_rgb[0][0] * l + oklms_to_rgb[0][1] * m + oklms_to_rgb[0][2] * s - 1;
+				float r1 = oklms_to_rgb[0][0] * ldt + oklms_to_rgb[0][1] * mdt + oklms_to_rgb[0][2] * sdt;
+				float r2 = oklms_to_rgb[0][0] * ldt2 + oklms_to_rgb[0][1] * mdt2 + oklms_to_rgb[0][2] * sdt2;
+
+				float u_r = r1 / (r1 * r1 - 0.5f * r * r2);
+				float t_r = -r * u_r;
+
+				float g = oklms_to_rgb[1][0] * l + oklms_to_rgb[1][1] * m + oklms_to_rgb[1][2] * s - 1;
+				float g1 = oklms_to_rgb[1][0] * ldt + oklms_to_rgb[1][1] * mdt + oklms_to_rgb[1][2] * sdt;
+				float g2 = oklms_to_rgb[1][0] * ldt2 + oklms_to_rgb[1][1] * mdt2 + oklms_to_rgb[1][2] * sdt2;
+
+				float u_g = g1 / (g1 * g1 - 0.5f * g * g2);
+				float t_g = -g * u_g;
+
+				float b = oklms_to_rgb[2][0] * l + oklms_to_rgb[2][1] * m + oklms_to_rgb[2][2] * s - 1;
+				float b1 = oklms_to_rgb[2][0] * ldt + oklms_to_rgb[2][1] * mdt + oklms_to_rgb[2][2] * sdt;
+				float b2 = oklms_to_rgb[2][0] * ldt2 + oklms_to_rgb[2][1] * mdt2 + oklms_to_rgb[2][2] * sdt2;
+
+				float u_b = b1 / (b1 * b1 - 0.5f * b * b2);
+				float t_b = -b * u_b;
+
+				t_r = u_r >= 0.f ? t_r : FLT_MAX;
+				t_g = u_g >= 0.f ? t_g : FLT_MAX;
+				t_b = u_b >= 0.f ? t_b : FLT_MAX;
+
+				t += min(t_r, min(t_g, t_b));
+			}
+		}
+	}
+
+	return t;
+}
+
+float3 gamut_clip_preserve_chroma(float3 rgb, bool BT2020)
+{
+	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
+		return rgb;
+
+	float3 lab = BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
+
+	float L = lab.x;
+	float C = max(FLT_MIN, sqrt(lab.y * lab.y + lab.z * lab.z));
+	float a_ = lab.y / C;
+	float b_ = lab.z / C;
+
+	float L0 = clamp(L, 0, 1);
+
+	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, BT2020);
+	float L_clipped = L0 * (1 - t) + t * L;
+	float C_clipped = t * C;
+
+	lab = float3(L_clipped, C_clipped * a_, C_clipped * b_);
+	return BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
+}
+
+float3 gamut_clip_project_to_L_cusp(float3 rgb, bool BT2020)
+{
+	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
+		return rgb; //TODO (this one and the one above). BT2020 HDR10 isn't limited by the 0-1 range.
+
+	float3 lab = BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
+
+	float L = lab.x;
+	float C = max(FLT_MIN, sqrt(lab.y * lab.y + lab.z * lab.z));
+	float a_ = lab.y / C;
+	float b_ = lab.z / C;
+
+	// The cusp is computed here and in oklab_find_gamut_intersection, an optimized solution would only compute it once.
+	LC cusp = oklab_find_cusp(a_, b_, BT2020);
+
+	float L0 = cusp.L;
+
+	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, BT2020);
+
+	float L_clipped = L0 * (1 - t) + t * L;
+	float C_clipped = t * C;
+
+	lab = float3(L_clipped, C_clipped * a_, C_clipped * b_);
+	return BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
 }
