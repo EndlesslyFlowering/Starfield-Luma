@@ -243,34 +243,59 @@ static const float3x3 oklms_to_srgb = {
 
 //OKLab's LMS -> RGB linear BT.2020
 static const float3x3 oklms_to_bt2020 = {
-	 2.1408574581146240234375f,       -1.24677360057830810546875f, 0.106467388570308685302734375f,
-	-0.8846709728240966796875f,        2.16277790069580078125f,   -0.2783108055591583251953125f,
-	-0.0486083738505840301513671875f, -0.45476520061492919921875f, 1.503262996673583984375f};
+	 2.1408574581146240234375f,       -1.24677360057830810546875f,  0.106467388570308685302734375f,
+	-0.8846709728240966796875f,        2.16277790069580078125f,    -0.2783108055591583251953125f,
+	-0.0486083738505840301513671875f, -0.45476520061492919921875f,  1.503262996673583984375f};
 
-// (in) sRGB/BT.709
+// (in) linear sRGB/BT.709
 // (out) OKLab:
 // L - perceived lightness
 // a - how green/red the color is
 // b - how blue/yellow the color is
 float3 linear_srgb_to_oklab(float3 rgb) {
+	//LMS
 	float3 lms = mul(srgb_to_oklms, rgb);
 
-	// Not sure whether the pow(abs())*sign() is technically correct, but if we pass in scRGB negative colors, this breaks,
-	// and we think this might work fine (we could convert to BT.2020 first otherwise)
 	//L'M'S'
 	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
 
 	return mul(oklms_to_oklab, lms_);
 }
 
-// sRGB/BT.709
+// (in) linear BT.2020
+// (out) OKLab
+float3 linear_bt2020_to_oklab(float3 rgb) {
+	//LMS
+	float3 lms = mul(bt2020_to_oklms, rgb);
+
+	//L'M'S'
+	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
+
+	return mul(oklms_to_oklab, lms_);
+}
+
+// (in) OKLab
+// (out) linear sRGB/BT.709
 float3 oklab_to_linear_srgb(float3 lab) {
 	//L'M'S'
 	float3 lms_ = mul(oklab_to_oklms_, lab);
 
+	//LMS
 	float3 lms = lms_ * lms_ * lms_;
 
 	return mul(oklms_to_srgb, lms);
+}
+
+// (in) OKLab
+// (out) linear BT.2020
+float3 oklab_to_linear_bt2020(float3 lab) {
+	//L'M'S'
+	float3 lms_ = mul(oklab_to_oklms_, lab);
+
+	//LMS
+	float3 lms = lms_ * lms_ * lms_;
+
+	return mul(oklms_to_bt2020, lms);
 }
 
 float3 oklab_to_oklch(float3 lab) {
@@ -295,7 +320,7 @@ float3 oklch_to_oklab(float3 lch) {
 	);
 }
 
-// (in) sRGB/BT.709
+// (in) linear sRGB/BT.709
 // (out) OKLch:
 // L – perceived lightness (identical to OKLAB)
 // c – chroma (saturation)
@@ -306,9 +331,26 @@ float3 linear_srgb_to_oklch(float3 rgb) {
 	);
 }
 
-// sRGB/BT.709
+// (in) linear BT.2020
+// (out) OKLch
+float3 linear_bt2020_to_oklch(float3 rgb) {
+	return oklab_to_oklch(
+		linear_bt2020_to_oklab(rgb)
+	);
+}
+
+// (in) OKLch
+// (out) sRGB/BT.709
 float3 oklch_to_linear_srgb(float3 lch) {
 	return oklab_to_linear_srgb(
+			oklch_to_oklab(lch)
+	);
+}
+
+// (in) OKLch
+// (out) BT.2020
+float3 oklch_to_linear_srgb(float3 lch) {
+	return oklab_to_linear_bt2020(
 			oklch_to_oklab(lch)
 	);
 }
