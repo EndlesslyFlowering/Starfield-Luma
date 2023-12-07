@@ -1585,8 +1585,14 @@ void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tm
 	//TODO: Try RestorePostProcess() here again?
 	params.outputColor *= safeDivision(tmParams.outputHDRLuminance, tmParams.outputSDRLuminance);
 
+	//TODO: Paper White shouldn't have been multiplied inside the SDR tonemapper by this point.
+	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
+	
+	// Bring back to a paper white neutral range
+	params.outputColor /= paperWhite;
 	ApplyUserSettingExtendGamut(params.outputColor);
 	ApplyUserSettingSaturation(params.outputColor);
+	params.outputColor *= paperWhite;
 
 	// Change paper white to default from 80 to 203.
 	params.outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
