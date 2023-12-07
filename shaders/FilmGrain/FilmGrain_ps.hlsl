@@ -8,7 +8,7 @@
 #if SDR_LINEAR_INTERMEDIARY
 	#define GAMMA_TO_LINEAR(x) x
 	#define LINEAR_TO_GAMMA(x) x
-#elif SDR_USE_GAMMA_2_2
+#elif SDR_USE_GAMMA_2_2 // NOTE: these gamma formulas should use their mirrored versions in the CLAMP_INPUT_OUTPUT_TYPE >= 3 case
 	#define GAMMA_TO_LINEAR(x) pow(x, 2.2f)
 	#define LINEAR_TO_GAMMA(x) pow(x, 1.f / 2.2f)
 #else
