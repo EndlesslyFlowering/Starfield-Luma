@@ -47,7 +47,7 @@ struct CSInput
 #if SDR_LINEAR_INTERMEDIARY
 	#define GAMMA_TO_LINEAR(x) x
 	#define LINEAR_TO_GAMMA(x) x
-#elif SDR_USE_GAMMA_2_2
+#elif SDR_USE_GAMMA_2_2 // NOTE: these gamma formulas should use their mirrored versions in the CLAMP_INPUT_OUTPUT_TYPE >= 3 case
 	#define GAMMA_TO_LINEAR(x) pow(x, 2.2h)
 	#define LINEAR_TO_GAMMA(x) pow(x, half(1.f / 2.2f))
 #else // doing sRGB in half is not accurate enough
@@ -55,18 +55,26 @@ struct CSInput
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
 #endif
 
+half3 conditionalSaturate(half3 Color)
+{
+#if CLAMP_INPUT_OUTPUT_TYPE >= 3
+	Color = saturate(Color);
+#endif
+	return Color;
+}
+
 half3 PrepareForProcessing(half3 Color)
 {
 	if (HdrDllPluginConstants.DisplayMode > 0)
 	{
 		Color /= PQMaxWhitePoint;
 		Color = BT709_To_WBT2020(Color);
-		return saturate(Color);
 	}
 	else
 	{
-		return saturate(GAMMA_TO_LINEAR(Color));
+		Color = GAMMA_TO_LINEAR(Color);
 	}
+	return conditionalSaturate(Color);
 }
 
 half3 PrepareForOutput(half3 Color)
@@ -400,14 +408,14 @@ void CS(CSInput csInput)
 	_783 = 1.h / _783;
 
 	half3 _803 = ((((((((_752 * _237) + (_744 * (_229 + _215))) + (_766 * _305)) + (_758 * _259)) + (_762 * _289)) + (_754 * (_321 + _313))) + (_748 * (_297 + _281))) + (_746 * (_273 + _251))) * _783.y;
-	half3 colorOut2 = saturate(_803);
+	half3 colorOut2 = conditionalSaturate(_803);
 
 	colorOut2 = PrepareForOutput(colorOut2);
 
 	if ((_58 <= _55.z) && (_59 <= _55.w))
 	{
 		half3 _961 = ((((((((_138 * _750) + ((_134 + _118) * _743)) + (_153 * _756)) + (_178 * _760)) + (_192 * _765)) + ((_200 + _196) * _753)) + ((_188 + _174) * _747)) + ((_164 + _149) * _745)) * _783.x;
-		half3 colorOut1 = saturate(_961);
+		half3 colorOut1 = conditionalSaturate(_961);
 
 		colorOut1 = PrepareForOutput(colorOut1);
 
@@ -695,14 +703,14 @@ void CS(CSInput csInput)
 	_1812 = 1.h / _1812;
 
 	half3 _1832 = ((((((((_1782 * _1280) + (_1774 * (_1272 + _1260))) + (_1796 * _1344)) + (_1788 * _1300)) + (_1792 * _1328)) + (_1784 * (_1360 + _1352))) + (_1778 * (_1336 + _1320))) + (_1776 * (_1312 + _1292))) * _1812.y;
-	half3 colorOut4 = saturate(_1832);
+	half3 colorOut4 = conditionalSaturate(_1832);
 
 	colorOut4 = PrepareForOutput(colorOut4);
 
 	if ((_58 <= _55.z) && (_1153 <= _55.w))
 	{
 		half3 _1987 = ((((((((_1196 * _1780) + ((_1192 + _1179) * _1773)) + (_1208 * _1786)) + (_1230 * _1790)) + (_1244 * _1795)) + ((_1252 + _1248) * _1783)) + ((_1240 + _1226) * _1777)) + ((_1216 + _1204) * _1775)) * _1812.x;
-		half3 colorOut3 = saturate(_1987);
+		half3 colorOut3 = conditionalSaturate(_1987);
 
 		colorOut3 = PrepareForOutput(colorOut3);
 
@@ -817,7 +825,7 @@ void CS(CSInput csInput)
 	{
 		half3 colorOut = (((_109 + _93 + _124 + _134) * _338) + _113) * _345;
 
-		colorOut = saturate(colorOut);
+		colorOut = conditionalSaturate(colorOut);
 		colorOut = PrepareForOutput(colorOut);
 
 		ColorOut[uint2(_58, _59)] = float4(float3(colorOut), 1.f);
@@ -829,7 +837,7 @@ void CS(CSInput csInput)
 	{
 		half3 colorOut = (((_161 + _146 + _184 + _192) * _339) + _169) * _346;
 
-		colorOut = saturate(colorOut);
+		colorOut = conditionalSaturate(colorOut);
 		colorOut = PrepareForOutput(colorOut);
 
 		ColorOut[uint2(_495, _59)] = float4(float3(colorOut), 1.f);
@@ -887,7 +895,7 @@ void CS(CSInput csInput)
 	{
 		half3 colorOut = (((_562 + _549 + _574 + _584) * _772) + _566) * _778;
 
-		colorOut = saturate(colorOut);
+		colorOut = conditionalSaturate(colorOut);
 		colorOut = PrepareForOutput(colorOut);
 
 		ColorOut[uint2(_58, _529)] = float4(float3(colorOut), 1.f);
@@ -897,7 +905,7 @@ void CS(CSInput csInput)
 	{
 		half3 colorOut = (((_604 + _592 + _624 + _632) * _773) + _612) * _779;
 
-		colorOut = saturate(colorOut);
+		colorOut = conditionalSaturate(colorOut);
 		colorOut = PrepareForOutput(colorOut);
 
 		ColorOut[uint2(_495, _529)] = float4(float3(colorOut), 1.f);

@@ -49,11 +49,19 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
+			//TODOFT: PEAK_BRIGHTNESS_THRESHOLD_SCRGB causes hue shift... Also make sure to fix HDR10 case as well, and gamut map all.
+#if CLAMP_INPUT_OUTPUT_TYPE == 1 || CLAMP_INPUT_OUTPUT_TYPE == 2
 			// safety clamp to BT.2020 as Windows may turn pixels that are low brightness and outside of BT.2020 into black pixels
 			// this only happens in software composition though (Composed Flip)
 			color.rgb = BT709_To_BT2020(color.rgb);
+#if CLAMP_INPUT_OUTPUT_TYPE == 1
+			//color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false); //TODO: proper gamut mapping (in the HDR10 case as well)
+#else
 			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
+#endif
 			color.rgb = BT2020_To_BT709(color.rgb);
+#else
+#endif // CLAMP_INPUT_OUTPUT_TYPE
 		}
 		else if (HdrDllPluginConstants.DisplayMode == -1) // SDR on scRGB HDR (gamma to linear space conversion)
 		{
@@ -61,9 +69,7 @@ float4 PS(PSInputs inputs) : SV_Target
 			color.rgb = GAMMA_TO_LINEAR(color.rgb);
 #endif // !SDR_LINEAR_INTERMEDIARY
 
-#if CLAMP_INPUT_OUTPUT || 1
-			color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
-#endif // CLAMP_INPUT_OUTPUT || 1
+			color.rgb = saturate(color.rgb); // Remove any non SDR color (independently of CLAMP_INPUT_OUTPUT_TYPE), this mode is just meant for debugging SDR in HDR
 			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			color.rgb *= paperWhite;
 		}
@@ -76,12 +82,19 @@ float4 PS(PSInputs inputs) : SV_Target
 			// Negative values need to be clamped though to avoid doing pow on a negative values -> Linear_to_PQ does this.
 			color.rgb /= PQMaxWhitePoint;
 			color.rgb = BT709_To_BT2020(color.rgb);
+#if CLAMP_INPUT_OUTPUT_TYPE == 1
+			//TODO
+#elif CLAMP_INPUT_OUTPUT_TYPE == 2
 			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_HDR10);
+#endif // CLAMP_INPUT_OUTPUT_TYPE
 			color.rgb = Linear_to_PQ(color.rgb);
 		}
 #if SDR_LINEAR_INTERMEDIARY
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)
 		{
+#if CLAMP_INPUT_OUTPUT_TYPE == 1
+			//TODO
+#endif // CLAMP_INPUT_OUTPUT_TYPE
 			color.rgb = LINEAR_TO_GAMMA(color.rgb);
 		}
 #endif // SDR_LINEAR_INTERMEDIARY

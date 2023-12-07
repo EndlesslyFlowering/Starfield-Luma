@@ -1239,7 +1239,7 @@ float3 GradingLUT(float3 color, float2 uv, int LUTExtrapolationColorSpace = DEFA
 	// double the saturation to maintain color tint more effectively around black (0 0 0 black doesn't have a hue, and LUTs are corrected so their black point is always full black).
 	// We can't do this in the LUT merge/mix shader as it would mess around with the LUT texture sampling.
 	// To do this 100% correctly we should do additional LUT samples (e.g. the first texel on the grey LUT line), but we designed it in a way to avoid it, to optimize it.
-	// We only do this in HDR as it creates a lot of colors beyond sRGB, which would clip in SDR unless we had gamut mapping on output (see "CLAMP_INPUT_OUTPUT"). 
+	// We only do this in HDR as it creates a lot of colors beyond sRGB, which would clip in SDR unless we had gamut mapping on output (see "CLAMP_INPUT_OUTPUT_TYPE"). 
 	if (HdrDllPluginConstants.DisplayMode > 0) //TODO: enable in SDR once we have gamut mapping
 	{
 		// The amount our color coordinates are within the first LUT sub cube (the one around the origin/black).
@@ -1804,7 +1804,7 @@ void ApplySDROutputTransforms(inout float3 Color)
 	#endif // SDR_USE_GAMMA_2_2
 #endif // SDR_LINEAR_INTERMEDIARY
 
-#if CLAMP_INPUT_OUTPUT
+#if CLAMP_INPUT_OUTPUT_TYPE >= 3
 	// To keep the UI blending behaviour the same as vanilla SDR, we should clamp the image,
 	// though if we don't, we possibly retain more detail in transparent UI background colors (hopefully nothing will be bright enough to ruin the UI readability).
 	Color = saturate(Color);
@@ -1813,7 +1813,7 @@ void ApplySDROutputTransforms(inout float3 Color)
 
 void ApplyHDROutputTransforms(inout float3 Color)
 {
-#if CLAMP_INPUT_OUTPUT
+#if CLAMP_INPUT_OUTPUT_TYPE >= 3
 	// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
 	Color = BT709_To_WBT2020(Color);
 	Color = max(Color, 0.f);
@@ -1914,11 +1914,11 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
 	float3 renderedColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
 
-#if CLAMP_INPUT_OUTPUT
+#if CLAMP_INPUT_OUTPUT_TYPE >= 4
 	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
 	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
 	renderedColor = max(renderedColor, 0.f);
-#endif // CLAMP_INPUT_OUTPUT
+#endif // CLAMP_INPUT_OUTPUT_TYPE
 
 	CompositeParams params =
 	{

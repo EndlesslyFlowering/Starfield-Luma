@@ -199,11 +199,15 @@ void frag_main()
 #endif
 
 		if (isHDR) {
+#if CLAMP_INPUT_OUTPUT_TYPE >= 3
 			outputColor = max(outputColor, 0.f);
+#endif
 			outputColor = WBT2020_To_BT709(outputColor);
 		}
 		else if (!isInOutColorLinear) {
+#if CLAMP_INPUT_OUTPUT_TYPE >= 3
 			outputColor = saturate(outputColor);
+#endif
 			outputColor = LINEAR_TO_GAMMA(outputColor);
 		}
 	}
