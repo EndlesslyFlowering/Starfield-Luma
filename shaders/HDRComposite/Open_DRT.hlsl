@@ -32,8 +32,7 @@
 // Safe power function raising float a to power float b
 // Never returns negative [0+]
 float spowf(float a, float b) {
-  if (a <= 0) return a;
-  return pow(a, b);
+  return pow(abs(a), b);
 }
 
 
@@ -190,11 +189,11 @@ float3 open_drt_transform(
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
-  float3 static weights = float3(
+  const static float3 weights = normalize(float3(
     0.001f, // 0.25
     0.359f, // 0.45
     0.11f   // 0.30
-  );
+  ));
 
   // Hue Shift RGB controls
   float3 static hs = float3(
@@ -440,8 +439,9 @@ float3 open_drt_transform(
   // Apply tonescale to RGB Ratios
   rgb = rats*ts;
 
-  // Clamp
+#if 0 // Disabled clamping as at worse we'll get a little bit of out of gamut values that we can still use in HDR (and SDR)
   rgb = saturate(rgb);
+#endif
 
   return rgb;
 }
