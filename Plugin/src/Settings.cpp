@@ -127,10 +127,10 @@ namespace Settings
 		// but it seems like it would run into thread safety problems
 	}
 
-    bool Main::IsSDRForcedOnHDR() const
+    bool Main::IsSDRForcedOnHDR(bool bAcknowledgeScreenshots) const //TODOFT
     {
 		// The game will tonemap to SDR if this is true
-		return ForceSDROnHDR.value.get_data() || (!bRequestedHDRScreenshot && bRequestedSDRScreenshot);
+		return ForceSDROnHDR.value.get_data() || (bAcknowledgeScreenshots && !bRequestedHDRScreenshot && bRequestedSDRScreenshot);
     }
 
     bool Main::IsDisplayModeSetToHDR() const
@@ -138,25 +138,25 @@ namespace Settings
 		return DisplayMode.value.get_data() > 0;
     }
 	
-    bool Main::IsGameRenderingSetToHDR() const
+    bool Main::IsGameRenderingSetToHDR(bool bAcknowledgeScreenshots) const
     {
 		// The game will tonemap to SDR if this is false
-		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR();
+		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR(bAcknowledgeScreenshots);
     }
 
-		bool Main::IsCustomToneMapper() const
-		{
-			return IsDisplayModeSetToHDR() || ToneMapperType.value.get_data() > 0;
-		}
+	bool Main::IsCustomToneMapper() const
+	{
+		return IsDisplayModeSetToHDR() || ToneMapperType.value.get_data() > 0;
+	}
 
     bool Main::IsFilmGrainTypeImproved() const
 	{
 		return FilmGrainType.value.get_data() == 1;
 	}
 
-    int32_t Main::GetActualDisplayMode() const
+    int32_t Main::GetActualDisplayMode(bool bAcknowledgeScreenshots) const
 	{
-		if (IsSDRForcedOnHDR()) {
+		if (IsSDRForcedOnHDR(bAcknowledgeScreenshots)) {
 		    return -1;
 		}
 
@@ -220,13 +220,13 @@ namespace Settings
 
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
     {
-		a_outShaderConstants.DisplayMode = GetActualDisplayMode();
 		a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
+		a_outShaderConstants.DisplayMode = GetActualDisplayMode(true);
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
 		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data() * 0.01f);                      // 0-100 to 0-1
 		// There is no reason this wouldn't work in HDR, but for now it's disabled
-		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR() ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
+		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
 		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                        // 0-100 to 0-2
 		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                            // 0-100 to 0-2

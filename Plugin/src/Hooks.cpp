@@ -168,9 +168,9 @@ namespace Hooks
 		const auto                         settings = Settings::Main::GetSingleton();
 
 		if (settings->bRequestedHDRScreenshot) {
-				screenshotCallback = &Utils::TakeHDRPhotoModeScreenshot;
+			screenshotCallback = &Utils::TakeHDRPhotoModeScreenshot;
 		} else if (settings->bRequestedSDRScreenshot) {
-				screenshotCallback = &Utils::TakeSDRPhotoModeScreenshot;
+			screenshotCallback = &Utils::TakeSDRPhotoModeScreenshot;
 		}
 
 		// Capture texture data on the GPU side initially

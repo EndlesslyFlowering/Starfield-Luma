@@ -401,16 +401,16 @@ namespace Settings
 		void RefreshHDRDisplayEnableState();
 
 		bool IsHDRSupported() const { return bIsHDRSupported; }
-		bool IsSDRForcedOnHDR() const;
+		bool IsSDRForcedOnHDR(bool bAcknowledgeScreenshots = false) const;
 		bool IsDisplayModeSetToHDR() const;
-		bool IsGameRenderingSetToHDR() const;
+		bool IsGameRenderingSetToHDR(bool bAcknowledgeScreenshots = false) const;
 		bool IsCustomToneMapper() const;
 		bool IsFilmGrainTypeImproved() const;
 
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
 		RE::BGSSwapChainObject* GetSwapChainObject() const { return swapChainObject; }
-		int32_t GetActualDisplayMode() const;
+		int32_t GetActualDisplayMode(bool bAcknowledgeScreenshots = false) const;
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
 
