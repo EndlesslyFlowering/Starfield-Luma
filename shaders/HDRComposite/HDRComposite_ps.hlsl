@@ -8,7 +8,8 @@
 // they are generally all on by default, you can undefine them manually below if necessary.
 //#define APPLY_BLOOM
 //#define APPLY_TONEMAPPING
-//#define APPLY_CINEMATICS // this is post processing
+// This is post processing
+//#define APPLY_CINEMATICS
 //#define APPLY_MERGED_COLOR_GRADING_LUT
 
 // This disables most other features (post processing/cinematics, LUTs, ...)
@@ -24,9 +25,8 @@
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
 // 0 Disabled.
 // 1 "Proper" LUT extrapolation done in conservative ways to determine colors outside of the LUT range as accurately as possible. It might look flat compared to other methods.
-// 2 Fast LUT extrapolation that isn't hue conserving (generally looks good and is fairly accurate).
+// 2 Fast LUT extrapolation that isn't hue conserving (works by rgb ratio) (generally looks good and is fairly accurate).
 // 3 Fast and hue conserving LUT extrapolation approach. It just scales the luminance up (it doesn't work LUTs that invert colors/brightness).
-// 4 Gamut compression before sampling and decompression after
 #define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 4)
 // 0 Linear space. Gradients look wrong and there's a lot of invalid colors.
 // 1 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
@@ -34,8 +34,8 @@
 // 3 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green), but looks pretty desaturated on highlights.
 // 4 Oklch - maintain hue. Gradients look off, not too many invalid colors.
 #define DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE 3
-#define ENABLE_REPLACED_TONEMAP 1
-#define ALLOW_EXPAND_GAMUT 1
+// 4 Fast gamut compression (by max channel) before sampling and decompression after. This isn't accurate but generally looks good.
+//   NOTE: this only compresses positive scRGB values, negative ones get clipped.
 // 0 inverts all of the range (the whole image), to then re-tonemap it with an HDR tonemapper.
 // 1 keeps SDR toe/shadow, invert tonemap in the rest of the range.
 // 2 keeps SDR toe/shadow and midtones, inverts highlights only.
@@ -63,6 +63,7 @@
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
 
+// Enables our Luma custom HDR tonemapper
 #define HDR_TONE_MAPPER_ENABLED 1
 
 // 0 Ignored, 1 ACES Reference, 2 ACES Parametric, 3 Hable, 4+ Disable tonemapper
@@ -142,9 +143,9 @@ SamplerState Sampler0 : register(s0, space9); // Clamped Bilinear
 struct PSInput
 {
 	float4 SV_Position : SV_Position0;
-#if (defined(APPLY_MERGED_COLOR_GRADING_LUT) || defined(APPLY_BLOOM))
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) || defined(APPLY_BLOOM)
 	float2 TEXCOORD    : TEXCOORD0;
-#endif
+#endif // APPLY_MERGED_COLOR_GRADING_LUT || APPLY_BLOOM
 };
 
 struct PSOutput
@@ -160,10 +161,11 @@ struct ACESParametricParams
 
 struct ToneMapperParams
 {
-	float3 inputColor;
-	float inputLuminance;
+	float3 inputColor; // Untonemapped color
+	float inputLuminance; // Untonemapped color luminance
 	float3 outputSDRColor;
 	float outputSDRLuminance;
+	// The following parameters might not always be written/used/modified:
 	float3 outputHDRColor;
 	float outputHDRLuminance;
 	ACESParametricParams acesParametricParams;
@@ -172,11 +174,12 @@ struct ToneMapperParams
 
 struct CompositeParams
 {
+	//TODO: rename these variables to input color, tonemapped color, post processed tonemapped color, color graded post processed tonemapped color etc etc?
 	PSInput psInput;
-	float3 renderedColor;
-	float3 outputColor;
-	float3 preLUTColor;
-	float3 sdrColor;
+	float3 renderedColor; // Source/input HDR linear color
+	float3 outputColor; // Final output color (SDR or HDR), and also the color we usually work with for any operation
+	float3 preLUTColor; // TM+PP
+	float3 finalSDRColor; // TM+PP+CG - Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 };
 
 // 1.1920928955078125e-07
@@ -216,9 +219,7 @@ T ACES(
 	float  modE,
 	float  modA)
 {
-	Color = (Color * (modA * Color + ACES_b))
-	      / ((Color * (ACES_c * Color + ACES_d)) + modE);
-
+	Color = (Color * (modA * Color + ACES_b)) / ((Color * (ACES_c * Color + ACES_d)) + modE);
 	return Clamp ? saturate(Color) : Color;
 }
 
@@ -475,9 +476,7 @@ float HableEval_Inverse(
 {
 	// clamp to smallest float
 	float y0 = max((Channel - hableItmParams.offsetY) / hableItmParams.scaleY, asfloat(0x00000001));
-
 	float x0 = exp((log(y0) - hableItmParams.lnA) / hableItmParams.B);
-
 	return x0 / hableItmParams.scaleX + hableItmParams.offsetX;
 }
 
@@ -623,7 +622,6 @@ float3 DICETonemap(
 // below 1 it increases the amount of additional contrast being applied
 // only change this for testing
 #define LOG_2_ADJUST_C 1
-
 
 // bias towards smaller numbers
 void Log2Adjust(inout float Channel)
@@ -824,40 +822,50 @@ float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 
 	return newPostProcessedColor;
 }
 
-void ApplyUserSettingExtendGamut(inout CompositeParams params)
+PSOutput GetPSOutput(float3 Color)
 {
-#if ALLOW_EXPAND_GAMUT
+	PSOutput psOutput;
+	psOutput.SV_Target.rgb = Color;
+	psOutput.SV_Target.a = 1.f;
+	return psOutput;
+}
+
+void ApplyUserSettingExtendGamut(inout float3 Color)
+{
 	// We do this after applying "midGrayScale" as otherwise the input values would be too high and shit colors too much,
 	// also they'd end up messing up the application of LUTs too badly.
 	if (HdrDllPluginConstants.HDRExtendGamut)
 	{
 		// Pow by 2 to make the 0-1 setting slider more perceptually linear
-		params.outputColor = ExtendGamut(params.outputColor, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
+		Color = ExtendGamut(Color, pow(HdrDllPluginConstants.HDRExtendGamut, 2.0f));
 	}
-#endif
 }
 
 // Secondary user driven saturation.
 // This is already placed in LUTs but it's only applied on LUTs normalization.
-void ApplyUserSettingSaturation(inout CompositeParams params)
+void ApplyUserSettingSaturation(inout float3 Color)
 {
+#if ENABLE_TONEMAP
 	float saturation = linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
 	saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
-#endif
-	params.outputColor = Saturation(params.outputColor, saturation);
+#endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_LUT
+	Color = Saturation(Color, saturation);
+#endif // ENABLE_TONEMAP
 }
 
-// Secondary user driven contrast
-void ApplyUserSettingContrast(inout CompositeParams params)
+// Secondary user driven contrast.
+void ApplyUserSettingContrast(inout float3 Color)
 {
+#if ENABLE_TONEMAP
 	const float secondaryContrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
 #if 0 // By luminance (no hue shift) (looks off)
-	float outputColorLuminance = Luminance(params.outputColor);
-	params.outputColor *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
+	float outputColorLuminance = Luminance(Color);
+	Color *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
 #else // By channel (also increases saturation)
-	params.outputColor = pow(abs(params.outputColor) / MidGray, secondaryContrast) * MidGray * sign(params.outputColor);
+	Color= pow(abs(Color) / MidGray, secondaryContrast) * MidGray * sign(Color);
 #endif
+#endif // ENABLE_TONEMAP
 }
 
 void PostInverseTonemapByChannel(
@@ -887,7 +895,8 @@ void PostInverseTonemapByChannel(
 	// Restore any highlight clipped or just crushed by the direct tonemappers (Hable does that).
 	if (isHighlight)
 	{
-		// Use alpha to smooth any gradient disconnects (not a perfect solution)
+		// Use alpha to smooth any gradient disconnects (not a perfect solution).
+		// Note: if necessary we could do the lerp before the highlights begin, on mid tones.
 		InverseTonemappedColorChannel = lerp(sourceHighlightInverseTonemappedColorChannel, InputChannel, highlightAlpha);
 	}
 }
@@ -908,7 +917,8 @@ float3 PostGradingGammaCorrect(float3 TonemappedPostProcessedGradedColor)
 	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
 	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(TonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
 #elif SDR_USE_GAMMA_2_2 && ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS
-	// If gamma correction is in LUTs but LUTs are disabled, do it here
+	// If gamma correction is in LUTs but LUTs are disabled, do it here.
+	// This is questionable as maybe we shouldn't correct gamma if we didn't apply any LUT? Though if we didn't, there would be a gamma difference between applying a neutral LUT and skipping the LUT completely, which is unexpected.
 	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, pow(gamma_linear_to_sRGB(TonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection * (1.f - HdrDllPluginConstants.ColorGradingStrength));
 #endif // SDR_USE_GAMMA_2_2
 
@@ -1059,7 +1069,10 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 {
 	const float3 unclampedNeutralLUTColor = specifyOriginalColor ? originalColor : gamma_sRGB_to_linear_mirrored(LUTCoordinates);
 	const float3 unclampedLUTCoordinates = LUTCoordinates;
-#if 0 // Old flowed method, just keeping it in case it was to ever come useful
+#if LUT_EXTRAPOLATION_TYPE == 4
+	const float maxChannel = max(1.f, max(unclampedNeutralLUTColor.r, max(unclampedNeutralLUTColor.g, unclampedNeutralLUTColor.b)));
+	LUTCoordinates = saturate(gamma_linear_to_sRGB(unclampedNeutralLUTColor / maxChannel));
+#elif 0 // Old flowed method, just keeping it in case it was to ever come useful
 	bool LUTCoordinatesClamped;
 	// Make sure the LUT coordinates are clamped following the normal of the color instead of just a saturate().
 	// Note that due to the coordinates being in sRGB gamma/perceptual space, this operation isn't fully correct,
@@ -1067,9 +1080,6 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	// as a LUT cube with linear coordinates mapping is extremely complicated and non appropriate for other reasons.
 	LUTCoordinates = clampCubeCoordinates(LUTCoordinates, LUTCoordinatesClamped);
 	const float3 neutralLUTColor = gamma_sRGB_to_linear_mirrored(LUTCoordinates); // We can't use "originalColor" here
-#elif LUT_EXTRAPOLATION_TYPE == 4
-	float maxChannel = max(1.f, max(originalColor.r, max(originalColor.g, originalColor.b)));
-	LUTCoordinates = gamma_linear_to_sRGB_mirrored(originalColor / maxChannel);
 #else
 	LUTCoordinates = saturate(LUTCoordinates);
 	const bool LUTCoordinatesClamped = length(unclampedLUTCoordinates - LUTCoordinates) > FLT_MIN; // Some threshold is needed here
@@ -1389,7 +1399,7 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 		float outputY = Luminance(params.outputColor);
 		if (outputY > valueY )
 		{
-			if (outputY < 0.18f)
+			if (outputY < MidGray)
 			{
 				params.outputColor = float3(0.3f,0,0.3f);
 			}
@@ -1404,7 +1414,7 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 		}
 		else
 		{
-			if (dtmParams.valueX < 0.18f)
+			if (dtmParams.valueX < MidGray)
 			{
 				params.outputColor = float3(0,0.3f,0);
 			}
@@ -1419,14 +1429,49 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 		}
 	}
 }
+#endif // DRAW_TONEMAPPER
 
-#endif
+void ApplyCinematics(inout CompositeParams params)
+{
+#if defined(APPLY_CINEMATICS) && ENABLE_TONEMAP
+	float prePostProcessColorLuminance;
+	// NOTE: applying most of the post process before LUTs is not a very smart choice,
+	// because there's multiple operations that can move the values outside of the 0-1 range,
+	// so LUT mapping would clip and hue shift, but also, applying contrast/saturation before LUT
+	// implies that LUTs will apply on a different baseline, which means even more hue shift
+	// (e.g. if mid tones were tinted red and highlights blue, the tint would shift due to post processing).
+	// We could move part of this after LUTs, but we want to retain the original game look more than anything else (depending on the scene settings, results could vary drastically).
+	params.outputColor = lerp(params.outputColor, PostProcess(params.outputColor, prePostProcessColorLuminance), PostProcessStrength);
+#endif // APPLY_CINEMATICS && ENABLE_TONEMAP
+}
+
+void ApplyColorGrading(inout float3 Color, float2 UV)
+{
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP
+#if ENABLE_LUT
+	// We don't need to keep the hue here, a lose extrapolation is fine.
+	// Note that we also do this in SDR, to avoid further runtime branches.
+	const int LUTExtrapolationColorSpace = 1;
+	Color = GradingLUT(Color, UV, LUTExtrapolationColorSpace);
+#endif // ENABLE_LUT
+	//TODO: we should skip this if "APPLY_MERGED_COLOR_GRADING_LUT" isn't enabled...?
+	Color = PostGradingGammaCorrect(Color);
+#endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_TONEMAP
+}
+
+void ApplyColorGrading(inout CompositeParams params)
+{
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+	ApplyColorGrading(params.outputColor, params.psInput.TEXCOORD);
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
+}
 
 #if HDR_TONE_MAPPER_ENABLED
 void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	if (TONE_MAPPER_ENUM != 3) { // ACESFitted/Parametric
-		params.outputColor *= 3.5f;
+	//TODO: this should be lerping DRT tonemapper parameters based on the vanilla SDR tonemapper parameters, not branch on them (nor multiply the input color).
+	if (PcwHdrComposite.Tmo != 3) { // ACESFitted/Parametric
+		params.outputColor *= 3.5f; 
 		tmParams.inputColor *= 3.5f;
 		tmParams.inputLuminance *= 3.5f;
 	}
@@ -1437,7 +1482,6 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 		tmParams.inputLuminance *= 2.8f;
 	}
 }
-
 
 void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
@@ -1455,11 +1499,8 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 
 	float contrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
 	// Compute ungraded tone map for exact nits
-
-
-	if (
-		HdrDllPluginConstants.DisplayMode <= 0 // If SDR
-		|| !HdrDllPluginConstants.ColorGradingStrength // No LUTs
+	if (HdrDllPluginConstants.DisplayMode <= 0 // If SDR
+		|| HdrDllPluginConstants.ColorGradingStrength == 0.f // No LUTs (this branch is more optimized and produces identical results if we have no LUT)
 #if LUT_EXTRAPOLATION_TYPE > 0
 		|| HdrDllPluginConstants.StrictLUTApplication // Use LUT Extrapolation
 #endif
@@ -1472,8 +1513,13 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 			highlightsScaling,
 			contrast
 		);
+		// Boost by peakNits/white to exceed SDR range (when in HDR).
+		// The tonemapping should have been achored around mid gray anyway.
 		tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
 		tmParams.outputSDRColor = tmParams.outputHDRColor;
+
+		tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
+		tmParams.outputSDRLuminance = tmParams.outputHDRLuminance;
 	}
 	else
 	{
@@ -1488,244 +1534,248 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 			contrast
 		);
 		tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
-	}
 
-	tmParams.outputSDRLuminance = Luminance(tmParams.outputSDRColor);
-	tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
+		tmParams.outputSDRLuminance = Luminance(tmParams.outputSDRColor);
+		tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
+	}
 
 	params.outputColor = tmParams.outputSDRColor;
 }
 
-
-void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, inout ToneMapperParams tmParams)
+void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tmParams)
 {
+	//TODO: Try RestorePostProcess() here again?
 	params.outputColor *= safeDivision(tmParams.outputHDRLuminance, tmParams.outputSDRLuminance);
 
-	ApplyUserSettingExtendGamut(params);
-	ApplyUserSettingSaturation(params);
+	ApplyUserSettingExtendGamut(params.outputColor);
+	ApplyUserSettingSaturation(params.outputColor);
 
-
+	// Change paper white to default from 80 to 203.
 	params.outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
 }
 
 #endif // HDR_TONE_MAPPER_ENABLED
 
-void ApplySDRToneMapperHDRUpgrade(inout CompositeParams params, inout ToneMapperParams tmParams)
+void ApplySDRToneMapperHDRUpgrade(inout CompositeParams params, in ToneMapperParams tmParams)
 {
-
-	// TODO: Migrate to using params
-	const float3 inputColor = tmParams.inputColor;
-	const float3 tonemappedPostProcessedColor = params.preLUTColor;
-	const float3 finalOriginalColor = params.sdrColor;
-	const PSInput psInput = params.psInput;
-
-	const float untonemappedColorLuminance = tmParams.inputLuminance;
 	float3 tonemappedColor = tmParams.outputSDRColor;
-	const float3 tonemappedColorLuminance = tmParams.outputSDRLuminance;
 
-	const float3 tonemappedByLuminanceColor = inputColor * safeDivision(tonemappedColorLuminance, untonemappedColorLuminance);
+	// Re-apply the tonemapped image luminance ratio on the untonemapped image 
+	const float3 tonemappedByLuminanceColor = tmParams.inputColor * safeDivision(tmParams.outputSDRLuminance, tmParams.inputLuminance);
 
 	const float acesParam_modE = tmParams.acesParametricParams.modE;
 	const float acesParam_modA = tmParams.acesParametricParams.modA;
 	const HableParams hableParams = tmParams.hableParams;
 
-// Following was part of SDR path but value was never used in SDR
-
-#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
 	const bool SDRTonemapByLuminance = (HDR_TONEMAP_TYPE > 0) && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
 #if 1 // This is delicate and could make things worse, especially within "RestorePostProcess()", but without it, highlights have uncontiguos gradients that shift color (due to strong LUTs)
 	if (SDRTonemapByLuminance)
 	{
 		tonemappedColor = tonemappedByLuminanceColor;
-		// NOTE: we should probably do the same to "tonemappedPostProcessedColor" and "tonemappedPostProcessedGradedColor" if they are used
+		// NOTE: we should probably do the same to "params.preLUTColor" and "tonemappedPostProcessedGradedColor" if they are used
 	}
 #endif
 
-#endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
-
-// (Removed HDR Check)
-
-#if ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-		const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
-
-		const float midGrayIn = MidGray;
-		float midGrayOut = midGrayIn;
+	const float midGrayIn = MidGray; // tonemapped SDR mid gray
+	float midGrayOut = midGrayIn; // inverse tonemapped (linear/raw/HDR) mid gray
 
 // NOTE: we should rename "minHighlightsColorIn" and "minHighlightsColorOut" to something more generic, as now we have "INVERT_TONEMAP_TYPE" (so it could be highlights or midtones, ...),
 // but it's not really necessary, as this dictates the point where we might start using the HDR tonemapper, which is indeed related to highlights.
 #if INVERT_TONEMAP_TYPE != 1 // invert highlights
-		float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception SDR space
+	float minHighlightsColorIn = MinHighlightsColor; // We consider highlight the last ~33% of perception SDR space
 #else // invert midtones and highlights
-		float minHighlightsColorIn = MaxShadowsColor; // We consider shadow the first ~33% of perception SDR space
+	float minHighlightsColorIn = MaxShadowsColor; // We consider shadow the first ~33% of perception SDR space
 #endif
-		float minHighlightsColorOut = minHighlightsColorIn;
+	float minHighlightsColorOut = minHighlightsColorIn;
 #if DEVELOPMENT && 0
-		const float localSDRTonemapHDRStrength = 1.f - HdrDllPluginConstants.DevSetting01;
+	const float localSDRTonemapHDRStrength = 1.f - HdrDllPluginConstants.DevSetting01;
 #else
-		const float localSDRTonemapHDRStrength = SDRTonemapHDRStrength;
+	const float localSDRTonemapHDRStrength = SDRTonemapHDRStrength;
 #endif
-		// If true, we need to calculate the inverse tonemap
-		const bool needsInverseTonemap = (INVERT_TONEMAP_TYPE <= 0) || localSDRTonemapHDRStrength != 1.f;
+	// If true, we need to calculate the inverse tonemap
+	const bool needsInverseTonemap = (INVERT_TONEMAP_TYPE <= 0) || localSDRTonemapHDRStrength != 1.f;
 
-		float3 inverseTonemappedColor = needsInverseTonemap ? tonemappedColor : inputColor;
+	float3 inverseTonemappedColor = needsInverseTonemap ? tonemappedColor : tmParams.inputColor;
 
-		// Restore a color very close to the original linear one (some information might get close in the direct tonemapper)
-		switch (TONE_MAPPER_ENUM)
+	// Restore a color very close to the original linear one (some information might get close in the direct tonemapper)
+	switch (TONE_MAPPER_ENUM)
+	{
+		case 1:
 		{
-			case 1:
+			if (needsInverseTonemap)
 			{
-				if (needsInverseTonemap)
-				{
-					inverseTonemappedColor = ACESFitted_Inverse(inverseTonemappedColor);
-					midGrayOut             = ACESFitted_Inverse(midGrayIn);
-				}
-				minHighlightsColorOut = ACESFitted_Inverse(minHighlightsColorIn);
-			} break;
+				inverseTonemappedColor = ACESFitted_Inverse(inverseTonemappedColor);
+				midGrayOut             = ACESFitted_Inverse(midGrayIn);
+			}
+			minHighlightsColorOut = ACESFitted_Inverse(minHighlightsColorIn);
+		} break;
 
-			case 2:
+		case 2:
+		{
+			if (needsInverseTonemap)
 			{
-				if (needsInverseTonemap)
-				{
-					inverseTonemappedColor = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
-					midGrayOut             = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
-				}
-				minHighlightsColorOut = ACESParametric_Inverse(minHighlightsColorIn, acesParam_modE, acesParam_modA);
-			} break;
+				inverseTonemappedColor = ACESParametric_Inverse(inverseTonemappedColor, acesParam_modE, acesParam_modA);
+				midGrayOut             = ACESParametric_Inverse(midGrayIn, acesParam_modE, acesParam_modA);
+			}
+			minHighlightsColorOut = ACESParametric_Inverse(minHighlightsColorIn, acesParam_modE, acesParam_modA);
+		} break;
 
-			case 3:
-			{
+		case 3:
+		{
 #if INVERT_TONEMAP_TYPE != 1
-				// Setup highlights for Hable, we use the official param based highlights shoulder start for it, so that we switch tonemapper in the same place where the hable curve would change direction (or so I think)
-				const float shoulderOutStart = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
-				minHighlightsColorIn         = shoulderOutStart;
+			// Setup highlights for Hable, we use the official param based highlights shoulder start for it, so that we switch tonemapper in the same place where the hable curve would change direction (or so I think)
+			const float shoulderOutStart = max(hableParams.params.y0, hableParams.params.y1); // Check both toe and mid params for extra safety
+			minHighlightsColorIn         = shoulderOutStart;
 #else
-				const float toeOutEnd        = min(hableParams.params.y0, hableParams.params.y1);
-				minHighlightsColorIn         = toeOutEnd;
+			const float toeOutEnd        = min(hableParams.params.y0, hableParams.params.y1);
+			minHighlightsColorIn         = toeOutEnd;
 #endif
 
-				if (needsInverseTonemap)
-				{
-					inverseTonemappedColor = Hable_Inverse(inverseTonemappedColor, hableParams);
-					midGrayOut             = Hable_Inverse(midGrayIn, hableParams);
-				}
+			if (needsInverseTonemap)
+			{
+				inverseTonemappedColor = Hable_Inverse(inverseTonemappedColor, hableParams);
+				midGrayOut             = Hable_Inverse(midGrayIn, hableParams);
+			}
 #if INVERT_TONEMAP_TYPE != 1 // Optimized and more "accurate"
-				minHighlightsColorOut = hableParams.shoulderStart;
+			minHighlightsColorOut = hableParams.shoulderStart;
 #elif 1
-				minHighlightsColorOut = hableParams.toeEnd;
+			minHighlightsColorOut = hableParams.toeEnd;
 #else
-				minHighlightsColorOut = Hable_Inverse(minHighlightsColorIn, hableParams);
+			minHighlightsColorOut = Hable_Inverse(minHighlightsColorIn, hableParams);
 #endif
-			} break;
+		} break;
 
-			default:
-				break;
-		}
+		default:
+			break;
+	}
 
-		if (!SDRTonemapByLuminance)
-		{
-			SDRTonemapByLuminancePP sPP;
-			sPP.minHighlightsColorIn  = minHighlightsColorIn;
-			sPP.minHighlightsColorOut = minHighlightsColorOut;
-			sPP.needsInverseTonemap   = needsInverseTonemap;
+	if (!SDRTonemapByLuminance)
+	{
+		SDRTonemapByLuminancePP sPP;
+		sPP.minHighlightsColorIn  = minHighlightsColorIn;
+		sPP.minHighlightsColorOut = minHighlightsColorOut;
+		sPP.needsInverseTonemap   = needsInverseTonemap;
 
-			PostInverseTonemapByChannel(inputColor.r, tonemappedColor.r, inverseTonemappedColor.r, sPP);
-			PostInverseTonemapByChannel(inputColor.g, tonemappedColor.g, inverseTonemappedColor.g, sPP);
-			PostInverseTonemapByChannel(inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
-		}
-		else
-		{
+		PostInverseTonemapByChannel(tmParams.inputColor.r, tonemappedColor.r, inverseTonemappedColor.r, sPP);
+		PostInverseTonemapByChannel(tmParams.inputColor.g, tonemappedColor.g, inverseTonemappedColor.g, sPP);
+		PostInverseTonemapByChannel(tmParams.inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
+	}
+	else
+	{
 #if 1
-			const bool isHighlight = untonemappedColorLuminance >= minHighlightsColorOut;
+		const bool isHighlight = tmParams.inputLuminance >= minHighlightsColorOut;
 #else
-			const bool isHighlight = (needsInverseTonemap ? Luminance(inverseTonemappedColor) : untonemappedColorLuminance) >= minHighlightsColorOut;
+		const bool isHighlight = (needsInverseTonemap ? Luminance(inverseTonemappedColor) : tmParams.inputLuminance) >= minHighlightsColorOut;
 #endif
-			if (INVERT_TONEMAP_TYPE > 0 && !isHighlight)
-			{
-				inverseTonemappedColor = tonemappedByLuminanceColor * (minHighlightsColorOut / minHighlightsColorIn);
-			}
-			if (needsInverseTonemap && isHighlight)
-			{
-				inverseTonemappedColor = inputColor;
-			}
-		}
-
-		if (INVERT_TONEMAP_TYPE > 0)
+		if (INVERT_TONEMAP_TYPE > 0 && !isHighlight)
 		{
-			// If we only inverted highlights, the mid gray in and out should follow the same scale of the highlightd in/out change, otherwise the curves wouldn't connect.
-			// In the extremely unlikely case that "midGrayOut" was higher than "minHighlightsColorOut", this calculaton should still be ok.
-			midGrayOut = lerp(midGrayOut, midGrayIn * (minHighlightsColorOut / minHighlightsColorIn), localSDRTonemapHDRStrength);
-			// Shift back to the original linear color if we want to ignore the SDR tonemapper
-			if (localSDRTonemapHDRStrength != 1.f)
-			{
-				inverseTonemappedColor = lerp(inputColor, inverseTonemappedColor, localSDRTonemapHDRStrength);
-				minHighlightsColorOut = lerp(minHighlightsColorIn, minHighlightsColorOut, localSDRTonemapHDRStrength);
-			}
+			inverseTonemappedColor = tonemappedByLuminanceColor * (minHighlightsColorOut / minHighlightsColorIn);
 		}
+		if (needsInverseTonemap && isHighlight)
+		{
+			inverseTonemappedColor = tmParams.inputColor;
+		}
+	}
 
-		const float midGrayScale = midGrayOut / midGrayIn;
+	if (INVERT_TONEMAP_TYPE > 0)
+	{
+		// If we only inverted highlights, the mid gray in and out should follow the same scale of the highlightd in/out change, otherwise the curves wouldn't connect.
+		// In the extremely unlikely case that "midGrayOut" was higher than "minHighlightsColorOut", this calculaton should still be ok.
+		midGrayOut = lerp(midGrayOut, midGrayIn * (minHighlightsColorOut / minHighlightsColorIn), localSDRTonemapHDRStrength);
+		// Shift back to the original linear color if we want to ignore the SDR tonemapper
+		if (localSDRTonemapHDRStrength != 1.f)
+		{
+			inverseTonemappedColor = lerp(tmParams.inputColor, inverseTonemappedColor, localSDRTonemapHDRStrength);
+			minHighlightsColorOut = lerp(minHighlightsColorIn, minHighlightsColorOut, localSDRTonemapHDRStrength);
+		}
+	}
 
-		// Bring back the color to the same range as SDR by matching the mid gray level.
-		inverseTonemappedColor /= midGrayScale;
-		minHighlightsColorOut  /= midGrayScale;
+	const float midGrayScale = midGrayOut / midGrayIn;
 
-		float3 inverseTonemappedPostProcessedColor;
-		const bool restorePostProcessForceKeepHue = HDR_POST_PROCESS_TYPE == 1 || HDR_POST_PROCESS_TYPE == 3; // If true, we force keeping the LUT hue to make sure they are always applied "correctly" (this actually can often look worse though)
+	// Bring back the color to the same range as SDR by matching the mid gray level.
+	inverseTonemappedColor /= midGrayScale;
+	minHighlightsColorOut  /= midGrayScale;
+
+	float3 inverseTonemappedPostProcessedColor;
+	const bool restorePostProcessForceKeepHue = HDR_POST_PROCESS_TYPE == 1 || HDR_POST_PROCESS_TYPE == 3; // If true, we force keeping the LUT hue to make sure they are always applied "correctly" (this actually can often look worse though)
 #if HDR_POST_PROCESS_TYPE == 0 || HDR_POST_PROCESS_TYPE == 1
-		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, tonemappedColor, finalOriginalColor, restorePostProcessForceKeepHue);
+	inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedColor, tonemappedColor, params.finalSDRColor, restorePostProcessForceKeepHue);
 #else // HDR_POST_PROCESS_TYPE
 
 #if defined(APPLY_CINEMATICS)
-		float prePostProcessColorLuminance;
-		inverseTonemappedPostProcessedColor = lerp(inverseTonemappedColor, PostProcess(inverseTonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
+	float prePostProcessColorLuminance;
+	inverseTonemappedPostProcessedColor = lerp(inverseTonemappedColor, PostProcess(inverseTonemappedColor, prePostProcessColorLuminance), PostProcessStrength);
 #else
-		inverseTonemappedPostProcessedColor = inverseTonemappedColor;
+	inverseTonemappedPostProcessedColor = inverseTonemappedColor;
 #endif // APPLY_CINEMATICS
 
-		const bool strictLUTApplication = (HDR_POST_PROCESS_TYPE == 5) ? HdrDllPluginConstants.StrictLUTApplication : (HDR_POST_PROCESS_TYPE == 4);
+	const bool strictLUTApplication = (HDR_POST_PROCESS_TYPE == 5) ? HdrDllPluginConstants.StrictLUTApplication : (HDR_POST_PROCESS_TYPE == 4);
 
-		if (strictLUTApplication)
-		{
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
-#if ENABLE_LUT
-			inverseTonemappedPostProcessedColor = GradingLUT(inverseTonemappedPostProcessedColor, psInput.TEXCOORD);
-#endif // ENABLE_LUT
-			inverseTonemappedPostProcessedColor = PostGradingGammaCorrect(inverseTonemappedPostProcessedColor);
+	if (strictLUTApplication)
+	{
+		ApplyColorGrading(inverseTonemappedPostProcessedColor, params.psInput.TEXCOORD);
+	}
+	else
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
-		}
-		else
-		{
-			inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedPostProcessedColor, tonemappedPostProcessedColor, finalOriginalColor, restorePostProcessForceKeepHue);
-		}
+	{
+		inverseTonemappedPostProcessedColor = RestorePostProcess(inverseTonemappedPostProcessedColor, params.preLUTColor, params.finalSDRColor, restorePostProcessForceKeepHue);
+	}
 
 #endif // HDR_POST_PROCESS_TYPE
 
 #if 0 // Enable this if you want the highlights shoulder start to be affected by post processing. It doesn't seem like the right thing to do and having it off works just fine.
-		minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, tonemappedColor, finalOriginalColor); // NOTE: this is broken since refactoring the RestorePostProcess() logic
+	minHighlightsColorOut = RestorePostProcess(minHighlightsColorOut, tonemappedColor, params.finalSDRColor); // NOTE: this is broken since refactoring the RestorePostProcess() logic
 #endif
 
-		params.outputColor = inverseTonemappedPostProcessedColor;
-		ApplyUserSettingExtendGamut(params);
-		ApplyUserSettingSaturation(params);
-		ApplyUserSettingContrast(params);
+	params.outputColor = inverseTonemappedPostProcessedColor;
+	ApplyUserSettingExtendGamut(params.outputColor);
+	ApplyUserSettingSaturation(params.outputColor);
+	ApplyUserSettingContrast(params.outputColor);
 
-		params.outputColor *= paperWhite;
-		minHighlightsColorOut *= paperWhite;
+	params.outputColor *= paperWhite;
+	minHighlightsColorOut *= paperWhite;
 
-		const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
-		// Never compress highlights before the top 2/3 of the image (the actual ratio is based on a user param), even if it means we have two separate mid tones sections,
-		// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
-		const float highlightsModulationPow = HdrDllPluginConstants.ToneMapperHighlights >= 0.5f ? linearNormalization(HdrDllPluginConstants.ToneMapperHighlights, 0.5f, 1.f, 1.f / 3.f, 1.f) : linearNormalization(HdrDllPluginConstants.ToneMapperHighlights, 0.0f, 0.5f, 0.f, 1.f / 3.f);
-		float highlightsShoulderStart = max(maxOutputLuminance * highlightsModulationPow, minHighlightsColorOut);
-		highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
+	const float maxOutputLuminance = HdrDllPluginConstants.HDRPeakBrightnessNits / WhiteNits_sRGB;
+	// Never compress highlights before the top 2/3 of the image (the actual ratio is based on a user param), even if it means we have two separate mid tones sections,
+	// one from the SDR tonemapped and one pure linear (hopefully the discontinuous curve won't be noticeable on gradients).
+	const float highlightsModulationPow = HdrDllPluginConstants.ToneMapperHighlights >= 0.5f ? linearNormalization(HdrDllPluginConstants.ToneMapperHighlights, 0.5f, 1.f, 1.f / 3.f, 1.f) : linearNormalization(HdrDllPluginConstants.ToneMapperHighlights, 0.0f, 0.5f, 0.f, 1.f / 3.f);
+	float highlightsShoulderStart = max(maxOutputLuminance * highlightsModulationPow, minHighlightsColorOut);
+	highlightsShoulderStart = (INVERT_TONEMAP_TYPE > 0) ? lerp(0.f, highlightsShoulderStart, localSDRTonemapHDRStrength) : 0.f;
 
-		params.outputColor = DICETonemap(params.outputColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
-#else // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
-		params.outputColor = finalOriginalColor * (HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408); // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image
-
-#endif // ENABLE_TONEMAP && ENABLE_REPLACED_TONEMAP
+	params.outputColor = DICETonemap(params.outputColor, maxOutputLuminance, highlightsShoulderStart, HDRHighlightsModulation);
 }
 
+void ApplySDROutputTransforms(inout float3 Color)
+{
+#if !SDR_LINEAR_INTERMEDIARY
+	// Note that gamma was never applied if LUTs were disabled, but we don't care about that as the affected shaders permutations were never used
+	#if SDR_USE_GAMMA_2_2
+		Color = pow(Color, 1.f / 2.2f);
+	#else
+		// Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
+		Color = gamma_linear_to_sRGB(Color);
+	#endif // SDR_USE_GAMMA_2_2
+#endif // SDR_LINEAR_INTERMEDIARY
+
+#if CLAMP_INPUT_OUTPUT
+	// To keep the UI blending behaviour the same as vanilla SDR, we should clamp the image,
+	// though if we don't, we possibly retain more detail in transparent UI background colors (hopefully nothing will be bright enough to ruin the UI readability).
+	Color = saturate(Color);
+#endif
+}
+
+void ApplyHDROutputTransforms(inout float3 Color)
+{
+#if CLAMP_INPUT_OUTPUT
+	// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
+	Color = BT709_To_WBT2020(Color);
+	Color = max(Color, 0.f);
+	Color = WBT2020_To_BT709(Color);
+#endif
+}
 
 bool ApplyDebugLUT(inout CompositeParams params)
 {
@@ -1747,24 +1797,18 @@ bool ApplyDebugLUT(inout CompositeParams params)
 #if SDR_USE_GAMMA_2_2 && !GAMMA_CORRECTION_IN_LUTS
 			outputColor = lerp(outputColor, pow(gamma_linear_to_sRGB(outputColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
 #endif // SDR_USE_GAMMA_2_2 && !GAMMA_CORRECTION_IN_LUTS
-
-#if !SDR_LINEAR_INTERMEDIARY
-#if SDR_USE_GAMMA_2_2
-			outputColor = pow(outputColor, 1.f / 2.2f);
-#else
-			outputColor = gamma_linear_to_sRGB(outputColor);
-#endif // SDR_USE_GAMMA_2_2
-#endif // SDR_LINEAR_INTERMEDIARY
+			ApplySDROutputTransforms(outputColor);
 		}
 		else
 		{
 			outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
+			ApplyHDROutputTransforms(outputColor);
 		}
 
 		params.outputColor = outputColor;
 		return true;
 	}
-#endif
+#endif // APPLY_MERGED_COLOR_GRADING_LUT && DRAW_LUT
 	return false;
 }
 
@@ -1774,15 +1818,6 @@ void ApplyBloom(inout CompositeParams params)
 	float3 bloom = Bloom.Sample(Sampler0, params.psInput.TEXCOORD);
 	params.outputColor += PcwHdrComposite.BloomMultiplier * bloom * (2.f * HdrDllPluginConstants.ToneMapperBloom);
 #endif // APPLY_BLOOM
-}
-
-void ApplyClamping(inout CompositeParams params)
-{
-#if CLAMP_INPUT_OUTPUT
-	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
-	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
-	params.outputColor = max(outputColor, 0.f);
-#endif // CLAMP_INPUT_OUTPUT
 }
 
 static const bool CLAMP_BETHESDA_ACES = false;
@@ -1813,107 +1848,47 @@ void ApplyDummyToneMap(inout CompositeParams params, inout ToneMapperParams tmPa
 	// noop
 }
 
-void ApplyCinematics(inout CompositeParams params)
+void ApplySDRBrightness(inout float3 Color)
 {
-#if defined(APPLY_CINEMATICS)
-	float prePostProcessColorLuminance;
-	// NOTE: applying most of the post process before LUTs is not a very smart choice,
-	// because there's multiple operations that can move the values outside of the 0-1 range,
-	// so LUT mapping would clip and hue shift, but also, applying contrast/saturation before LUT
-	// implies that LUTs will apply on a different baseline, which means even more hue shift
-	// (e.g. if mid tones were tinted red and highlights blue, the tint would shift due to post processing).
-	// We could move part of this after LUTs, but we want to retain the original game look more than anything else (depending on the scene settings, results could vary drastically).
-	params.outputColor = lerp(
-		params.outputColor,
-		PostProcess(params.outputColor, prePostProcessColorLuminance),
-		PostProcessStrength
-	);
-#endif //APPLY_CINEMATICS
-}
-
-void ApplyColorGrading(inout CompositeParams params)
-{
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
-#if ENABLE_LUT
-	// We don't need to keep the hue here, a lose extrapolation is fine.
-	// Note that we also do this in SDR, to avoid further runtime branches.
-	const int LUTExtrapolationColorSpace = 1;
-	params.outputColor = GradingLUT(params.outputColor, params.psInput.TEXCOORD, LUTExtrapolationColorSpace);
-#endif // ENABLE_LUT
-	params.outputColor = PostGradingGammaCorrect(params.outputColor);
-#endif
-}
-
-void ApplyBrightness(inout CompositeParams params)
-{
-		// The dll makes sure this is 1 when we are in HDR.
+#if ENABLE_TONEMAP
+	// The dll makes sure "SDRSecondaryBrightness" is 1 when we are in HDR.
+	// NOTE: this can produce values beyond 1, as Oklab isn't guaranteed to output colors within 0-1.
 	if (HdrDllPluginConstants.SDRSecondaryBrightness != 1.f)
 	{
-		float3 oklabColor = linear_srgb_to_oklab(params.outputColor);
-		// We make sure this doesn't have negative brightness with abs()*sign()
-		// (it might have been very unlikely anyway)
-		oklabColor[0] = pow(
-			abs(oklabColor[0]),
-			linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 1.25f, 0.75f)
-		) * sign(oklabColor[0]);
-		params.outputColor = oklab_to_linear_srgb(oklabColor);
+		float3 oklabColor = linear_srgb_to_oklab(Color);
+		// We make sure this doesn't have negative brightness with abs()*sign() (it might have been very unlikely anyway).
+		// Note that this can generate rgb values beyond 1 which will then be clipped, though it doesn't happen enough for it to be a problem.
+		oklabColor[0] = pow(abs(oklabColor[0]), linearNormalization(HdrDllPluginConstants.SDRSecondaryBrightness, 0.f, 2.f, 1.25f, 0.75f)) * sign(oklabColor[0]);
+		Color = oklab_to_linear_srgb(oklabColor);
 	}
-}
-
-
-
-void ApplyHDROutputTransforms(inout CompositeParams params)
-{
-	// move into custom BT.2020 that is a little wider than BT.2020 and clamp to that
-	params.outputColor = BT709_To_WBT2020(params.outputColor);
-	params.outputColor = max(params.outputColor, 0.f);
-	params.outputColor = WBT2020_To_BT709(params.outputColor);
-}
-
-void ApplySDROutputTransforms(inout CompositeParams params)
-{
-#if !SDR_LINEAR_INTERMEDIARY
-	// Note that gamma was never applied if LUTs were disabled, but we don't care about that as the affected shaders permutations were never used
-	#if SDR_USE_GAMMA_2_2
-		params.outputColor = pow(params.outputColor, 1.f / 2.2f);
-	#else
-		// Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
-		params.outputColor = gamma_linear_to_sRGB(params.outputColor);
-	#endif // SDR_USE_GAMMA_2_2
-#endif // SDR_LINEAR_INTERMEDIARY
-
-#if CLAMP_INPUT_OUTPUT
-	// To keep the UI blending behaviour the same as vanilla SDR, we should clamp the image,
-	// though if we don't, we possibly retain more detail in transparent UI background colors (hopefully nothing will be bright enough to ruin the UI readability).
-	params.outputColor = saturate(params.outputColor);
-#endif
+#endif // ENABLE_TONEMAP
 }
 
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput) // Main Entrypoint
 {
 	// Linear HDR color straight from the renderer (possibly with exposure pre-applied to it, assuming the game has some auto exposure mechanism)
-	const float3 renderedColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
+	float3 renderedColor = InputColorTexture.Load(int3(int2(psInput.SV_Position.xy), 0));
+
+#if CLAMP_INPUT_OUTPUT
+	// Remove any negative value caused by using R16G16B16A16F buffers (originally this was R11G11B10F, which has no negative values).
+	// Doing gamut mapping, or keeping the colors outside of BT.709 doesn't seem to be right, as they seem to be just be accidentally coming out of some shader math.
+	renderedColor = max(renderedColor, 0.f);
+#endif // CLAMP_INPUT_OUTPUT
+
 	CompositeParams params =
 	{
 		psInput,
-		renderedColor,
+		renderedColor, // renderedColor
 		renderedColor, // outputColor
 		renderedColor, // preLUTColor
-		renderedColor, // sdrColor
+		renderedColor, // finalSDRColor
 	};
 
 #if DEVELOPMENT
 	if (ApplyDebugLUT(params))
-	{
-		PSOutput psOutput;
-		psOutput.SV_Target.rgb = params.outputColor;
-		psOutput.SV_Target.a = 1.f;
-		return psOutput;
-	}
+		return GetPSOutput(params.outputColor);
 #endif
-
-	ApplyClamping(params);
 
 	ApplyBloom(params);
 
@@ -1921,7 +1896,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 	DrawToneMapperParams dtmParams = DrawToneMapperStart(params);
 #endif
 
-	float tmParamsInputColorLuminance = Luminance(params.outputColor);
+	const float tmParamsInputColorLuminance = Luminance(params.outputColor);
 	ACESParametricParams acesParametricParams;
 	HableParams hableParams;
 	ToneMapperParams tmParams =
@@ -1950,20 +1925,30 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 		case 1:     ApplyOpenDRTToneMap(params, tmParams); break;
 		#endif
 	}
+#endif // ENABLE_TONEMAP
+
+	const bool strictLUTApplication = (HDR_POST_PROCESS_TYPE == 5) ? HdrDllPluginConstants.StrictLUTApplication : (HDR_POST_PROCESS_TYPE == 4); // Vanilla+ TM
+	bool needsSDRPostProcess = !strictLUTApplication || HdrDllPluginConstants.DisplayMode <= 0;
+#if HDR_TONE_MAPPER_ENABLED
+	if (HdrDllPluginConstants.ToneMapperType > 0)
+		needsSDRPostProcess = true;
 #endif
-
-	ApplyCinematics(params);
-
-	params.preLUTColor = params.outputColor;
-
-	ApplyColorGrading(params);
-
-	// Final "original" (vanilla, ~unmodded) linear SDR color before output transform
-	params.sdrColor = params.outputColor;
-
-	if (HdrDllPluginConstants.DisplayMode > 0)
+	if (needsSDRPostProcess)
 	{
+		ApplyCinematics(params);
+		params.preLUTColor = params.outputColor;
 
+		ApplyColorGrading(params);
+		params.finalSDRColor = params.outputColor;
+	}
+	else
+	{
+		params.preLUTColor = params.outputColor;
+		params.finalSDRColor = params.outputColor;
+	}
+
+	if (HdrDllPluginConstants.DisplayMode > 0) // HDR
+	{
 #if ENABLE_TONEMAP
 		switch(HdrDllPluginConstants.ToneMapperType)
 		{
@@ -1973,30 +1958,31 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 			case 1:       ApplyOpenDRTHDRUpgrade(params, tmParams); break;
 			#endif
 		}
+#else
+		params.outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408; // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image
 #endif
-
-		ApplyHDROutputTransforms(params);
+#if DRAW_TONEMAPPER
+		DrawToneMapperEnd(params, dtmParams);
+#endif
+		ApplyHDROutputTransforms(params.outputColor);
 	}
-	else
+	else // SDR
 	{
-		ApplyBrightness(params);
-		ApplyUserSettingSaturation(params);
+		ApplySDRBrightness(params.outputColor);
+		//TODOFT: contast and saturation in SDR?
+		ApplyUserSettingSaturation(params.outputColor);
 #if HDR_TONE_MAPPER_ENABLED
+		// User contrast is already baked in the DRT TM
 		if (HdrDllPluginConstants.ToneMapperType == 0)
 #endif
 		{
-
-			ApplyUserSettingContrast(params);
+			ApplyUserSettingContrast(params.outputColor);
 		}
-		ApplySDROutputTransforms(params);
+#if DRAW_TONEMAPPER
+		DrawToneMapperEnd(params, dtmParams);
+#endif
+		ApplySDROutputTransforms(params.outputColor);
 	}
 
-#if DRAW_TONEMAPPER
-	DrawToneMapperEnd(params, dtmParams);
-#endif
-
-	PSOutput psOutput;
-	psOutput.SV_Target.rgb = params.outputColor;
-	psOutput.SV_Target.a = 1.f;
-	return psOutput;
+	return GetPSOutput(params.outputColor);
 }

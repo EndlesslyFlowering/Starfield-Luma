@@ -214,7 +214,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		1.f);
 
 #if LUT_DEBUG_VALUES
-	// increaseY must always be >= 1
+	// raiseL must always be >= 1
 	if (raiseL < 1.f) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
 
