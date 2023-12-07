@@ -1862,21 +1862,21 @@ static const bool CLAMP_BETHESDA_ACES = false;
 
 void ApplyACESFitted(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	tmParams.outputSDRColor = ACESFitted(tmParams.inputColor, CLAMP_BETHESDA_ACES);
+	tmParams.outputSDRColor = ACESFitted(abs(tmParams.inputColor), CLAMP_BETHESDA_ACES) * sign(tmParams.inputColor);
 	tmParams.outputSDRLuminance = ACESFitted(tmParams.inputLuminance, CLAMP_BETHESDA_ACES);
 	params.outputColor = tmParams.outputSDRColor;
 }
 
 void ApplyACESParametric(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	tmParams.outputSDRColor  = ACESParametric(tmParams.inputColor, CLAMP_BETHESDA_ACES, tmParams.acesParametricParams);
+	tmParams.outputSDRColor  = ACESParametric(abs(tmParams.inputColor), CLAMP_BETHESDA_ACES, tmParams.acesParametricParams) * sign(tmParams.inputColor);
 	tmParams.outputSDRLuminance = ACESParametric(tmParams.inputLuminance, CLAMP_BETHESDA_ACES, tmParams.acesParametricParams);
 	params.outputColor = tmParams.outputSDRColor;
 }
 
 void ApplyHable(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	tmParams.outputSDRColor  = Hable(tmParams.inputColor, tmParams.hableParams);
+	tmParams.outputSDRColor  = Hable(abs(tmParams.inputColor), tmParams.hableParams) * sign(tmParams.inputColor);
 	tmParams.outputSDRLuminance = Hable(tmParams.inputLuminance.xxx, tmParams.hableParams).x; //TODO: make hable templatable
 	params.outputColor = tmParams.outputSDRColor;
 }
