@@ -366,10 +366,6 @@ namespace Utils
 
     void TransformColor_HDR(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t a_y)
 	{
-		const auto  settings = Settings::Main::GetSingleton();
-		const float peakBrightness = settings->PeakBrightness.value.get_data();
-		const auto  peakBrightnessThreshold = DirectX::XMVectorReplicate(peakBrightness * (1.05f / 80.f));
-
 		const DirectX::XMMATRIX c_fromBT709toBT2020 = {
 			   0.62722527980804443359375f,      0.0690418779850006103515625f, 0.01639117114245891571044921875f, 0.f,
 			  0.329476892948150634765625f,       0.919605672359466552734375f,        0.0880887508392333984375f, 0.f,
@@ -384,12 +380,19 @@ namespace Utils
 			0.f, 0.f, 0.f, 1.f
 		};
 
+#if 0
+		const auto  settings = Settings::Main::GetSingleton();
+		const float peakBrightness = settings->PeakBrightness.value.get_data();
+		const auto  peakBrightnessThreshold = DirectX::XMVectorReplicate(peakBrightness * (1.05f / 80.f));
+#endif
+
 		for (size_t i = 0; i < a_width; ++i) {
 			// color.rgb = BT709_To_BT2020(color.rgb);
 			auto color = DirectX::XMVector4Transform(a_inPixels[i], c_fromBT709toBT2020);
 
-			// color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
+#if 0 // Replicate the same peak brightness clamping we have in the copy shader. This has been disabled as it's not necessary.
 			color = DirectX::XMVectorClamp(color, DirectX::XMVectorZero(), peakBrightnessThreshold);
+#endif
 
 			// color.rgb = BT2020_To_BT709(color.rgb);
 			color = DirectX::XMVector4Transform(color, c_fromBT2020toBT709);
