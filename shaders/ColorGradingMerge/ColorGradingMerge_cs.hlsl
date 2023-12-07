@@ -224,9 +224,38 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Use hue from original LUT color
 	const float targetHue = originalLCh[2];
 
-	float3 outputLCh = float3(targetL, targetChroma, targetHue);
+	const float3 targetLCh = float3(targetL, targetChroma, targetHue);
+	float3 outputLCh = targetLCh;
+	
+#if 0
+	// Try to remove the S filmic tonemapper curve that is baked in inside some LUTs.
+	// We do it by average because usually the S curve would have (very likely) been applied by channel, and not by luminance.
+	// Don't do this in SDR as it can easily make LUTs go out of range.
+	// NOTE: this doesn't always work as expected there's many LUTs that just boost or dim the whole range, not in a S curve fashion,
+	// thus basically this acts as a way of transforming LUTs in color tint filters only, without changing the average brightness much.
+	if (!SDRRange)
+	{
+		float3 targetLinear = oklch_to_linear_srgb(targetLCh);
+#if DEVELOPMENT
+		const float LUTFilmicTonemapCorrection = HdrDllPluginConstants.DevSetting04;
+#else
+		static const float LUTFilmicTonemapCorrection = 1.f;
+#endif
+		const float colorAverageRatio = safeDivision(average(neutralLUTColor), average(targetLinear));
+		// (optional) Pivot adjustments around the center.
+		// Not using length() as average seems more appropriate here (especially with negative coordinates being possible).
+		const float distanceFromCenter = saturate(abs(average(neutralLUTColor) - 0.5f) * 2.f);
+		targetLinear *= lerp(1.f, colorAverageRatio, LUTFilmicTonemapCorrection * distanceFromCenter);
+		outputLCh = linear_srgb_to_oklch(targetLinear);
+	}
+#endif
 
 #if LUT_DEBUG_VALUES // Debug black point
+	// Refresh variables
+	targetL = outputLCh[0];
+	targetChroma = outputLCh[1];
+	targetHue = outputLCh[2];
+	
 	float3 debugLinear = oklch_to_linear_srgb(outputLCh);
 
 	bool isBlackPoint = neutralLUTColor.r == 0.f && neutralLUTColor.g == 0.f && neutralLUTColor.b == 0.f;
