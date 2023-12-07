@@ -20,6 +20,7 @@ List of features:
 -Improved film grain to be more realistic and nice to look at (e.g. rebalancing the grain size and strength on dark/bright colors)
 -Fixed the game using very wrong gamma formulas
 -Customization settings for you to personalize the game visuals (all of the features above are adjustable at runtime)
+-The game photo mode allows you to take HDR (.jxr) screenshots as well as SDR ones
 -More!
 
 Details on the implementation:
@@ -50,7 +51,8 @@ Our suggestion is to use the LUT correction that is built in Luma, as it extract
 Additionally Luma should be compatible with any story content and new location, whether official added by Bethesda as DLCs, or unofficial mods.
 You do NOT need any other HDR related mod, like AutoHDR ReShades, SpecialK, or "HUD for HDR" (which dimmed the UI for AutoHDR).
 Refrain from using any ReShade shaders unless you are certain they support HDR.
-If you find the playabla character flashlight too intense, you can use this mod https://www.nexusmods.com/starfield/mods/4888.
+If you find the playable character flashlight too intense, you can use this mod https://www.nexusmods.com/starfield/mods/4888.
+If you want to make some game VFX more "HDR" like, you can use this mod https://www.nexusmods.com/starfield/mods/340.
 
 Issues and limitations:
 -scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)
@@ -69,4 +71,4 @@ https://ko-fi.com/shortfuse
 https://ko-fi.com/endlesslyflowering (Lilium)
 
 Thanks:
-Phinix (testing), Fank (testing), MPaul (testing)
+Phinix (testing), Fank (testing), MPaul (testing), sixty9sublime (testing), KoKlusz (testing), BR4P CITY (testing)
