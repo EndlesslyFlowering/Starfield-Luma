@@ -220,8 +220,15 @@ namespace Settings
 
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
     {
-		a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
 		a_outShaderConstants.DisplayMode = GetActualDisplayMode(true);
+		if (bRequestedHDRScreenshot) {
+			// Unlock HDR range to HDR10 max when taking screenshots, to they appear consistently independently of the user peak brightness.
+			// For now we don't force the paper white to 203 (reference/suggested value) because that'd be a bit confusing for users.
+			a_outShaderConstants.PeakBrightness = 10000.f;
+		}
+		else {
+			a_outShaderConstants.PeakBrightness = static_cast<float>(PeakBrightness.value.get_data());
+		}
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
 		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data() * 0.01f);                      // 0-100 to 0-1
