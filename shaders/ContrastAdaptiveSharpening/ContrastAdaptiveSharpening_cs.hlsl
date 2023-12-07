@@ -643,6 +643,346 @@ void CS(CSInput csInput)
 		}
 	}
 
+#elif !defined(USE_PACKED_MATH) \
+    && defined(USE_UPSCALING)
+
+// FP32 CAS upscaling
+
+	uint4 _55 = CASData.rectLimits0;
+
+	uint _58 = ((csInput.SV_GroupThreadID.x >> 1) & 7)
+	         | (csInput.SV_GroupID.x << 4);
+	_58 += _55.x;
+
+	uint _59 = ((csInput.SV_GroupThreadID.x >> 3) & 6)
+	         | (csInput.SV_GroupThreadID.x & 1)
+	         | (csInput.SV_GroupID.y << 4);
+	_59 += _55.y;
+
+	static const bool testX0 = _58 <= _55.z;
+	static const bool testY0 = _59 <= _55.w;
+
+	if (testX0 && testY0)
+	{
+		uint  _604 = _58 + 8;
+		uint _1110 = _59 + 8;
+
+		CASConst0 _62 = CASData.upscalingConst0;
+		CASConst1 _69 = CASData.upscalingConst1;
+
+		uint4 _92 = CASData.rectLimits1;
+
+		uint minX = _92.x;
+		uint minY = _92.y;
+		uint maxX = _92.z;
+		uint maxY = _92.w;
+
+		static const float sharp = _69.sharp;
+
+		float _79   = (float(_58)   * _62.rcpScalingFactorX) + _62.otherScalingFactorX;
+		float _80   = (float(_59)   * _62.rcpScalingFactorY) + _62.otherScalingFactorY;
+		float _607  = _79 + _69.rcpScalingFactorXTimes8; // for some reason this optimisation only exists for the width
+		float _1113 = (float(_1110) * _62.rcpScalingFactorY) + _62.otherScalingFactorY;
+
+		float   _82 = floor(  _79);
+		float   _83 = floor(  _80);
+		float  _608 = floor( _607);
+		float _1114 = floor(_1113);
+
+		float   _84 =   _79 -   _82;
+		float   _85 =   _80 -   _83;
+		float  _609 =  _607 -  _608;
+		float _1115 = _1113 - _1114;
+
+		uint   _86 = uint(  _82);
+		uint   _87 = uint(  _83);
+		uint  _610 = uint( _608);
+		uint _1116 = uint(_1114);
+
+		uint _109 = CLAMPX(_86 - 1);
+		uint  _99 = CLAMPX(_86);
+		uint _119 = CLAMPX(_86 + 1);
+		uint _128 = CLAMPX(_86 + 2);
+
+		uint _629 = CLAMPX(_610 - 1);
+		uint _620 = CLAMPX(_610);
+		uint _639 = CLAMPX(_610 + 1);
+		uint _648 = CLAMPX(_610 + 2);
+
+		uint _100 = CLAMPY(_87 - 1);
+		uint _110 = CLAMPY(_87);
+		uint _134 = CLAMPY(_87 + 1);
+		uint _143 = CLAMPY(_87 + 2);
+
+		uint _1128 = CLAMPY(_1116 - 1);
+		uint _1136 = CLAMPY(_1116);
+		uint _1158 = CLAMPY(_1116 + 1);
+		uint _1167 = CLAMPY(_1116 + 2);
+
+
+		float3 _102 = ColorIn.Load(int3( _99, _100, 0)).rgb;
+		float3 _111 = ColorIn.Load(int3(_109, _110, 0)).rgb;
+		float3 _114 = ColorIn.Load(int3( _99, _110, 0)).rgb;
+		float3 _120 = ColorIn.Load(int3(_119, _100, 0)).rgb;
+		float3 _123 = ColorIn.Load(int3(_119, _110, 0)).rgb;
+		float3 _129 = ColorIn.Load(int3(_128, _110, 0)).rgb;
+		float3 _135 = ColorIn.Load(int3(_109, _134, 0)).rgb;
+		float3 _138 = ColorIn.Load(int3( _99, _134, 0)).rgb;
+		float3 _144 = ColorIn.Load(int3( _99, _143, 0)).rgb;
+		float3 _147 = ColorIn.Load(int3(_119, _134, 0)).rgb;
+		float3 _150 = ColorIn.Load(int3(_128, _134, 0)).rgb;
+		float3 _153 = ColorIn.Load(int3(_119, _143, 0)).rgb;
+
+		float3 _165 = PrepareForProcessing(_102);
+		float3 _170 = PrepareForProcessing(_120);
+		float3 _175 = PrepareForProcessing(_111);
+		float3 _180 = PrepareForProcessing(_114);
+		float3 _185 = PrepareForProcessing(_123);
+		float3 _190 = PrepareForProcessing(_129);
+		float3 _195 = PrepareForProcessing(_135);
+		float3 _200 = PrepareForProcessing(_138);
+		float3 _205 = PrepareForProcessing(_147);
+		float3 _210 = PrepareForProcessing(_150);
+		float3 _215 = PrepareForProcessing(_144);
+		float3 _220 = PrepareForProcessing(_153);
+
+		float3 _224 = min(min(_165, min(_175, _180)), min(_185, _200));
+		float3 _228 = max(max(_165, max(_175, _180)), max(_185, _200));
+
+		float3 _232 = min(min(_170, min(_180, _185)), min(_190, _205));
+		float3 _236 = max(max(_170, max(_180, _185)), max(_190, _205));
+
+		float3 _240 = min(min(_180, min(_195, _200)), min(_205, _215));
+		float3 _244 = max(max(_180, max(_195, _200)), max(_205, _215));
+
+		float3 _248 = min(min(_185, min(_200, _205)), min(_210, _220));
+		float3 _252 = max(max(_185, max(_200, _205)), max(_210, _220));
+
+		float3  _306 = 1.f -   _84;
+		float3  _307 = 1.f -   _85;
+		float3  _817 = 1.f -  _609;
+		float3 _1323 = 1.f - _1115;
+
+		float3 _318 = (_306 * _307) * (1.f / ((0.03125f - _224) + _228));
+		float3 _324 = (_307 *  _84) * (1.f / ((0.03125f - _232) + _236));
+		float3 _330 = (_306 *  _85) * (1.f / ((0.03125f - _240) + _244));
+		float3 _336 = ( _84 *  _85) * (1.f / ((0.03125f - _248) + _252));
+
+		float3 _337 = (sqrt(saturate(min(_224, 1.f - _228) * (1.f / _228))) * sharp) * _318;
+		float3 _338 = (sqrt(saturate(min(_232, 1.f - _236) * (1.f / _236))) * sharp) * _324;
+		float3 _339 = (sqrt(saturate(min(_240, 1.f - _244) * (1.f / _244))) * sharp) * _330;
+		float3 _342 = (sqrt(saturate(min(_248, 1.f - _252) * (1.f / _252))) * sharp) * _336;
+
+		float3 _341 = (_338 + _318) + _339;
+		float3 _344 = (_337 + _324) + _342;
+		float3 _346 = (_337 + _330) + _342;
+		float3 _348 = (_338 + _336) + _339;
+
+		float3 _364 = 1.f / (((_338 + _337 + _339 + _342) * 2.f) + _348 + _341 + _344 + _346);
+
+		float3 colorOut0 = _364 * ((((((((_341 * _180) + (_337 * (_175 + _165))) + (_348 * _205)) + (_344 * _185)) + (_346 * _200)) + (_342 * (_220 + _210))) + (_339 * (_215 + _195))) + (_338 * (_190 + _170)));
+
+		colorOut0 = PrepareForOutput(colorOut0);
+
+		ColorOut[uint2(_58, _59)] = float4(colorOut0, 1.f);
+
+
+		static const bool testX1 =  _604 <= _55.z;
+		static const bool testY1 = _1110 <= _55.w;
+
+		if (testX1)
+		{
+			float3 _623 = ColorIn.Load(int3(_620, _100, 0)).rgb;
+			float3 _631 = ColorIn.Load(int3(_629, _110, 0)).rgb;
+			float3 _634 = ColorIn.Load(int3(_620, _110, 0)).rgb;
+			float3 _640 = ColorIn.Load(int3(_639, _100, 0)).rgb;
+			float3 _643 = ColorIn.Load(int3(_639, _110, 0)).rgb;
+			float3 _649 = ColorIn.Load(int3(_648, _110, 0)).rgb;
+			float3 _654 = ColorIn.Load(int3(_629, _134, 0)).rgb;
+			float3 _657 = ColorIn.Load(int3(_620, _134, 0)).rgb;
+			float3 _662 = ColorIn.Load(int3(_620, _143, 0)).rgb;
+			float3 _665 = ColorIn.Load(int3(_639, _134, 0)).rgb;
+			float3 _668 = ColorIn.Load(int3(_648, _134, 0)).rgb;
+			float3 _671 = ColorIn.Load(int3(_639, _143, 0)).rgb;
+
+			float3 _681 = PrepareForProcessing(_623);
+			float3 _686 = PrepareForProcessing(_640);
+			float3 _691 = PrepareForProcessing(_631);
+			float3 _696 = PrepareForProcessing(_634);
+			float3 _701 = PrepareForProcessing(_643);
+			float3 _706 = PrepareForProcessing(_649);
+			float3 _711 = PrepareForProcessing(_654);
+			float3 _716 = PrepareForProcessing(_657);
+			float3 _721 = PrepareForProcessing(_665);
+			float3 _726 = PrepareForProcessing(_668);
+			float3 _731 = PrepareForProcessing(_662);
+			float3 _736 = PrepareForProcessing(_671);
+
+			float3 _740 = min(min(_681, min(_691, _696)), min(_701, _716));
+			float3 _744 = max(max(_681, max(_691, _696)), max(_701, _716));
+
+			float3 _748 = min(min(_686, min(_696, _701)), min(_706, _721));
+			float3 _752 = max(max(_686, max(_696, _701)), max(_706, _721));
+
+			float3 _756 = min(min(_696, min(_711, _716)), min(_721, _731));
+			float3 _760 = max(max(_696, max(_711, _716)), max(_721, _731));
+
+			float3 _764 = min(min(_701, min(_716, _721)), min(_726, _736));
+			float3 _768 = max(max(_701, max(_716, _721)), max(_726, _736));
+
+			float3 _827 = (_307 * _817) * (1.f / ((0.03125f - _740) + _744));
+			float3 _833 = (_307 * _609) * (1.f / ((0.03125f - _748) + _752));
+			float3 _839 = (_817 *  _85) * (1.f / ((0.03125f - _756) + _760));
+			float3 _845 = ( _85 * _609) * (1.f / ((0.03125f - _764) + _768));
+
+			float3 _846 = (sqrt(saturate(min(_740, 1.f - _744) * (1.f / _744))) * sharp) * _827;
+			float3 _847 = (sqrt(saturate(min(_748, 1.f - _752) * (1.f / _752))) * sharp) * _833;
+			float3 _848 = (sqrt(saturate(min(_756, 1.f - _760) * (1.f / _760))) * sharp) * _839;
+			float3 _851 = (sqrt(saturate(min(_764, 1.f - _768) * (1.f / _768))) * sharp) * _845;
+
+			float3 _850 = (_847 + _827) + _848;
+			float3 _853 = (_846 + _833) + _851;
+			float3 _855 = (_846 + _839) + _851;
+			float3 _857 = (_847 + _845) + _848;
+
+			float3 _871 = 1.f / (((_847 + _846 + _848 + _851) * 2.f) + _857 + _850 + _853 + _855);
+
+			float3 colorOut1 = _871 * ((((((((_850 * _696) + (_846 * (_691 + _681))) + (_857 * _721)) + (_853 * _701)) + (_855 * _716)) + (_851 * (_736 + _726))) + (_848 * (_731 + _711))) + (_847 * (_706 + _686)));
+
+			colorOut1 = PrepareForOutput(colorOut1);
+
+			ColorOut[uint2(_604, _59)] = float4(colorOut1, 1.f);
+
+			if (testY1)
+			{
+				float3 _1130 = ColorIn.Load(int3(_620, _1128, 0)).rgb;
+				float3 _1137 = ColorIn.Load(int3(_629, _1136, 0)).rgb;
+				float3 _1140 = ColorIn.Load(int3(_620, _1136, 0)).rgb;
+				float3 _1145 = ColorIn.Load(int3(_639, _1128, 0)).rgb;
+				float3 _1148 = ColorIn.Load(int3(_639, _1136, 0)).rgb;
+				float3 _1153 = ColorIn.Load(int3(_648, _1136, 0)).rgb;
+				float3 _1159 = ColorIn.Load(int3(_629, _1158, 0)).rgb;
+				float3 _1162 = ColorIn.Load(int3(_620, _1158, 0)).rgb;
+				float3 _1168 = ColorIn.Load(int3(_620, _1167, 0)).rgb;
+				float3 _1171 = ColorIn.Load(int3(_639, _1158, 0)).rgb;
+				float3 _1174 = ColorIn.Load(int3(_648, _1158, 0)).rgb;
+				float3 _1177 = ColorIn.Load(int3(_639, _1167, 0)).rgb;
+
+				float3 _1187 = PrepareForProcessing(_1130);
+				float3 _1192 = PrepareForProcessing(_1145);
+				float3 _1197 = PrepareForProcessing(_1137);
+				float3 _1202 = PrepareForProcessing(_1140);
+				float3 _1207 = PrepareForProcessing(_1148);
+				float3 _1212 = PrepareForProcessing(_1153);
+				float3 _1217 = PrepareForProcessing(_1159);
+				float3 _1222 = PrepareForProcessing(_1162);
+				float3 _1227 = PrepareForProcessing(_1171);
+				float3 _1232 = PrepareForProcessing(_1174);
+				float3 _1237 = PrepareForProcessing(_1168);
+				float3 _1242 = PrepareForProcessing(_1177);
+
+				float3 _1246 = min(min(_1187, min(_1197, _1202)), min(_1207, _1222));
+				float3 _1250 = max(max(_1187, max(_1197, _1202)), max(_1207, _1222));
+
+				float3 _1254 = min(min(_1192, min(_1202, _1207)), min(_1212, _1227));
+				float3 _1258 = max(max(_1192, max(_1202, _1207)), max(_1212, _1227));
+
+				float3 _1262 = min(min(_1202, min(_1217, _1222)), min(_1227, _1237));
+				float3 _1266 = max(max(_1202, max(_1217, _1222)), max(_1227, _1237));
+
+				float3 _1270 = min(min(_1207, min(_1222, _1227)), min(_1232, _1242));
+				float3 _1274 = max(max(_1207, max(_1222, _1227)), max(_1232, _1242));
+
+				float3 _1333 = (_1323 * _817) * (1.f / ((0.03125f - _1246) + _1250));
+				float3 _1339 = (_1323 * _609) * (1.f / ((0.03125f - _1254) + _1258));
+				float3 _1345 = (_817 * _1115) * (1.f / ((0.03125f - _1262) + _1266));
+				float3 _1351 = (_1115 * _609) * (1.f / ((0.03125f - _1270) + _1274));
+
+				float3 _1352 = (sqrt(saturate(min(_1246, 1.f - _1250) * (1.f / _1250))) * sharp) * _1333;
+				float3 _1353 = (sqrt(saturate(min(_1254, 1.f - _1258) * (1.f / _1258))) * sharp) * _1339;
+				float3 _1354 = (sqrt(saturate(min(_1262, 1.f - _1266) * (1.f / _1266))) * sharp) * _1345;
+				float3 _1357 = (sqrt(saturate(min(_1270, 1.f - _1274) * (1.f / _1274))) * sharp) * _1351;
+
+				float3 _1356 = (_1353 + _1333) + _1354;
+				float3 _1359 = (_1352 + _1339) + _1357;
+				float3 _1361 = (_1352 + _1345) + _1357;
+				float3 _1363 = (_1353 + _1351) + _1354;
+
+				float3 _1377 = 1.f / (((_1353 + _1352 + _1354 + _1357) * 2.f) + _1363 + _1356 + _1359 + _1361);
+
+				float3 colorOut2 = _1377 * ((((((((_1356 * _1202) + (_1352 * (_1197 + _1187))) + (_1363 * _1227)) + (_1359 * _1207)) + (_1361 * _1222)) + (_1357 * (_1242 + _1232))) + (_1354 * (_1237 + _1217))) + (_1353 * (_1212 + _1192)));
+
+				colorOut2 = PrepareForOutput(colorOut2);
+
+				ColorOut[uint2(_604, _1110)] = float4(colorOut2, 1.f);
+			}
+		}
+
+		if (testY1)
+		{
+			float3 _1628 = ColorIn.Load(int3( _99, _1128, 0)).rgb;
+			float3 _1635 = ColorIn.Load(int3(_109, _1136, 0)).rgb;
+			float3 _1638 = ColorIn.Load(int3( _99, _1136, 0)).rgb;
+			float3 _1643 = ColorIn.Load(int3(_119, _1128, 0)).rgb;
+			float3 _1646 = ColorIn.Load(int3(_119, _1136, 0)).rgb;
+			float3 _1651 = ColorIn.Load(int3(_128, _1136, 0)).rgb;
+			float3 _1656 = ColorIn.Load(int3(_109, _1158, 0)).rgb;
+			float3 _1659 = ColorIn.Load(int3( _99, _1158, 0)).rgb;
+			float3 _1664 = ColorIn.Load(int3( _99, _1167, 0)).rgb;
+			float3 _1667 = ColorIn.Load(int3(_119, _1158, 0)).rgb;
+			float3 _1670 = ColorIn.Load(int3(_128, _1158, 0)).rgb;
+			float3 _1673 = ColorIn.Load(int3(_119, _1167, 0)).rgb;
+
+			float3 _1683 = PrepareForProcessing(_1628);
+			float3 _1688 = PrepareForProcessing(_1643);
+			float3 _1693 = PrepareForProcessing(_1635);
+			float3 _1698 = PrepareForProcessing(_1638);
+			float3 _1703 = PrepareForProcessing(_1646);
+			float3 _1708 = PrepareForProcessing(_1651);
+			float3 _1713 = PrepareForProcessing(_1656);
+			float3 _1718 = PrepareForProcessing(_1659);
+			float3 _1723 = PrepareForProcessing(_1667);
+			float3 _1728 = PrepareForProcessing(_1670);
+			float3 _1733 = PrepareForProcessing(_1664);
+			float3 _1738 = PrepareForProcessing(_1673);
+
+			float3 _1742 = min(min(_1683, min(_1693, _1698)), min(_1703, _1718));
+			float3 _1746 = max(max(_1683, max(_1693, _1698)), max(_1703, _1718));
+
+			float3 _1750 = min(min(_1688, min(_1698, _1703)), min(_1708, _1723));
+			float3 _1754 = max(max(_1688, max(_1698, _1703)), max(_1708, _1723));
+
+			float3 _1758 = min(min(_1698, min(_1713, _1718)), min(_1723, _1733));
+			float3 _1762 = max(max(_1698, max(_1713, _1718)), max(_1723, _1733));
+
+			float3 _1766 = min(min(_1703, min(_1718, _1723)), min(_1728, _1738));
+			float3 _1770 = max(max(_1703, max(_1718, _1723)), max(_1728, _1738));
+
+			float3 _1828 = (_1323 *  _306) * (1.f / ((0.03125f - _1742) + _1746));
+			float3 _1834 = (_1323 *   _84) * (1.f / ((0.03125f - _1750) + _1754));
+			float3 _1840 = ( _306 * _1115) * (1.f / ((0.03125f - _1758) + _1762));
+			float3 _1846 = (_1115 *   _84) * (1.f / ((0.03125f - _1766) + _1770));
+
+			float3 _1847 = (sqrt(saturate(min(_1742, 1.f - _1746) * (1.f / _1746))) * sharp) * _1828;
+			float3 _1848 = (sqrt(saturate(min(_1750, 1.f - _1754) * (1.f / _1754))) * sharp) * _1834;
+			float3 _1849 = (sqrt(saturate(min(_1758, 1.f - _1762) * (1.f / _1762))) * sharp) * _1840;
+			float3 _1852 = (sqrt(saturate(min(_1766, 1.f - _1770) * (1.f / _1770))) * sharp) * _1846;
+
+			float3 _1851 = (_1848 + _1828) + _1849;
+			float3 _1854 = (_1847 + _1834) + _1852;
+			float3 _1856 = (_1847 + _1840) + _1852;
+			float3 _1858 = (_1848 + _1846) + _1849;
+
+			float3 _1872 = 1.f / (((_1848 + _1847 + _1849 + _1852) * 2.f) + _1858 + _1851 + _1854 + _1856);
+
+			float3 colorOut3 = _1872 * ((((((((_1851 * _1698) + (_1847 * (_1693 + _1683))) + (_1858 * _1723)) + (_1854 * _1703)) + (_1856 * _1718)) + (_1852 * (_1738 + _1728))) + (_1849 * (_1733 + _1713))) + (_1848 * (_1708 + _1688)));
+
+			colorOut3 = PrepareForOutput(colorOut3);
+
+			ColorOut[uint2(_58, _1110)] = float4(colorOut3, 1.f);
+		}
+	}
+
 #elif defined(USE_PACKED_MATH) \
   && !defined(USE_UPSCALING)
 

@@ -424,6 +424,7 @@ namespace Hooks
 
 		case 0x1FE95:
 		case 0x201FE95:
+		case 0x401FE95:
 		case 0x601FE95:
 			{
 				Settings::ShaderConstants shaderConstants;
