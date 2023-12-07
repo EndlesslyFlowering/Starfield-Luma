@@ -826,5 +826,167 @@ void CS(CSInput csInput)
 	}
 
 #endif
-#endif // USE_PACKED_MATH
+#else
+
+// FP32 CAS sharpening
+
+	uint4 _55 = CASData.rectLimits0;
+
+	uint _58 = ((csInput.SV_GroupThreadID.x >> 1) & 7)
+	         | (csInput.SV_GroupID.x << 4);
+	_58 += _55.x;
+
+	uint _59 = ((csInput.SV_GroupThreadID.x >> 3) & 6)
+	         | (csInput.SV_GroupThreadID.x & 1)
+	         | (csInput.SV_GroupID.y << 4);
+	_59 += _55.y;
+
+	static const bool testX0 = _58 <= _55.z;
+	static const bool testY0 = _59 <= _55.w;
+
+	if (testX0 && testY0)
+	{
+		uint _285 = _58 + 8;
+		uint _492 = _59 + 8;
+
+		static const float sharp = CASData.upscalingConst1.sharp;
+
+		uint4 _68 = CASData.rectLimits1;
+
+		uint minX = _68.x;
+		uint minY = _68.y;
+		uint maxX = _68.z;
+		uint maxY = _68.w;
+
+		uint _83 = CLAMPX(_58 - 1);
+		uint _76 = CLAMPX(_58);
+		uint _94 = CLAMPX(_58 + 1);
+
+		uint  _64 = CLAMPY(_59 - 1);
+		uint  _87 = CLAMPY(_59);
+		uint _100 = CLAMPY(_59 + 1);
+
+		uint _301 = CLAMPX(_285 - 1);
+		uint _295 = CLAMPX(_285);
+		uint _312 = CLAMPX(_285 + 1);
+
+		uint _513 = CLAMPY(_492 - 1);
+		uint _512 = CLAMPY(_492);
+		uint _514 = CLAMPY(_492 + 1);
+
+		float3 b0 = ColorIn.Load(int3(_76,  _64, 0)).rgb;
+		float3 d0 = ColorIn.Load(int3(_83,  _87, 0)).rgb;
+		float3 e0 = ColorIn.Load(int3(_76,  _87, 0)).rgb;
+		float3 f0 = ColorIn.Load(int3(_94,  _87, 0)).rgb;
+		float3 h0 = ColorIn.Load(int3(_76, _100, 0)).rgb;
+
+		b0 = PrepareForProcessing(b0);
+		d0 = PrepareForProcessing(d0);
+		e0 = PrepareForProcessing(e0);
+		f0 = PrepareForProcessing(f0);
+		h0 = PrepareForProcessing(h0);
+
+		float3 maxRGB0 = max(max(d0, max(e0, f0)), max(b0, h0));
+		float3 minRGB0 = min(min(d0, min(e0, f0)), min(b0, h0));
+
+		float3 weight0 = sharp * sqrt(saturate(min(minRGB0, 1.f - maxRGB0) * (1.f / maxRGB0)));
+
+		float3 rcpWeight0 = 1.f / ((weight0 * 4.f) + 1.f);
+
+		float3 colorOut0 = (((d0 + b0 + f0 + h0) * weight0) + e0) * rcpWeight0;
+
+		colorOut0 = PrepareForOutput(colorOut0);
+
+		ColorOut[uint2(_58, _59)] = float4(colorOut0, 1.f);
+
+
+		static const bool testX1 = _285 <= _55.z;
+		static const bool testY1 = _492 <= _55.w;
+
+		if (testX1)
+		{
+			float3 b1 = ColorIn.Load(int3(_295,  _64, 0)).rgb;
+			float3 d1 = ColorIn.Load(int3(_301,  _87, 0)).rgb;
+			float3 e1 = ColorIn.Load(int3(_295,  _87, 0)).rgb;
+			float3 f1 = ColorIn.Load(int3(_312,  _87, 0)).rgb;
+			float3 h1 = ColorIn.Load(int3(_295, _100, 0)).rgb;
+
+			b1 = PrepareForProcessing(b1);
+			d1 = PrepareForProcessing(d1);
+			e1 = PrepareForProcessing(e1);
+			f1 = PrepareForProcessing(f1);
+			h1 = PrepareForProcessing(h1);
+
+			float3 maxRGB1 = max(max(d1, max(e1, f1)), max(b1, h1));
+			float3 minRGB1 = min(min(d1, min(e1, f1)), min(b1, h1));
+
+			float3 weight1 = sharp * sqrt(saturate(min(minRGB1, 1.f - maxRGB1) * (1.f / maxRGB1)));
+
+			float3 rcpWeight1 = 1.f / ((weight1 * 4.f) + 1.f);
+
+			float3 colorOut1 = (((d1 + b1 + f1 + h1) * weight1) + e1) * rcpWeight1;
+
+			colorOut1 = PrepareForOutput(colorOut1);
+
+			ColorOut[uint2(_285, _59)] = float4(colorOut1, 1.f);
+
+			if (testY1)
+			{
+				float3 b2 = ColorIn.Load(int3(_295, _513, 0)).rgb;
+				float3 d2 = ColorIn.Load(int3(_301, _512, 0)).rgb;
+				float3 e2 = ColorIn.Load(int3(_295, _512, 0)).rgb;
+				float3 f2 = ColorIn.Load(int3(_312, _512, 0)).rgb;
+				float3 h2 = ColorIn.Load(int3(_295, _514, 0)).rgb;
+
+				b2 = PrepareForProcessing(b2);
+				d2 = PrepareForProcessing(d2);
+				e2 = PrepareForProcessing(e2);
+				f2 = PrepareForProcessing(f2);
+				h2 = PrepareForProcessing(h2);
+
+				float3 maxRGB2 = max(max(d2, max(e2, f2)), max(b2, h2));
+				float3 minRGB2 = min(min(d2, min(e2, f2)), min(b2, h2));
+
+				float3 weight2 = sharp * sqrt(saturate(min(minRGB2, 1.f - maxRGB2) * (1.f / maxRGB2)));
+
+				float3 rcpWeight2 = 1.f / ((weight2 * 4.f) + 1.f);
+
+				float3 colorOut2 = (((d2 + b2 + f2 + h2) * weight2) + e2) * rcpWeight2;
+
+				colorOut2 = PrepareForOutput(colorOut2);
+
+				ColorOut[uint2(_285, _492)] = float4(colorOut2, 1.f);
+			}
+		}
+
+		if (testY1)
+		{
+			float3 b3 = ColorIn.Load(int3(_76, _513, 0)).rgb;
+			float3 d3 = ColorIn.Load(int3(_83, _512, 0)).rgb;
+			float3 e3 = ColorIn.Load(int3(_76, _512, 0)).rgb;
+			float3 f3 = ColorIn.Load(int3(_94, _512, 0)).rgb;
+			float3 h3 = ColorIn.Load(int3(_76, _514, 0)).rgb;
+
+			b3 = PrepareForProcessing(b3);
+			d3 = PrepareForProcessing(d3);
+			e3 = PrepareForProcessing(e3);
+			f3 = PrepareForProcessing(f3);
+			h3 = PrepareForProcessing(h3);
+
+			float3 maxRGB3 = max(max(d3, max(e3, f3)), max(b3, h3));
+			float3 minRGB3 = min(min(d3, min(e3, f3)), min(b3, h3));
+
+			float3 weight3 = sharp * sqrt(saturate(min(minRGB3, 1.f - maxRGB3) * (1.f / maxRGB3)));
+
+			float3 rcpWeight3 = 1.f / ((weight3 * 4.f) + 1.f);
+
+			float3 colorOut3 = (((d3 + b3 + f3 + h3) * weight3) + e3) * rcpWeight3;
+
+			colorOut3 = PrepareForOutput(colorOut3);
+
+			ColorOut[uint2(_58, _492)] = float4(colorOut3, 1.f);
+		}
+	}
+
+#endif
 }

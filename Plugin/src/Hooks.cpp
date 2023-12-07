@@ -422,7 +422,7 @@ namespace Hooks
 				break;
 			}
 
-		//case 0x1FE95:
+		case 0x1FE95:
 		case 0x201FE95:
 		case 0x601FE95:
 			{
@@ -467,7 +467,7 @@ namespace Hooks
 
 		settings->RegisterReshadeOverlay();
 
-		return _UnkFunc(a1, a_bgsSwapchainObject);		
+		return _UnkFunc(a1, a_bgsSwapchainObject);
     }
 
     void Hooks::Hook_UnkFunc2(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4)
