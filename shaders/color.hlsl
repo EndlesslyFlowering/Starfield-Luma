@@ -349,7 +349,7 @@ float3 oklch_to_linear_srgb(float3 lch) {
 
 // (in) OKLch
 // (out) BT.2020
-float3 oklch_to_linear_srgb(float3 lch) {
+float3 oklch_to_linear_bt2020(float3 lch) {
 	return oklab_to_linear_bt2020(
 			oklch_to_oklab(lch)
 	);
