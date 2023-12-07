@@ -30,7 +30,7 @@ $main =
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE86" -OutputName "HDRColorGradingMerge"
 
 	#ContrastAdaptiveSharpening
-	#Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "1FE95" -Entry "main"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "1FE95"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "201FE95" -Defines "USE_PACKED_MATH" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "601FE95" -Defines "USE_PACKED_MATH", "USE_UPSCALING" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 
