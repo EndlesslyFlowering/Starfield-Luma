@@ -61,7 +61,6 @@ float flare_invert(float x, float fl) {
   return (x + sqrt(x * ((4.0f * fl) + x))) / 2.0f;
 }
 
-
 // // https://www.desmos.com/calculator/jrff9lrztn
 // float powerptoe(float x, float p, float m, float t0) {
 //   return (x > t0)
@@ -161,7 +160,6 @@ float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
 }
 
 float3 apply_user_highlights(float3 rgb, float highlights = 1.f) {
-
   rgb = hl_con(rgb, 0.10f + highlights - 1.f, 203.f / 100.f);
   return rgb;
 }
@@ -477,7 +475,6 @@ void open_drt_transform_dual(
   float contrast = 1.f
   )
 {
-
   sdrOutput = apply_aces_highlights(rgb);
   hdrOutput = sdrOutput;
 
@@ -487,7 +484,6 @@ void open_drt_transform_dual(
   sdrOutput = apply_user_highlights(sdrOutput, 0.75f);
   hdrOutput = apply_user_highlights(hdrOutput, highlights);
 
-  // TODO: Mulithread
   sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.30f, 1.f);
   hdrOutput = open_drt_transform(hdrOutput * peakScaling, hdrPeakNits, 0, contrast);
 }

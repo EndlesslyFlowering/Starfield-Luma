@@ -28,6 +28,7 @@
 // 2) Linear mapping + OKLAB blending: Blend multiple LUTs (by their respective percentage) in OKLab colorspace before returning as Linear SRGB. Identical to index 1 when there's only one LUT applied.
 // 3) REMOVED: OKLAB mapping: this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black,
 //    the problem with this is that near black blending is very different compared to sRGB gamma or linear, crushing blacks without further adjustments.
+//    "MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK" has since then fixed the near black ting problem in a different way.
 #define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 0)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
