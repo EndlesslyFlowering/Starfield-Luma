@@ -230,7 +230,7 @@ struct HableEvalParams
 	float shoulderSegment_B_optimised;
 };
 
-struct SDRTonemapByLuminancePP
+struct PostInverseTonemapByChannelData
 {
 	float minHighlightsColorIn;
 	float minHighlightsColorOut;

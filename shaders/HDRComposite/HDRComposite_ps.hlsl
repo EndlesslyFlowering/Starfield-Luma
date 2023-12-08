@@ -41,7 +41,7 @@
 // 0 inverts all of the range (the whole image), to then re-tonemap it with an HDR tonemapper.
 // 1 keeps SDR toe/shadow, invert tonemap in the rest of the range.
 // 2 keeps SDR toe/shadow and midtones, inverts highlights only.
-// Only invert highlights, which helps conserve the SDR filmic look (shadow crush) and altered colors.
+// Only invert highlights is the suggested choice, as it helps conserve the SDR filmic look (shadow crush) and altered colors.
 // The alternative is to keep the linear space image tonemapped by the lightweight DICE tonemapper,
 // or to replicate the SDR tonemapper by luminance, though both would alter the look too much and break some scenes.
 #define INVERT_TONEMAP_TYPE 2
@@ -51,9 +51,6 @@
 // If we are running in HDR, and we are keeping the SDR tonemapped shadow and midtones ("INVERT_TONEMAP_TYPE" >0),
 // then if this is 1+, we replace the SDR tonemapped image with one tonemapped by channel instead than by luminance, to maintain more saturation.
 #define HDR_TONEMAP_TYPE 2
-// Note: this could cause a disconnect in gradients, as LUTs shift colors by channel, not by luminance.
-// It also dampens colors, making them darker and less saturation, especially bright colors.
-#define HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE 0
 // 0 restore SDR post process (and LUT) on the HDR tonemapped image. This makes bright saturated colors pop more, but doesn't always retain the right hue.
 // 1 restore SDR post process (and LUT) on the HDR tonemapped image, and make sure we conserve the hue of the final SDR image.
 // 2 directly apply the post process on the HDR tonemapped image, but we restore the LUT difference from the SDR image. Similar to 0.
@@ -166,8 +163,8 @@ struct ToneMapperParams
 	float3 inputColor; // Untonemapped color
 	float inputLuminance; // Untonemapped color luminance
 	float3 outputSDRColor;
-	float outputSDRLuminance;
 	// The following parameters might not always be written/used/modified:
+	float outputSDRLuminance;
 	float3 outputHDRColor;
 	float outputHDRLuminance;
 	ACESParametricParams acesParametricParams;
@@ -874,7 +871,7 @@ void PostInverseTonemapByChannel(
 	float                         InputChannel,
 	float                         TonemappedChannel,
 	inout float                   InverseTonemappedColorChannel,
-	const SDRTonemapByLuminancePP sPP)
+	const PostInverseTonemapByChannelData sPP)
 {
 #if 1 // Directly use the input/source non tonemapped color for comparisons against the highlights
 	const bool isHighlight = InputChannel >= sPP.minHighlightsColorOut;
@@ -1623,21 +1620,9 @@ void ApplySDRToneMapperHDRUpgrade(inout CompositeParams params, in ToneMapperPar
 {
 	float3 tonemappedColor = tmParams.outputSDRColor;
 
-	// Re-apply the tonemapped image luminance ratio on the untonemapped image 
-	const float3 tonemappedByLuminanceColor = tmParams.inputColor * safeDivision(tmParams.outputSDRLuminance, tmParams.inputLuminance);
-
 	const float acesParam_modE = tmParams.acesParametricParams.modE;
 	const float acesParam_modA = tmParams.acesParametricParams.modA;
 	const HableParams hableParams = tmParams.hableParams;
-
-	const bool SDRTonemapByLuminance = (HDR_TONEMAP_TYPE > 0) && (bool)HDR_INVERT_SDR_TONEMAP_BY_LUMINANCE;
-#if 1 // This is delicate and could make things worse, especially within "RestorePostProcess()", but without it, highlights have uncontiguos gradients that shift color (due to strong LUTs)
-	if (SDRTonemapByLuminance)
-	{
-		tonemappedColor = tonemappedByLuminanceColor;
-		// NOTE: we should probably do the same to "params.preLUTColor" and "tonemappedPostProcessedGradedColor" if they are used
-	}
-#endif
 
 	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 
@@ -1714,33 +1699,14 @@ void ApplySDRToneMapperHDRUpgrade(inout CompositeParams params, in ToneMapperPar
 			break;
 	}
 
-	if (!SDRTonemapByLuminance)
-	{
-		SDRTonemapByLuminancePP sPP;
-		sPP.minHighlightsColorIn  = minHighlightsColorIn;
-		sPP.minHighlightsColorOut = minHighlightsColorOut;
-		sPP.needsInverseTonemap   = needsInverseTonemap;
+	PostInverseTonemapByChannelData sPP;
+	sPP.minHighlightsColorIn  = minHighlightsColorIn;
+	sPP.minHighlightsColorOut = minHighlightsColorOut;
+	sPP.needsInverseTonemap   = needsInverseTonemap;
 
-		PostInverseTonemapByChannel(tmParams.inputColor.r, tonemappedColor.r, inverseTonemappedColor.r, sPP);
-		PostInverseTonemapByChannel(tmParams.inputColor.g, tonemappedColor.g, inverseTonemappedColor.g, sPP);
-		PostInverseTonemapByChannel(tmParams.inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
-	}
-	else
-	{
-#if 1
-		const bool isHighlight = tmParams.inputLuminance >= minHighlightsColorOut;
-#else
-		const bool isHighlight = (needsInverseTonemap ? Luminance(inverseTonemappedColor) : tmParams.inputLuminance) >= minHighlightsColorOut;
-#endif
-		if (INVERT_TONEMAP_TYPE > 0 && !isHighlight)
-		{
-			inverseTonemappedColor = tonemappedByLuminanceColor * (minHighlightsColorOut / minHighlightsColorIn);
-		}
-		if (needsInverseTonemap && isHighlight)
-		{
-			inverseTonemappedColor = tmParams.inputColor;
-		}
-	}
+	PostInverseTonemapByChannel(tmParams.inputColor.r, tonemappedColor.r, inverseTonemappedColor.r, sPP);
+	PostInverseTonemapByChannel(tmParams.inputColor.g, tonemappedColor.g, inverseTonemappedColor.g, sPP);
+	PostInverseTonemapByChannel(tmParams.inputColor.b, tonemappedColor.b, inverseTonemappedColor.b, sPP);
 
 	if (INVERT_TONEMAP_TYPE > 0)
 	{
@@ -1888,21 +1854,18 @@ static const bool CLAMP_BETHESDA_ACES = false;
 void ApplyACESFitted(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
 	tmParams.outputSDRColor = ACESFitted(abs(tmParams.inputColor), CLAMP_BETHESDA_ACES) * sign(tmParams.inputColor);
-	tmParams.outputSDRLuminance = ACESFitted(tmParams.inputLuminance, CLAMP_BETHESDA_ACES);
 	params.outputColor = tmParams.outputSDRColor;
 }
 
 void ApplyACESParametric(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
 	tmParams.outputSDRColor  = ACESParametric(abs(tmParams.inputColor), CLAMP_BETHESDA_ACES, tmParams.acesParametricParams) * sign(tmParams.inputColor);
-	tmParams.outputSDRLuminance = ACESParametric(tmParams.inputLuminance, CLAMP_BETHESDA_ACES, tmParams.acesParametricParams);
 	params.outputColor = tmParams.outputSDRColor;
 }
 
 void ApplyHable(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
 	tmParams.outputSDRColor  = Hable(abs(tmParams.inputColor), tmParams.hableParams) * sign(tmParams.inputColor);
-	tmParams.outputSDRLuminance = Hable(tmParams.inputLuminance.xxx, tmParams.hableParams).x; //TODO: make hable templatable
 	params.outputColor = tmParams.outputSDRColor;
 }
 
