@@ -94,25 +94,11 @@ float3 shd_con(float3 rgb, float ex, float str) {
 
   const float n = max(rgb.x, max(rgb.y, rgb.z));
   const float n2 = n*n;
-  const float s = (n2 + m*w)/(n2 + w); // Implicit divide by n
+  const float dividend = n2 + w;
+  const float s = dividend ? (n2 + m*w) / dividend : 1.f; // Implicit divide by n
   return rgb * s;
 }
 
-float3 shd_con_invert(float3 rgb, float ex, float str) {
-  // Parameter setup
-  const float m = exp2(ex);
-  // Perf: explicit cube
-  // const float w = pow(str, 3.0f);
-  const float w = str * str * str;
-
-  const float n = max(rgb.x, max(rgb.y, rgb.z));
-  const float n2 = n*n;
-  const float p0 = n2 - 3.0f*m*w;
-  const float p1 = 2.0f*n2 + 27.0f*w - 9.0f*m*w;
-  const float p2 = pow(sqrt(n2*p1*p1 - 4*p0*p0*p0)/2.0f + n*p1/2.0f,1.0f/3.0f);
-  const float s = (p0/(3.0f*p2) + p2/3.0f + n/3.0f) / n;
-  return rgb * s;
-}
 
 /* Highlight Contrast
     Invertible quadratic highlight contrast function. Same as ex_high without lin ext
@@ -187,6 +173,7 @@ float3 open_drt_transform(
 
   // Dechroma
 
+  rgb = min(rgb, 10000.f / (8.f)); // Limit to 10K nits
   const static float dch = 0.20f;
 
   // Chroma contrast
