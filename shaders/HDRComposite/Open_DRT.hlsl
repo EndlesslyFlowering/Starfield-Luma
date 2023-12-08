@@ -267,12 +267,15 @@ float3 open_drt_transform(
   // Perf: Use dot for mult+add
   // weights *= rgb; // multiply rgb by weights
   // float lum = max(1e-8f, weights.x + weights.y + weights.z); // take the norm
-  float lum = max(1e-8f, dot(rgb, weights)); // take the norm
+  // Perf: Use safe division later instead of max
+  float lum = dot(rgb, weights); // take the norm
 
   // RGB Ratios
   // Perf: lum is > 0 (1e-8f)
   // float3 rats = sdivf3f(rgb, lum);
-  float3 rats = rgb / lum;
+  // Perf: If rgb is zero, ratio is actually 1:1:1, also avoid divide by 0
+  // TODO: Support negative input channels
+  float3 rats = lum ? rgb / lum : 1.f;
 
   // Apply tonescale function to lum
   float ts;
@@ -283,7 +286,8 @@ float3 open_drt_transform(
   ts *= 100.0f/Lp;
 
   // Clamp ts to display peak
-  ts = min(1.0f, ts); // [0-1]
+  // Perf: Skip clamp
+  // ts = min(1.0f, ts); // [0-1]
 
   /* Gamut Compress ------------------------------------------ *
     Most of our data is now inside of the display gamut cube, but there may still be some gradient disruptions
@@ -438,10 +442,6 @@ float3 open_drt_transform(
   // Apply tonescale to RGB Ratios
   rgb = rats*ts;
 
-  // Replace saturate() with max(0)
-  // Tone scale may create negative colors.
-  // Input shouldn't have negative colors anyway since it is the same colorspace.
-  rgb = max(0, rgb);
 
   return rgb;
 }
