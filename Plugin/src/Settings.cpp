@@ -127,7 +127,7 @@ namespace Settings
 		// but it seems like it would run into thread safety problems
 	}
 
-    bool Main::IsSDRForcedOnHDR(bool bAcknowledgeScreenshots) const //TODOFT
+    bool Main::IsSDRForcedOnHDR(bool bAcknowledgeScreenshots) const
     {
 		// The game will tonemap to SDR if this is true
 		return ForceSDROnHDR.value.get_data() || (bAcknowledgeScreenshots && !bRequestedHDRScreenshot && bRequestedSDRScreenshot);
@@ -221,6 +221,7 @@ namespace Settings
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
     {
 		a_outShaderConstants.DisplayMode = GetActualDisplayMode(true);
+		// TODO: expose HDR screenshot normalization as a user (advanced/config only) setting
 		if (bRequestedHDRScreenshot) {
 			// Unlock HDR range to HDR10 max when taking screenshots, to they appear consistently independently of the user peak brightness.
 			// For now we don't force the paper white to 203 (reference/suggested value) because that'd be a bit confusing for users.
