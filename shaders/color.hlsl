@@ -224,13 +224,13 @@ static const float3x3 bt2020_to_oklms = {
 	0.2650513947010040283203125f,  0.635972559452056884765625f,   0.0989705026149749755859375f,
 	0.10011710226535797119140625f, 0.20404155552387237548828125f, 0.69590473175048828125f};
 
-//OKLab's L'M'S' -> OKLab
-static const float3x3 oklms_to_oklab = {
+//OKLab's (_) L'M'S' -> OKLab
+static const float3x3 oklms__to_oklab = {
 	0.2104542553f,  0.7936177850f, -0.0040720468f,
 	1.9779984951f, -2.4285922050f,  0.4505937099f,
 	0.0259040371f,  0.7827717662f, -0.8086757660f};
 
-//OKLab -> OKLab's L'M'S'
+//OKLab -> OKLab's L'M'S' (_)
 //the 1s get optimized away by the compiler
 static const float3x3 oklab_to_oklms_ = {
 	1.f,  0.3963377774f,  0.2158037573f,
@@ -263,7 +263,7 @@ float3 linear_srgb_to_oklab(float3 rgb) {
 	//L'M'S'
 	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
 
-	return mul(oklms_to_oklab, lms_);
+	return mul(oklms__to_oklab, lms_);
 }
 
 // (in) linear BT.2020
@@ -275,7 +275,7 @@ float3 linear_bt2020_to_oklab(float3 rgb) {
 	//L'M'S'
 	float3 lms_ = pow(abs(lms), 1.f/3.f) * sign(lms);
 
-	return mul(oklms_to_oklab, lms_);
+	return mul(oklms__to_oklab, lms_);
 }
 
 // (in) OKLab
@@ -585,33 +585,18 @@ float oklab_compute_max_saturation(float a, float b, bool BT2020)
     // this gives an error less than 10e6, except for some blue hues where the dS/dh is close to infinite
     // this should be sufficient for most applications, otherwise do two/three steps 
 
-    float k_l = oklab_to_oklms_[0][0] * a + oklab_to_oklms_[0][1] * b;
-    float k_m = oklab_to_oklms_[1][0] * a + oklab_to_oklms_[1][1] * b;
-    float k_s = oklab_to_oklms_[2][0] * a + oklab_to_oklms_[2][1] * b;
+	float3 k_lms = mul(oklab_to_oklms_, float3(0.f, a, b));
+	float3 lms_ = 1.f + S * k_lms;
+	float3 lms = lms_ * lms_ * lms_;
 
-    {
-        float l_ = 1.f + S * k_l;
-        float m_ = 1.f + S * k_m;
-        float s_ = 1.f + S * k_s;
+	float3 lms_dS = 3.f * k_lms * lms_ * lms_;
+	float3 lms_dS2 = 6.f * k_lms * k_lms * lms_;
 
-        float l = l_ * l_ * l_;
-        float m = m_ * m_ * m_;
-        float s = s_ * s_ * s_;
+	float f  = wl * lms[0]     + wm * lms[1]     + ws * lms[2];
+	float f1 = wl * lms_dS[0]  + wm * lms_dS[1]  + ws * lms_dS[2];
+	float f2 = wl * lms_dS2[0] + wm * lms_dS2[1] + ws * lms_dS2[2];
 
-        float l_dS = 3.f * k_l * l_ * l_;
-        float m_dS = 3.f * k_m * m_ * m_;
-        float s_dS = 3.f * k_s * s_ * s_;
-
-        float l_dS2 = 6.f * k_l * k_l * l_;
-        float m_dS2 = 6.f * k_m * k_m * m_;
-        float s_dS2 = 6.f * k_s * k_s * s_;
-
-        float f  = wl * l     + wm * m     + ws * s;
-        float f1 = wl * l_dS  + wm * m_dS  + ws * s_dS;
-        float f2 = wl * l_dS2 + wm * m_dS2 + ws * s_dS2;
-
-        S = S - f * f1 / (f1*f1 - 0.5f * f * f2);
-    }
+	S = S - f * f1 / (f1*f1 - 0.5f * f * f2);
 
     return S;
 }
@@ -672,53 +657,39 @@ float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float 
 			float dL = L1 - L0;
 			float dC = C1;
 
-			float k_l = oklab_to_oklms_[0][0] * a + oklab_to_oklms_[0][1] * b;
-			float k_m = oklab_to_oklms_[1][0] * a + oklab_to_oklms_[1][1] * b;
-			float k_s = oklab_to_oklms_[1][0] * a + oklab_to_oklms_[2][1] * b;
+			float3 k_lms = mul(oklab_to_oklms_, float3(0.f, a, b));
 
-			float l_dt = dL + dC * k_l;
-			float m_dt = dL + dC * k_m;
-			float s_dt = dL + dC * k_s;
+			float3 lms_dt = dL + dC * k_lms;
 
 			// If higher accuracy is required, 2 or 3 iterations of the following block can be used:
 			{
 				float L = L0 * (1.f - t) + t * L1;
 				float C = t * C1;
 
-				float l_ = L + C * k_l;
-				float m_ = L + C * k_m;
-				float s_ = L + C * k_s;
+				float3 lms_ = L + C * k_lms;
+				float3 lms = lms_ * lms_ * lms_;
 
-				float l = l_ * l_ * l_;
-				float m = m_ * m_ * m_;
-				float s = s_ * s_ * s_;
+				float3 lmsdt = 3.f * lms_dt * lms_ * lms_;
+				float3 lmsdt2 = 6.f * lms_dt * lms_dt * lms_;
 
-				float ldt = 3 * l_dt * l_ * l_;
-				float mdt = 3 * m_dt * m_ * m_;
-				float sdt = 3 * s_dt * s_ * s_;
-
-				float ldt2 = 6 * l_dt * l_dt * l_;
-				float mdt2 = 6 * m_dt * m_dt * m_;
-				float sdt2 = 6 * s_dt * s_dt * s_;
-
-				//TODO: optimize all matrix multiplications (and verify them)
-				float r = oklms_to_rgb[0][0] * l + oklms_to_rgb[0][1] * m + oklms_to_rgb[0][2] * s - 1;
-				float r1 = oklms_to_rgb[0][0] * ldt + oklms_to_rgb[0][1] * mdt + oklms_to_rgb[0][2] * sdt;
-				float r2 = oklms_to_rgb[0][0] * ldt2 + oklms_to_rgb[0][1] * mdt2 + oklms_to_rgb[0][2] * sdt2;
+				// NOTE: these could possibly be optimized?
+				float r = oklms_to_rgb[0][0] * lms[0] + oklms_to_rgb[0][1] * lms[1] + oklms_to_rgb[0][2] * lms[2] - 1.f;
+				float r1 = oklms_to_rgb[0][0] * lmsdt[0] + oklms_to_rgb[0][1] * lmsdt[1] + oklms_to_rgb[0][2] * lmsdt[2];
+				float r2 = oklms_to_rgb[0][0] * lmsdt2[0] + oklms_to_rgb[0][1] * lmsdt2[1] + oklms_to_rgb[0][2] * lmsdt2[2];
 
 				float u_r = r1 / (r1 * r1 - 0.5f * r * r2);
 				float t_r = -r * u_r;
 
-				float g = oklms_to_rgb[1][0] * l + oklms_to_rgb[1][1] * m + oklms_to_rgb[1][2] * s - 1;
-				float g1 = oklms_to_rgb[1][0] * ldt + oklms_to_rgb[1][1] * mdt + oklms_to_rgb[1][2] * sdt;
-				float g2 = oklms_to_rgb[1][0] * ldt2 + oklms_to_rgb[1][1] * mdt2 + oklms_to_rgb[1][2] * sdt2;
+				float g = oklms_to_rgb[1][0] * lms[0] + oklms_to_rgb[1][1] * lms[1] + oklms_to_rgb[1][2] * lms[2] - 1.f;
+				float g1 = oklms_to_rgb[1][0] * lmsdt[0] + oklms_to_rgb[1][1] * lmsdt[1] + oklms_to_rgb[1][2] * lmsdt[2];
+				float g2 = oklms_to_rgb[1][0] * lmsdt2[0] + oklms_to_rgb[1][1] * lmsdt2[1] + oklms_to_rgb[1][2] * lmsdt2[2];
 
 				float u_g = g1 / (g1 * g1 - 0.5f * g * g2);
 				float t_g = -g * u_g;
 
-				float b = oklms_to_rgb[2][0] * l + oklms_to_rgb[2][1] * m + oklms_to_rgb[2][2] * s - 1;
-				float b1 = oklms_to_rgb[2][0] * ldt + oklms_to_rgb[2][1] * mdt + oklms_to_rgb[2][2] * sdt;
-				float b2 = oklms_to_rgb[2][0] * ldt2 + oklms_to_rgb[2][1] * mdt2 + oklms_to_rgb[2][2] * sdt2;
+				float b = oklms_to_rgb[2][0] * lms[0] + oklms_to_rgb[2][1] * lms[1] + oklms_to_rgb[2][2] * lms[2] - 1.f;
+				float b1 = oklms_to_rgb[2][0] * lmsdt[0] + oklms_to_rgb[2][1] * lmsdt[1] + oklms_to_rgb[2][2] * lmsdt[2];
+				float b2 = oklms_to_rgb[2][0] * lmsdt2[0] + oklms_to_rgb[2][1] * lmsdt2[1] + oklms_to_rgb[2][2] * lmsdt2[2];
 
 				float u_b = b1 / (b1 * b1 - 0.5f * b * b2);
 				float t_b = -b * u_b;
