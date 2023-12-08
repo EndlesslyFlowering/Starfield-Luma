@@ -1285,7 +1285,7 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 		// Thus only half of the colors in the lerp will have a hue, which means duplicating the color chroma/saturation strength will normalize the color "tint" amount.
 		static const float saturationMultiplier = 2.f;
 		// NOTE: it would be better to do this with Oklab chroma, but it would be much more expensive
-		LUTColor = Saturation(LUTColor, lerp(1.f, saturationMultiplier, closenessToZero * luminanceDeviationFromNeutralLUT * chromaDeviationFromNeutralLUT * HdrDllPluginConstants.LUTCorrectionStrength * HdrDllPluginConstants.DevSetting03));
+		LUTColor = Saturation(LUTColor, lerp(1.f, saturationMultiplier, closenessToZero * luminanceDeviationFromNeutralLUT * chromaDeviationFromNeutralLUT * HdrDllPluginConstants.LUTCorrectionStrength));
 	}
 #endif // MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK
 
