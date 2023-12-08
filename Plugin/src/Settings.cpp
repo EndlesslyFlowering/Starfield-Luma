@@ -319,7 +319,7 @@ namespace Settings
 				"EnvBRDF",
 				"ImageSpaceBufferR10G10B10A2"
 				//"NativeResolutionColorBuffer01",  // issues on AMD
-				//"ColorBuffer01"
+				//"ColorBuffer01",  // issues on AMD
 				);
 			config->Bind(PeakBrightnessAutoDetected, false);
 		});
