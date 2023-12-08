@@ -297,9 +297,10 @@ float3 open_drt_transform(
   // Perf: Fold in values to avoid spowf
   // rats.x = powerptoe(rats.x, 0.05f, -0.05f, 1.0f);
 
-  rats.x = powerptoe_fixed(rats.x);
-  rats.y = powerptoe_fixed(rats.y);
-  rats.z = powerptoe_fixed(rats.z);
+  // Perf: Input and Output gamut are the same, skip compression
+  // rats.x = powerptoe_fixed(rats.x);
+  // rats.y = powerptoe_fixed(rats.y);
+  // rats.z = powerptoe_fixed(rats.z);
 
   /* Calculate RGB CMY hue angles from the input RGB.
     The classical way of calculating hue angle from RGB is something like this
@@ -437,9 +438,10 @@ float3 open_drt_transform(
   // Apply tonescale to RGB Ratios
   rgb = rats*ts;
 
-#if 0 // Disabled clamping as at worse we'll get a little bit of out of gamut values that we can still use in HDR (and SDR)
-  rgb = saturate(rgb);
-#endif
+  // Replace saturate() with max(0)
+  // Tone scale may create negative colors.
+  // Input shouldn't have negative colors anyway since it is the same colorspace.
+  rgb = max(0, rgb);
 
   return rgb;
 }
