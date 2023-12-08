@@ -640,12 +640,17 @@ LC oklab_find_cusp(float a, float b, bool BT2020)
 // L = L0 * (1 - t) + t * L1;
 // C = t * C1;
 // a and b must be normalized so a^2 + b^2 == 1
-float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float L0, bool BT2020)
+static const LC defaultCusp = (LC)0;
+float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float L0, bool BT2020, bool overrideCusp = false, LC overriddenCusp = defaultCusp)
 {
 	const float3x3 oklms_to_rgb = BT2020 ? oklms_to_bt2020 : oklms_to_srgb;
 
 	// Find the cusp of the gamut triangle
-	LC cusp = oklab_find_cusp(a, b, BT2020);
+	LC cusp;
+	if (overrideCusp)
+		cusp = overriddenCusp;
+	else
+		cusp = oklab_find_cusp(a, b, BT2020);
 
 	// Find the intersection for upper and lower half seprately
 	float t;
@@ -675,7 +680,6 @@ float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float 
 			float m_dt = dL + dC * k_m;
 			float s_dt = dL + dC * k_s;
 
-			
 			// If higher accuracy is required, 2 or 3 iterations of the following block can be used:
 			{
 				float L = L0 * (1.f - t) + t * L1;
@@ -731,31 +735,36 @@ float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float 
 	return t;
 }
 
-float3 gamut_clip_preserve_chroma(float3 rgb, bool in_BT2020, bool clamp_BT2020, bool out_BT2020)
+// This only works in the SDR 0-1 range, thus it's hardcoded for sRGB
+float3 gamut_clip_preserve_chroma(float3 rgb)
 {
-	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
+	const bool isInSDRRange = rgb.r <= 1.f && rgb.g <= 1.f && rgb.b <= 1.f && rgb.r >= 0.f && rgb.g >= 0.f && rgb.b >= 0.f;
+	if (isInSDRRange)
 		return rgb;
 
-	float3 lab = in_BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
+	float3 lab = linear_srgb_to_oklab(rgb);
 
 	float L = lab.x;
 	float C = max(FLT_MIN, sqrt(lab.y * lab.y + lab.z * lab.z));
 	float a_ = lab.y / C;
 	float b_ = lab.z / C;
 
-	float L0 = clamp(L, 0, 1);
+	// This step can't be skipped, we are forced to stay in the SDR range
+	float L0 = clamp(L, 0.f, 1.f);
 
-	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, clamp_BT2020);
-	float L_clipped = L0 * (1 - t) + t * L;
+	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, false);
+	float L_clipped = L0 * (1.f - t) + t * L;
 	float C_clipped = t * C;
 
 	lab = float3(L_clipped, C_clipped * a_, C_clipped * b_);
-	return out_BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
+	return oklab_to_linear_srgb(lab);
 }
 
 float3 gamut_clip_project_to_L_cusp(float3 rgb, bool in_BT2020, bool clamp_BT2020, bool out_BT2020)
 {
-	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
+	const bool isInSDRRange = rgb.r <= 1.f && rgb.g <= 1.f && rgb.b <= 1.f && rgb.r >= 0.f && rgb.g >= 0.f && rgb.b >= 0.f;
+	const bool isFullySRGB = !in_BT2020 && !clamp_BT2020 && !out_BT2020;
+	if (isInSDRRange && isFullySRGB)
 		return rgb; //TODO (this one and the one above). BT2020 HDR10 isn't limited by the 0-1 range.
 
 	float3 lab = in_BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
@@ -765,14 +774,11 @@ float3 gamut_clip_project_to_L_cusp(float3 rgb, bool in_BT2020, bool clamp_BT202
 	float a_ = lab.y / C;
 	float b_ = lab.z / C;
 
-	// The cusp is computed here and in oklab_find_gamut_intersection, an optimized solution would only compute it once.
 	LC cusp = oklab_find_cusp(a_, b_, clamp_BT2020);
-
 	float L0 = cusp.L;
+	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, clamp_BT2020, true, cusp);
 
-	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, clamp_BT2020);
-
-	float L_clipped = L0 * (1 - t) + t * L;
+	float L_clipped = L0 * (1.f - t) + t * L;
 	float C_clipped = t * C;
 
 	lab = float3(L_clipped, C_clipped * a_, C_clipped * b_);
