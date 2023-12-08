@@ -384,6 +384,7 @@ namespace Hooks
 				const auto settings = Settings::Main::GetSingleton();
 				settings->GetShaderConstants(shaderConstants);
 				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
+				    shaderConstants.LUTCorrectionStrength = 0.f;
 					shaderConstants.ColorGradingStrength = 1.f;
 				}
 				uploadRootConstants(shaderConstants, 14, false);  // HDRComposite
