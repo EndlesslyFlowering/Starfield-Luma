@@ -340,6 +340,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	LUT4Color = LINEARIZE(LUT4Color);
 #endif // LUT_IMPROVEMENT_TYPE
 
+	// NOTE: we could ignore clamping to the SDR range if "CLAMP_INPUT_OUTPUT_TYPE" was 1 (gamut mapping)
 	const bool SDRRange = HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
 	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);

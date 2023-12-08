@@ -1239,8 +1239,8 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 	// double the saturation to maintain color tint more effectively around black (0 0 0 black doesn't have a hue, and LUTs are corrected so their black point is always full black).
 	// We can't do this in the LUT merge/mix shader as it would mess around with the LUT texture sampling.
 	// To do this 100% correctly we should do additional LUT samples (e.g. the first texel on the grey LUT line), but we designed it in a way to avoid it, to optimize it.
-	// We only do this in HDR as it creates a lot of colors beyond sRGB, which would clip in SDR unless we had gamut mapping on output (see "CLAMP_INPUT_OUTPUT_TYPE"). 
-	if (HdrDllPluginConstants.DisplayMode > 0 && HdrDllPluginConstants.LUTCorrectionStrength != 0.f) //TODO: enable in SDR once we have gamut mapping
+	// Unless gamut mapping is enabled, We only do this in HDR as it creates a lot of colors beyond sRGB, which would clip in SDR unless we had gamut mapping on output. 
+	if ((CLAMP_INPUT_OUTPUT_TYPE == 1 || HdrDllPluginConstants.DisplayMode > 0) && HdrDllPluginConstants.LUTCorrectionStrength != 0.f)
 	{
 		const float3 neutralLUTColor = color;
 		// The amount our color coordinates are within the first LUT sub cube (the one around the origin/black).

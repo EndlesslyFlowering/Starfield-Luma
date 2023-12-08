@@ -731,12 +731,12 @@ float oklab_find_gamut_intersection(float a, float b, float L1, float C1, float 
 	return t;
 }
 
-float3 gamut_clip_preserve_chroma(float3 rgb, bool BT2020)
+float3 gamut_clip_preserve_chroma(float3 rgb, bool in_BT2020, bool clamp_BT2020, bool out_BT2020)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
 
-	float3 lab = BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
+	float3 lab = in_BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
 
 	float L = lab.x;
 	float C = max(FLT_MIN, sqrt(lab.y * lab.y + lab.z * lab.z));
@@ -745,20 +745,20 @@ float3 gamut_clip_preserve_chroma(float3 rgb, bool BT2020)
 
 	float L0 = clamp(L, 0, 1);
 
-	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, BT2020);
+	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, clamp_BT2020);
 	float L_clipped = L0 * (1 - t) + t * L;
 	float C_clipped = t * C;
 
 	lab = float3(L_clipped, C_clipped * a_, C_clipped * b_);
-	return BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
+	return out_BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
 }
 
-float3 gamut_clip_project_to_L_cusp(float3 rgb, bool BT2020)
+float3 gamut_clip_project_to_L_cusp(float3 rgb, bool in_BT2020, bool clamp_BT2020, bool out_BT2020)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb; //TODO (this one and the one above). BT2020 HDR10 isn't limited by the 0-1 range.
 
-	float3 lab = BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
+	float3 lab = in_BT2020 ? linear_bt2020_to_oklab(rgb) : linear_srgb_to_oklab(rgb);
 
 	float L = lab.x;
 	float C = max(FLT_MIN, sqrt(lab.y * lab.y + lab.z * lab.z));
@@ -766,15 +766,37 @@ float3 gamut_clip_project_to_L_cusp(float3 rgb, bool BT2020)
 	float b_ = lab.z / C;
 
 	// The cusp is computed here and in oklab_find_gamut_intersection, an optimized solution would only compute it once.
-	LC cusp = oklab_find_cusp(a_, b_, BT2020);
+	LC cusp = oklab_find_cusp(a_, b_, clamp_BT2020);
 
 	float L0 = cusp.L;
 
-	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, BT2020);
+	float t = oklab_find_gamut_intersection(a_, b_, L, C, L0, clamp_BT2020);
 
 	float L_clipped = L0 * (1 - t) + t * L;
 	float C_clipped = t * C;
 
 	lab = float3(L_clipped, C_clipped * a_, C_clipped * b_);
-	return BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
+	return out_BT2020 ? oklab_to_linear_bt2020(lab) : oklab_to_linear_srgb(lab);
+}
+
+// linear (or perceptual?) sRGB to HSV: hue, saturation, value
+float3 srgb_to_hsv(float3 rgb)
+{
+	float M = max(rgb.r, max(rgb.g, rgb.b));
+	float m = min(rgb.r, min(rgb.g, rgb.b));
+	float C = M - m;
+	float invertedC = C == 0.f ? 0.f : rcp(C);
+	float h1 = 0.f;
+	if (M == rgb.r)
+		h1 = (rgb.g - rgb.b) * invertedC;
+	else if (M == rgb.g)
+		h1 = (rgb.b - rgb.r) * invertedC + 2.f;
+	else if (M == rgb.b)
+		h1 = (rgb.r - rgb.g) * invertedC + 4.f;
+	if (h1 < 0.f)
+		h1 += 6.f;
+	float h = h1 / 6.f;
+	float v = M;
+	float s = (v == 0.f) ? 0.f : (C / v);
+	return float3(h, s, v);
 }
