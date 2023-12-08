@@ -45,7 +45,7 @@ Dependencies:
 -ShaderInjector by Nukem: https://www.nexusmods.com/starfield/mods/5562 (source code: https://github.com/Nukem9/sf-shader-injector)
 
 Compatibility:
-This mod should work with any other mod, including DLSS Super Resolution and DLSS Frame Generation (scRGB is NOT supported by FG).
+This mod should work with any other mod.
 You can also use customized LUTs mods. If the customized LUT is in limited range, the "LUTs Correction" slider can be used to scale it.
 Our suggestion is to use the LUT correction that is built in Luma, as it extract extracts HDR detail out of SDR LUTs while normalizing them, something that cannot be achieved by replacing assets.
 Additionally Luma should be compatible with any story content and new location, whether official added by Bethesda as DLCs, or unofficial mods.
