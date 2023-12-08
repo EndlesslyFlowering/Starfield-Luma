@@ -1543,11 +1543,10 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
 		? HdrDllPluginConstants.HDRPeakBrightnessNits
 		: ReferenceWhiteNits_BT2408; // 203
-	const float whiteNits = (HdrDllPluginConstants.DisplayMode > 0)
-		? HdrDllPluginConstants.HDRGamePaperWhiteNits
-		: ReferenceWhiteNits_BT2408; // 203
 
-	float paperWhiteScaling = whiteNits / ReferenceWhiteNits_BT2408;
+	float exposureAdjustment = (HdrDllPluginConstants.DisplayMode > 0)
+		? HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408
+		: 1.f;
 	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
 	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
 
@@ -1561,7 +1560,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 	)
 	{
 		tmParams.outputHDRColor = open_drt_transform_single(
-			tmParams.inputColor * paperWhiteScaling,
+			tmParams.inputColor * exposureAdjustment,
 			peakNits,
 			shadowsScaling,
 			highlightsScaling,
@@ -1582,7 +1581,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 			tmParams.outputSDRColor,
 			tmParams.outputHDRColor,
 			peakNits,
-			paperWhiteScaling,
+			exposureAdjustment,
 			shadowsScaling,
 			highlightsScaling,
 			contrast
@@ -1601,14 +1600,8 @@ void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tm
 	//TODO: Try RestorePostProcess() here again?
 	params.outputColor *= safeDivision(tmParams.outputHDRLuminance, tmParams.outputSDRLuminance);
 
-	//TODO: Paper White shouldn't have been multiplied inside the SDR tonemapper by this point.
-	const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
-	
-	// Bring back to a paper white neutral range
-	params.outputColor /= paperWhite;
 	ApplyUserSettingExtendGamut(params.outputColor);
 	ApplyUserSettingSaturation(params.outputColor);
-	params.outputColor *= paperWhite;
 
 	// Change paper white to default from 80 to 203.
 	params.outputColor *= ReferenceWhiteNits_BT2408 / WhiteNits_sRGB;
