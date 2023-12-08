@@ -1219,7 +1219,7 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 }
 
 // In/Out: linear space
-float3 GradingLUT(float3 color, float2 uv, int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE)
+float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE)
 {
 // Overall, we don't really care about maintaining the wrong sRGB gamma formula as it broke LUT mapping, causing clipping, and just looked bad.
 #if !FORCE_VANILLA_LOOK
@@ -1240,33 +1240,52 @@ float3 GradingLUT(float3 color, float2 uv, int LUTExtrapolationColorSpace = DEFA
 	// We can't do this in the LUT merge/mix shader as it would mess around with the LUT texture sampling.
 	// To do this 100% correctly we should do additional LUT samples (e.g. the first texel on the grey LUT line), but we designed it in a way to avoid it, to optimize it.
 	// We only do this in HDR as it creates a lot of colors beyond sRGB, which would clip in SDR unless we had gamut mapping on output (see "CLAMP_INPUT_OUTPUT_TYPE"). 
-	if (HdrDllPluginConstants.DisplayMode > 0) //TODO: enable in SDR once we have gamut mapping
+	if (HdrDllPluginConstants.DisplayMode > 0 && HdrDllPluginConstants.LUTCorrectionStrength != 0.f) //TODO: enable in SDR once we have gamut mapping
 	{
+		const float3 neutralLUTColor = color;
 		// The amount our color coordinates are within the first LUT sub cube (the one around the origin/black).
-#if 1
-		const float distanceFromZero = saturate(average(abs(LUTCoordinates) * LUT_SIZE));
-#else // This is based on a sphere around 0, though returns values < 1 for coordinates like 1 0 0 or 0 1 1, which we don't really want, we only want to correct the LUT sub cube closest to the origin (we'd need to project to the sub cube closest edge for this to work as we'd like it).
+#if 0 // This returns values < 1 for coordinates like 1 0 0 or 0 1 1, which we don't really want, we only want to correct the LUT sub cube closest to the origin (we'd need to project to the sub cube closest edge for this to work as we'd like it).
 		static const float LUTRadius = length(float3(1.f, 1.f, 1.f));
-		const float distanceFromZero = saturate((length(LUTCoordinates) * LUT_SIZE) / LUTRadius);
+#else // This makes the sphere inscribed within the LUT first sub cube, which also isn't ideal, but is better
+		static const float LUTRadius = 1.f;
 #endif
+		// Find the distance based on a sphere around 0
+		const float distanceFromZero = saturate((length(LUTCoordinates) * LUT_SIZE) / LUTRadius);
 		const float closenessToZero = 1.f - distanceFromZero;
+
 		// If the LUT color was highly deviated from black, don't correct saturation, this avoids false positive cases (e.g. inverted colors LUTs).
 		// We only want to correct LUTs that had a near black tint. Theoretically we'd just branch on whether the LUT was corrected or not, but that's technically "impossible".
 #if 1 // Branching is risky but it will probably work due to the high threshold
-		const float deviationFromNeutralLUTBlack = abs(Luminance(color) - Luminance(LUTColor)) > 0.5f ? 0.f : 1.f;
+		const float luminanceDeviationFromNeutralLUT = abs(Luminance(LUTColor) - Luminance(neutralLUTColor)) > 0.5f ? 0.f : 1.f;
 #else
-		const float deviationFromNeutralLUTBlack = 1.f - saturate(abs(Luminance(color) - Luminance(LUTColor)) * LUT_SIZE);
+		const float luminanceDeviationFromNeutralLUT = 1.f - saturate(abs(Luminance(LUTColor) - Luminance(neutralLUTColor)) * LUT_SIZE);
 #endif
-		// Don't correct LUTs that are close to the neutral one (which implies they have no tint). This basically represents how tinted the LUT is.
-		// Given that our color correction always makes the LUT origin texture 0 0 0, we need to normalize the deviation by the distance from the LUT origin,
-		// and then normalize it by "LUT_SIZE" to find the tint ratio around 1.
-		static float deviationFromNeutralLUTThreshold = 100.f / 3.f; // Found empirically. E.g. if it's 50, that means a color tint of 0.02 (1/50) (like from 1 1 1 to 1.02 1.02 1.02)
-		const float deviationFromNeutralLUT = saturate((average(abs(color - LUTColor)) / max(FLT_MIN, distanceFromZero)) * LUT_SIZE * deviationFromNeutralLUTThreshold);
+
+		// Don't correct LUTs that are close to the neutral one.
+		// This basically represents how tinted the LUT is. If a LUT just moved the brightness around without shifting the hue or saturation, this shouldn't have any effect.
+		//
+		// We divide the LUT in and out colors to find their normalized value around one (a projection of their rate of change).
+		// Given that our color correction always makes the LUT origin texel 0 0 0, we need to normalize by the distance from the LUT origin as well
+#if 0 // We don't use the 3D distance as it would cause a hue shift in "normalizedDeviationFromNeutralLUT", given it's per channel
+		const float3 distanceFromZero3D = saturate(abs(LUTCoordinates * LUT_SIZE));
+		const float3 normalizedDeviationFromNeutralLUT = ((LUTColor / neutralLUTColor) / distanceFromZero3D);
+#elif 0 // This is possibly more accurate, as it's all in gamma space instead of being a mix of linear and gamma spaces, though it's more expensive
+		const float3 normalizedDeviationFromNeutralLUT = ((gamma_linear_to_sRGB_mirrored(LUTColor) / LUTCoordinates) / distanceFromZero3D);
+#else
+		const float3 normalizedDeviationFromNeutralLUT = ((LUTColor / neutralLUTColor) / distanceFromZero);
+#endif
+		// To find the tint (chroma) deviation from 1 1 1, we use this approximate but functional method:
+		const float maxNormalizedDeviationFromNeutralLUT = max(normalizedDeviationFromNeutralLUT.x, max(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z));
+		const float minNormalizedDeviationFromNeutralLUT = min(normalizedDeviationFromNeutralLUT.x, min(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z));
+		const float minNormalizedDeviationFromNeutralLUTChroma = maxNormalizedDeviationFromNeutralLUT - minNormalizedDeviationFromNeutralLUT;
+		static float deviationFromNeutralLUTThreshold = 1.f; // Found empirically (there's no meaning to it being 1)
+		const float chromaDeviationFromNeutralLUT = saturate(minNormalizedDeviationFromNeutralLUTChroma * deviationFromNeutralLUTThreshold); // Mid gray should have chroma at 0
+
 		// Double the saturation because when near black, we are lerping between a color without hue (0 0 0 / origin) and a color with hue (the ones immediately after, > 0).
 		// Thus only half of the colors in the lerp will have a hue, which means duplicating the color chroma/saturation strength will normalize the color "tint" amount.
 		static const float saturationMultiplier = 2.f;
 		// NOTE: it would be better to do this with Oklab chroma, but it would be much more expensive
-		LUTColor = Saturation(LUTColor, lerp(1.f, saturationMultiplier, closenessToZero * deviationFromNeutralLUTBlack * deviationFromNeutralLUT * HdrDllPluginConstants.LUTCorrectionStrength));
+		LUTColor = Saturation(LUTColor, lerp(1.f, saturationMultiplier, closenessToZero * luminanceDeviationFromNeutralLUT * chromaDeviationFromNeutralLUT * HdrDllPluginConstants.LUTCorrectionStrength * HdrDllPluginConstants.DevSetting03));
 	}
 #endif // MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK
 
