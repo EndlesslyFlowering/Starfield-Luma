@@ -325,7 +325,7 @@ float3 oklch_to_oklab(float3 lch) {
 }
 
 // (in) linear sRGB/BT.709
-// (out) OKLch:
+// (out) OKLch
 // L – perceived lightness (identical to OKLAB)
 // c – chroma (saturation)
 // h – hue
@@ -365,7 +365,7 @@ float3 gamma_linear_to_sRGB_Bethesda_Optimized(float3 Color, float InverseGamma 
 	return (pow(Color, InverseGamma) * 1.055f) - 0.055f;
 }
 
-	// Original exact inverse formula, this is heavily broken, especially in its inverse form
+// Original exact inverse formula, this is heavily broken, especially in its inverse form
 float3 gamma_sRGB_to_linear_Bethesda_Optimized(float3 Color, float Gamma = 2.4f)
 {
 	return (pow(Color, Gamma) / 1.055f) + 0.055f;

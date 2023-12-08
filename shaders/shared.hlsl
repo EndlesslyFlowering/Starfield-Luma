@@ -12,7 +12,7 @@
 // 2 Clamp final output only (with raw rgb clipping).
 // 3 Clamp many shader passes input and output.
 // 4 Clamp many shader passes input and output, including the first input (HDRComposite pixel shader).
-#define CLAMP_INPUT_OUTPUT_TYPE 2
+#define CLAMP_INPUT_OUTPUT_TYPE (FORCE_VANILLA_LOOK ? 3 : 2)
 // If this is true, the code makes the assumption that Bethesda developed and calibrated the game on gamma 2.2 screens, as opposed to sRGB gamma.
 // This implies there was a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
 // By turning this on, we emulate the SDR look in HDR (and out SDR) by baking that assumption into our calculations.

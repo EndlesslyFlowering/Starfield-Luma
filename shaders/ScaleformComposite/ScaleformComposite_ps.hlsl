@@ -15,9 +15,9 @@
 // and without or alpha pow modifications, it becomes much more noticeable).
 #define HDR_UI_BLEND_POW_ALPHA 0.5f
 
-#if SDR_USE_GAMMA_2_2
-	#define GAMMA_TO_LINEAR(x) pow(x, 2.2f)
-	#define LINEAR_TO_GAMMA(x) pow(x, 1.f / 2.2f)
+#if SDR_USE_GAMMA_2_2 // NOTE: these gamma formulas should use their mirrored versions in the CLAMP_INPUT_OUTPUT_TYPE < 3 case
+	#define GAMMA_TO_LINEAR(x) gamma_to_linear_mirrored(x, 2.2f)
+	#define LINEAR_TO_GAMMA(x) linear_to_gamma_mirrored(x, 2.2f)
 #else
 	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
