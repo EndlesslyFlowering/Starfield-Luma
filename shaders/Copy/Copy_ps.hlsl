@@ -51,7 +51,7 @@ float4 PS(PSInputs inputs) : SV_Target
 			// safety clamp to BT.2020 as Windows may turn pixels that are low brightness (Rec.601 luminance <= 0) and outside of BT.2020 into black pixels
 			// this only happens in software composition though (Composed Flip).
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			//TODO: proper gamut mapping
+			//TODO: proper gamut mapping here and in the other cases
 			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, true, false);
 #elif CLAMP_INPUT_OUTPUT_TYPE >= 2
 			color.rgb = BT709_To_BT2020(color.rgb);
@@ -67,7 +67,6 @@ float4 PS(PSInputs inputs) : SV_Target
 #endif // !SDR_LINEAR_INTERMEDIARY
 
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			//TODO: gamut mapping to Rec.709
 			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, false, false);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
 			color.rgb = saturate(color.rgb); // Remove any non SDR color (independently of CLAMP_INPUT_OUTPUT_TYPE), this mode is just meant for debugging SDR in HDR
@@ -83,9 +82,9 @@ float4 PS(PSInputs inputs) : SV_Target
 			// Negative values need to be clamped though to avoid doing pow on a negative values ("Linear_to_PQ()"" already does this).
 			color.rgb /= PQMaxWhitePoint;
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			//TODO: gamut mapping to Rec.2020
 			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, true, true);
 #elif CLAMP_INPUT_OUTPUT_TYPE >= 2
+            color.rgb = BT709_To_BT2020(color.rgb);
 			// Note: this might cause a little hue shift
 			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_HDR10);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
@@ -95,7 +94,6 @@ float4 PS(PSInputs inputs) : SV_Target
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)
 		{
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			//TODO: gamut mapping to Rec.709
 			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, false, false);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
 #if SDR_USE_GAMMA_2_2 // Avoid negative pow
