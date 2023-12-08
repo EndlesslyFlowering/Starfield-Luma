@@ -31,23 +31,29 @@
 
 // Safe power function raising float a to power float b
 // Never returns negative [0+]
-float spowf(float a, float b) {
-  return pow(abs(a), b);
-}
+// float spowf(float a, float b) {
+//   return pow(abs(a), b);
+// }
 
 
 // [0-2]
 float3 narrow_hue_angles(float3 v) {
-  return clamp(float3(
-    v.x - (v.y + v.z),
-    v.y - (v.x + v.z),
-    v.z - (v.x + v.y)
+  // Refactor: Clamp and vector subtraction
+  // return float3(
+  //   min(2.0f, max(0.0f, v.x - (v.y + v.z))),
+  //   min(2.0f, max(0.0f, v.y - (v.x + v.z))),
+  //   min(2.0f, max(0.0f, v.z - (v.x + v.y))));
+  return clamp(v - float3(
+    (v.y + v.z),
+    (v.x + v.z),
+    (v.x + v.y)
   ), 0, 2.f);
 }
 
 // [0+]
 float tonescale(float x, float m, float s, float c) {
-  return spowf(m*x/(x + s), c);
+  // Perf spowf not needed
+  return pow(m*x/(x + s), c);
 }
 
 // x is tonescale which is >=0 [0+]
@@ -82,7 +88,9 @@ float powerptoe_fixed(float x) {
 float3 shd_con(float3 rgb, float ex, float str) {
   // Parameter setup
   const float m = exp2(ex);
-  const float w = pow(str, 3.0f);
+  // Perf: explicit cube
+  // const float w = pow(str, 3.0f);
+  const float w = str * str * str;
 
   const float n = max(rgb.x, max(rgb.y, rgb.z));
   const float n2 = n*n;
@@ -93,7 +101,9 @@ float3 shd_con(float3 rgb, float ex, float str) {
 float3 shd_con_invert(float3 rgb, float ex, float str) {
   // Parameter setup
   const float m = exp2(ex);
-  const float w = pow(str, 3.0f);
+  // Perf: explicit cube
+  // const float w = pow(str, 3.0f);
+  const float w = str * str * str;
 
   const float n = max(rgb.x, max(rgb.y, rgb.z));
   const float n2 = n*n;
