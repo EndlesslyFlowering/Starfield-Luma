@@ -189,11 +189,12 @@ float3 open_drt_transform(
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
-  const static float3 weights = normalize(float3(
+  // This should be normalized theoretically but it also works if it's not
+  const static float3 weights = float3(
     0.001f, // 0.25
     0.359f, // 0.45
     0.11f   // 0.30
-  ));
+  );
 
   // Hue Shift RGB controls
   float3 static hs = float3(
