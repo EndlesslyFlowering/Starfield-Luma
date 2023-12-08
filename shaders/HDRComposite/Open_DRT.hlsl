@@ -177,7 +177,7 @@ float3 open_drt_transform(
 
   // Dechroma
 
-  const static float dch = 0.4f;
+  const static float dch = 0.20f;
 
   // Chroma contrast
   const static float chc_p = 1.1f; // 1.2 // amount of contrast
@@ -190,15 +190,15 @@ float3 open_drt_transform(
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
   // This should be normalized theoretically but it also works if it's not
-  const static float3 weights = float3(
+  const float3 static weights = float3(
     0.001f, // 0.25
-    0.359f, // 0.45
-    0.11f   // 0.30
+    0.45f, // 0.45
+    0.25f   // 0.30
   );
 
   // Hue Shift RGB controls
   float3 static hs = float3(
-    0.3f,   // 0.3f
+    0.60f,   // 0.3f
     0.1f,   // -0.1f
     -0.2f   // -0.5f
   );
@@ -353,8 +353,8 @@ float3 open_drt_transform(
   float3 rats_h2 = rats_h * rats_h;
   float chf = ts * max(rats_h2.x, max(rats_h2.y, rats_h2.z)); // [0+]
   
-  const float chf_m = 0.25f;
-  const float chf_p = 0.65f;
+  const float chf_m = 0.20f; // 0.25f
+  const float chf_p = 0.75f; // 0.65f
   // Perf: chf is never negative
   // chf = 1.0f - spowf(spowf(chf/chf_m, 1.0f/chf_p)+1.0f, -chf_p);
   chf = 1.0f - pow(pow(chf/chf_m, 1.0f/chf_p)+1.0f, -chf_p);
