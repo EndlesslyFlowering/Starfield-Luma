@@ -1278,7 +1278,7 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 		const float maxNormalizedDeviationFromNeutralLUT = max(normalizedDeviationFromNeutralLUT.x, max(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z));
 		const float minNormalizedDeviationFromNeutralLUT = min(normalizedDeviationFromNeutralLUT.x, min(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z));
 		const float minNormalizedDeviationFromNeutralLUTChroma = maxNormalizedDeviationFromNeutralLUT - minNormalizedDeviationFromNeutralLUT;
-		static float deviationFromNeutralLUTThreshold = 1.f; // Found empirically (there's no meaning to it being 1)
+		static const float deviationFromNeutralLUTThreshold = 1.f; // Found empirically (there's no meaning to it being 1)
 		const float chromaDeviationFromNeutralLUT = saturate(minNormalizedDeviationFromNeutralLUTChroma * deviationFromNeutralLUTThreshold); // Mid gray should have chroma at 0
 
 		// Double the saturation because when near black, we are lerping between a color without hue (0 0 0 / origin) and a color with hue (the ones immediately after, > 0).
@@ -2032,7 +2032,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 	else // SDR
 	{
 		ApplySDRBrightness(params.outputColor);
-		//TODOFT: contast and saturation in SDR?
+		//TODOFT: contast and saturation in SDR? (some of this is applied in LUTs)
 		ApplyUserSettingSaturation(params.outputColor);
 #if HDR_TONE_MAPPER_ENABLED
 		// User contrast is already baked in the DRT TM
