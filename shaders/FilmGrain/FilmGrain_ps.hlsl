@@ -68,6 +68,7 @@ float computeFilmDensity(float luminance) {
 // https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2003/PICS-0-287/8583.pdf
 float computeFilmGraininess(float density) {
 	float preComputedMin = 7.5857757502918375f;
+	if (density < 0) return 0; // Because Luminance can be negative, pow can be unsafe
 	float bofDOverC = 0.880f - (0.736f * density) - (0.003f * pow(density, 7.6f));
 	return pow(10.f, bofDOverC);
 }
