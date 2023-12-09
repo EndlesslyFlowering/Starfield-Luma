@@ -160,6 +160,5 @@ try {
 	& $main
 }
 catch {
-	Write-Host -ForegroundColor Red $_
-	Pause
+	Write-Error $_
 }
