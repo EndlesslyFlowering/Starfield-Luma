@@ -1,5 +1,5 @@
 Luma aims to rewrite the game post processing phase to drastically improve the look without drifting too much from the original artistic vision.
-The highlight feature is adding Native HDR support, which is not the same as the fake official HDR seen on the Xbox version, though benefits are not restricted to HDR users,
+The highlight feature is adding Native HDR support, which is not the same as the fake official HDR implementation, though benefits are not restricted to HDR users,
 all LUTs are now normalized at runtime without needing any content changes, banding is gone, there's gamma correction etc etc.
 
 Luma was created by 4 HDR passionate developers (Ersh, Pumbo, Lilium, ShortFuse), whom all took on different roles to achieve this expansive refactor.
@@ -63,6 +63,9 @@ Comparison with other "HDR" methods:
  The game allows some basic LUT correction to stretch the black floor and peak white in HDR, but it's very lightweight compared to the adjustmenets that Luma is capable of making.
 -SpecialK HDR Retrofit: It can upgrade all buffers to 16bit but the game tonemapping remains SDR, and highlights gets mushed together and clipped.
 -Pumbo's Advanced Auto HDR + DXVK: Same problems as SpecialK HDR.
+
+Source Code:
+https://github.com/EndlesslyFlowering/Starfield-Luma
 
 Donations:
 https://ko-fi.com/ershin
