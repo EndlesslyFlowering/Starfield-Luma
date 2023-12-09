@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 
-$ShaderOutputDirectory = Get-Content "${PSScriptRoot}\target_folder.txt"
+$ShaderOutputDirectoryFile = "${PSScriptRoot}\target_folder.txt"
+$EnvironmentShaderOutputDirectory = "$env:SFPath\Data\shadersfx\"
 $DistDirectory = "${PSScriptRoot}\..\Plugin\dist\Data\shadersfx\"
 $ShaderOutputEmbedPDB = $false
 
@@ -139,6 +140,14 @@ function Compile-Shader {
     New-Item -Force -ItemType Directory -Path "${DistDirectory}\${OutputName}" | Out-Null
     Copy-Item -Force -Path $stagedBinPath -Destination "${DistDirectory}\${OutputName}\${outputBinName}"
     Copy-Item -Force -Path $stagedSigPath -Destination "${DistDirectory}\${OutputName}\${outputSigName}"
+    
+    $ShaderOutputDirectory = $null
+    If (Test-Path -path $ShaderOutputDirectoryFile -PathType Leaf) {
+        $ShaderOutputDirectory = Get-Content $ShaderOutputDirectoryFile
+    }
+    if ($ShaderOutputDirectory -eq $null) {
+        $ShaderOutputDirectory = $EnvironmentShaderOutputDirectory
+    }
 
 	# Move the resulting bins to the game directory. Move-Item is to avoid partial reads when live shader editing
 	# is enabled.
