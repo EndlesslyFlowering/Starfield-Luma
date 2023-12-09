@@ -1,3 +1,5 @@
+[![CMake on Windows](https://github.com/EndlesslyFlowering/Starfield-Luma/actions/workflows/cmake-windows.yml/badge.svg)](https://github.com/EndlesslyFlowering/Starfield-Luma/actions/workflows/cmake-windows.yml)
+
 Source code for the Starfield Luma mod.
 
 To set up a development environment for this mod (skip to step 7 if you don't care about developing the code plugin and only want to modify shaders):
