@@ -173,8 +173,7 @@ float3 open_drt_transform(
 
   // Dechroma
 
-  rgb = min(rgb, 10000.f / (8.f)); // Limit to 10K nits
-  const static float dch = 0.20f;
+  const static float dch = 0.10f;
 
   // Chroma contrast
   const static float chc_p = 1.1f; // 1.2 // amount of contrast
@@ -186,16 +185,19 @@ float3 open_drt_transform(
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
-  // This should be normalized theoretically but it also works if it's not
   const float3 static weights = float3(
     0.001f, // 0.25
-    0.45f, // 0.45
-    0.25f   // 0.30
+    0.40f, // 0.45
+    0.20f   // 0.30
   );
+
+  // Weights are assumed add to 1, but also affect vibrancy.
+  // Use sum to later correct lum
+  float weightSum = weights.x + weights.y + weights.z;
 
   // Hue Shift RGB controls
   float3 static hs = float3(
-    0.60f,   // 0.3f
+    0.3f,   // 0.3f
     0.1f,   // -0.1f
     -0.2f   // -0.5f
   );
@@ -269,6 +271,9 @@ float3 open_drt_transform(
   // float lum = max(1e-8f, weights.x + weights.y + weights.z); // take the norm
   // Perf: Use safe division later instead of max
   float lum = dot(rgb, weights); // take the norm
+  
+  // Correct the unbalanced weights
+  lum *= 1.f / weightSum;
 
   // RGB Ratios
   // Perf: lum is > 0 (1e-8f)
@@ -286,8 +291,8 @@ float3 open_drt_transform(
   ts *= 100.0f/Lp;
 
   // Clamp ts to display peak
-  // Perf: Skip clamp
-  // ts = min(1.0f, ts); // [0-1]
+  // Required when using low contrast
+  ts = min(1.0f, ts); // [0-1]
 
   /* Gamut Compress ------------------------------------------ *
     Most of our data is now inside of the display gamut cube, but there may still be some gradient disruptions
@@ -355,8 +360,8 @@ float3 open_drt_transform(
   float3 rats_h2 = rats_h * rats_h;
   float chf = ts * max(rats_h2.x, max(rats_h2.y, rats_h2.z)); // [0+]
   
-  const float chf_m = 0.20f; // 0.25f
-  const float chf_p = 0.75f; // 0.65f
+  const float chf_m = 0.25f;
+  const float chf_p = 0.65f;
   // Perf: chf is never negative
   // chf = 1.0f - spowf(spowf(chf/chf_m, 1.0f/chf_p)+1.0f, -chf_p);
   chf = 1.0f - pow(pow(chf/chf_m, 1.0f/chf_p)+1.0f, -chf_p);
@@ -441,6 +446,13 @@ float3 open_drt_transform(
 
   // Apply tonescale to RGB Ratios
   rgb = rats*ts;
+
+  // Clamp:
+  // Colors below 0 are not yet supported (and will be clipped).
+  // Colors past 1 would introduce hue shift.
+  // Despite being 0-1, output range does not mean SDR range.
+  // Output is still scene-linear, only compressed to output range.
+  rgb = saturate(rgb);
 
 
   return rgb;
