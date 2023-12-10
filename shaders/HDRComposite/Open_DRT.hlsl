@@ -1,3 +1,5 @@
+#include "../color.hlsl"
+
 /*  OpenDRT -------------------------------------------------/
       v0.2.8
       Written by Jed Smith
@@ -454,6 +456,85 @@ float3 open_drt_transform(
   // Output is still scene-linear, only compressed to output range.
   rgb = saturate(rgb);
 
+
+  return rgb;
+}
+
+// Very simple luminance-based srgb transform
+// No hue correction or desaturation control
+float3 open_drt_transform_luminance_only(
+  float3 rgb,
+  float Lp = 100.f,
+  float gb = 0.12,
+  float contrast = 1.f
+) {
+  const float c = 0.8f * contrast; // 1.1 contrast
+  const static float fl = 0.01f; // flare/glare compensation
+
+  // input scene-linear peak x intercept
+  float px = 256.0*log(Lp)/LOG_OF_100 - 128.0f;
+  // output display-linear peak y intercept
+  float py = Lp/100.0f;
+  // input scene-linear middle grey x intercept
+  float gx = 0.18f;
+  // output display-linear middle grey y intercept
+  float gy = 11.696f/100.0f*(1.0f + gb*log(py)/LOG_OF_2);
+  // s0 and s are input x scale for middle grey intersection constraint
+  // m0 and m are output y scale for peak white intersection constraint
+  float s0 = flare_invert(gy, fl); // [0+]
+  float m0 = flare_invert(py, fl); // [0+]
+  const float ip = 1.0f/c;
+  float m0_ip = pow(m0, ip); // [0+]
+  float s0_ip = pow(s0, ip); // [0+]
+  // Perf: Store pow(m0, ip) and pow(s0, ip)
+  // float s = (px*gx*(m0_ip - s0_ip))/(px*s0_ip - gx*m0_ip);
+  float s = (px*gx*(m0_ip - s0_ip))/(px*s0_ip - gx*m0_ip);
+  float m = m0_ip*(s + px)/px;
+
+  
+  float lum = Luminance(rgb);
+
+  // Apply tonescale function to lum
+  float ts = tonescale(lum, m, s, c); // [0+]
+  ts = flare(ts, fl); // [0+]
+
+  // Normalize so peak luminance is at 1.0
+  ts *= 100.0f/Lp;
+
+  // Clamp ts to display peak
+  // Required when using low contrast
+  ts = min(1.0f, ts); // [0-1]
+
+  rgb *= ts / lum;
+
+  // Luminance is always under 1.f but some channels may be above (1.f);
+  // First apply desaturation which may bring it down
+  // Skip gamut compression after and just clip
+  float dechromaStart = 0.60f;
+  float dechromaStrength = 1.4f;
+  float newLum = Luminance(rgb);
+  float distanceFromDechromaStart = max(0, newLum - dechromaStart);
+  rgb = Saturation(rgb, 1.f - (dechromaStrength * distanceFromDechromaStart));
+  
+  rgb = saturate(rgb);
+
+  return rgb;
+}
+
+float3 open_drt_transform_fast(
+  float3 rgb,
+  float peakNits = 1000.f,
+  float shadows = 1.f,
+  float highlights = 1.f,
+  float contrast = 1.f
+  )
+{
+  rgb = apply_aces_highlights(rgb);
+  
+  rgb = apply_user_shadows(rgb, shadows);
+  rgb = apply_user_highlights(rgb, highlights);
+
+  rgb = open_drt_transform_luminance_only(rgb, peakNits, 0, contrast);
 
   return rgb;
 }

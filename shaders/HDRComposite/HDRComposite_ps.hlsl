@@ -1555,8 +1555,16 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 
 	float contrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
 	// Compute ungraded tone map for exact nits
-	if (HdrDllPluginConstants.DisplayMode <= 0 // If SDR
-		|| HdrDllPluginConstants.ColorGradingStrength == 0.f // No LUTs (this branch is more optimized and produces identical results if we have no LUT)
+	if (HdrDllPluginConstants.DisplayMode <= 0) { // SDR benefits from fast luminance only-pass
+		tmParams.outputSDRColor = open_drt_transform_fast(
+			tmParams.inputColor * exposureAdjustment,
+			peakNits,
+			shadowsScaling,
+			highlightsScaling,
+			contrast
+		);
+		tmParams.outputSDRLuminance = tmParams.outputHDRLuminance;
+	} else if (HdrDllPluginConstants.ColorGradingStrength == 0.f // No LUTs (this branch is more optimized and produces identical results if we have no LUT)
 #if LUT_EXTRAPOLATION_TYPE > 0
 		|| HdrDllPluginConstants.StrictLUTApplication // Use LUT Extrapolation
 #endif
