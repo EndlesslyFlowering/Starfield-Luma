@@ -5,10 +5,6 @@ name: CMake on Windows
 on:
   push:
     branches: [ $default-branch ]
-    paths:
-      - "Plugin/**"
-      - "shaders/**"
-      - ".gitmodules"
   pull_request:
     branches: [ $default-branch ]
 
