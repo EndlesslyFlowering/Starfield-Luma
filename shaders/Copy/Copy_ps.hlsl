@@ -51,7 +51,7 @@ float4 PS(PSInputs inputs) : SV_Target
 			// safety clamp to BT.2020 as Windows may turn pixels that are low brightness (Rec.601 luminance <= 0) and outside of BT.2020 into black pixels
 			// this only happens in software composition though (Composed Flip).
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			//TODO: proper gamut mapping here and in the other cases
+			//TODO: proper gamut mapping here and in the other cases (try gamut_clip_preserve_chroma()). Also maybe expose a setting to whether gamut clip to BT.2020 or not for scRGB
 			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, true, false);
 #elif CLAMP_INPUT_OUTPUT_TYPE >= 2
 			color.rgb = BT709_To_BT2020(color.rgb);

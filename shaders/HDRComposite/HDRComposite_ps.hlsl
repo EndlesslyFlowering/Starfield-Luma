@@ -1570,6 +1570,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 #endif
 	)
 	{
+		// NOTE: any negative scRGB color might get lost (clipped or gamut mapped to Rec.709) with OpenDRT, though this doesn't really matter as there seems to be none to begin with
 		tmParams.outputHDRColor = open_drt_transform_single(
 			tmParams.inputColor * exposureAdjustment,
 			peakNits,
@@ -1883,6 +1884,9 @@ void ApplyACESParametric(inout CompositeParams params, inout ToneMapperParams tm
 
 void ApplyHable(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
+	// NOTE: do abs() * sign() to keep scRGB negative values, it works fine with Hable and (simplified) ACES as they work completely per channel.
+	// Still, there seems to be no scRGB negative value coming from the game rendering, which means the rendering is fully Rec.709.
+	// This operation will force an input of 0 to return an output of zero, which should always be the case with Hable anyway.
 	tmParams.outputSDRColor  = Hable(abs(tmParams.inputColor), tmParams.hableParams) * sign(tmParams.inputColor);
 	params.outputColor = tmParams.outputSDRColor;
 }
