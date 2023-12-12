@@ -562,7 +562,7 @@ void open_drt_transform_dual(
   inout float3 sdrOutput,
   inout float3 hdrOutput,
   float hdrPeakNits = 1000.f,
-  float peakScaling = 1.f,
+  float midGrayAdjustment = 1.f,
   float shadows = 1.f,
   float highlights = 1.f,
   float contrast = 1.f
@@ -578,6 +578,6 @@ void open_drt_transform_dual(
   hdrOutput = apply_user_highlights(hdrOutput, highlights);
 
   sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.30f, 1.f);
-  hdrOutput = open_drt_transform(hdrOutput * peakScaling, hdrPeakNits, 0, contrast);
+  hdrOutput = open_drt_transform(hdrOutput, hdrPeakNits, (midGrayAdjustment - 1.f) / 5.f, contrast);
 }
 
