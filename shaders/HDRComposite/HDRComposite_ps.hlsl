@@ -1608,8 +1608,16 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 
 void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tmParams)
 {
-	//TODO: Try RestorePostProcess() here again?
-	params.outputColor *= safeDivision(tmParams.outputHDRLuminance, tmParams.outputSDRLuminance);
+	// Instead of multiplying by the HDR/SDR Y ratio, add the difference.
+	// This solves an issue of LUTs that cause heavy luminance shifts being
+	// raised to extremely high values. (eg: low contrast + uncorrected LUTs)
+	
+	float deltaY = tmParams.outputHDRLuminance - tmParams.outputSDRLuminance;
+	float outputY = Luminance(params.outputColor);
+	float newY = outputY + max(0, deltaY); // Never substract
+	float addedYRatio = outputY ? newY / outputY : 0; // Never add to black
+
+	params.outputColor *= addedYRatio;
 
 	ApplyUserSettingExtendGamut(params.outputColor);
 	ApplyUserSettingSaturation(params.outputColor);
