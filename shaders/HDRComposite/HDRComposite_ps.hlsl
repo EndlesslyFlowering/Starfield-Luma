@@ -1612,12 +1612,18 @@ void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tm
 	// This solves an issue of LUTs that cause heavy luminance shifts being
 	// raised to extremely high values. (eg: low contrast + uncorrected LUTs)
 	
-	float deltaY = tmParams.outputHDRLuminance - tmParams.outputSDRLuminance;
+	float scaledRatio;
 	float outputY = Luminance(params.outputColor);
-	float newY = outputY + max(0, deltaY); // Never substract
-	float addedYRatio = outputY ? newY / outputY : 0; // Never add to black
+	if (tmParams.outputHDRLuminance < tmParams.outputSDRLuminance) {
+		// If substracting (user contrast or paperwhite) scale down instead
+		scaledRatio = tmParams.outputHDRLuminance / tmParams.outputSDRLuminance;
+	} else {
+		float deltaY = tmParams.outputHDRLuminance - tmParams.outputSDRLuminance;
+		float newY = outputY + deltaY;
+		scaledRatio = outputY ? (newY / outputY) : 0;
+	}
 
-	params.outputColor *= addedYRatio;
+	params.outputColor *= scaledRatio;
 
 	ApplyUserSettingExtendGamut(params.outputColor);
 	ApplyUserSettingSaturation(params.outputColor);
