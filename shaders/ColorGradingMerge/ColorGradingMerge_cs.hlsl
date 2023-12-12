@@ -126,12 +126,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	float fixRaisedBlacksOutputSmoothing = lerp(1.f, 0.666f, HdrDllPluginConstants.GammaCorrection); // Values from 0 up, smaller than 1 is smoother
 	const float3 invertedBlack = 1.f - (pow(analysis.black, lerp(1.f, fixRaisedBlacksInputSmoothing, analysis.black)) * fixRaisedBlacksStrength);
 	const float3 blackScaling = lerp(1.f / invertedBlack, 1.f, pow(neutralLUTColor, fixRaisedBlacksOutputSmoothing));
-#elif 1 // Original implementation
+#elif 1 // Original implementation (we can't do this by luminance or in any other way really)
 	const float3 blackScaling = lerp(1.f / (1.f - analysis.black), 1.f, neutralLUTColor);
-#elif 0 // Alternative implementation, generates slightly smoother shadow gradients but it hasn't been tested around the game much, and still crushes blacks
-	const float3 blackScaling = lerp(1.f + analysis.black, 1.f, neutralLUTColor);
 #else // Disable for quick testing
-	const float3 blackScaling = 1.f;
+	const float blackScaling = 1.f;
 #endif
 
 	// On full black (neutralLUTColor coordinates 0 0 0) this will always result in 0 0 0.
@@ -146,17 +144,17 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// (eg: (-2,0,1) * 2 = (-4, 0, 2) instead of (0,0,2)
 	// Trade off here is, near black, more visibility vs smoother gradients.
 	// Basically without this, the output might be overly dark.
-	static const bool AlwaysClampDetintedColor = true;
+	static const bool AlwaysClampDetintedColor = false;
 	if (AlwaysClampDetintedColor || SDRRange) {
 		detintedLinear = max(detintedLinear, 0.f);
 	}
-
+	// Should never happen (but it actually can?)
+	else if (Luminance(detintedLinear) < 0.f) {
 #if LUT_DEBUG_VALUES
-	// Should never happen, especially if "AlwaysClampDetintedColor" is true
-	if (Luminance(detintedColor) < 0.f) {
 		return DEBUG_COLOR;
-	}
 #endif // LUT_DEBUG_VALUES
+		detintedLinear = 0.f;
+	}
 
 	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
 	const float detintedChroma = linear_srgb_to_oklch(detintedLinear)[1];
