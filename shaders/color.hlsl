@@ -308,8 +308,8 @@ float3 oklab_to_oklch(float3 lab) {
 	float b = lab[2];
 	return float3(
 		L,
-		sqrt((a*a) + (b*b)),
-		atan2(b, a)
+		sqrt((a*a) + (b*b)), // The length of the color ab (or xy) offset, which represents saturation. Range 0+.
+		atan2(b, a) // Hue. Range can be beyond 0-1, it loops around.
 	);
 }
 
