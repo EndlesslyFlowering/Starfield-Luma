@@ -1524,25 +1524,9 @@ void ApplyColorGrading(inout CompositeParams params)
 }
 
 #if HDR_TONE_MAPPER_ENABLED
-void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperParams tmParams)
-{
-	//TODO: this should be lerping DRT tonemapper parameters based on the vanilla SDR tonemapper parameters, not branch on them (nor multiply the input color).
-	if (PcwHdrComposite.Tmo != 3) { // ACESFitted/Parametric
-		params.outputColor *= 3.5f; 
-		tmParams.inputColor *= 3.5f;
-		tmParams.inputLuminance *= 3.5f;
-	}
-	else if (PerSceneConstants[3266u].w == 0 || PerSceneConstants[3266u].z == 0) // 0-Toe Hable
-	{
-		params.outputColor *= 2.8f;
-		tmParams.inputColor *= 2.8f;
-		tmParams.inputLuminance *= 2.8f;
-	}
-}
 
 void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
-	ApplyHDRToneMapperScaling(params, tmParams);
 	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
 		? HdrDllPluginConstants.HDRPeakBrightnessNits
 		: ReferenceWhiteNits_BT2408; // 203
@@ -1554,26 +1538,36 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
 
 	float contrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
-	// Compute ungraded tone map for exact nits
-	if (HdrDllPluginConstants.DisplayMode <= 0) { // SDR benefits from fast luminance only-pass
-		tmParams.outputSDRColor = open_drt_transform_fast(
-			tmParams.inputColor * exposureAdjustment,
-			peakNits,
-			shadowsScaling,
-			highlightsScaling,
-			contrast
-		);
-		tmParams.outputSDRLuminance = tmParams.outputHDRLuminance;
-	} else if (HdrDllPluginConstants.ColorGradingStrength == 0.f // No LUTs (this branch is more optimized and produces identical results if we have no LUT)
-#if LUT_EXTRAPOLATION_TYPE > 0
-		|| HdrDllPluginConstants.StrictLUTApplication // Use LUT Extrapolation
-#endif
-	)
-	{
-		// NOTE: any negative scRGB color might get lost (clipped or gamut mapped to Rec.709) with OpenDRT, though this doesn't really matter as there seems to be none to begin with
+
+	float3 rgb = tmParams.inputColor;
+	if (PcwHdrComposite.Tmo == 3) {
+		if (PerSceneConstants[3266u].w == 0 || PerSceneConstants[3266u].z == 0) // 0-Toe Hable
+		{
+			rgb *= 2.8f ;
+		} else {
+			const float toeLength        =   pow(saturate(PerSceneConstants[3266u].w), 2.2f); // Constant is usually 0.3, but can also be ~0
+			const float toeStrength      =       saturate(PerSceneConstants[3266u].z); // Constant is usually 0.5
+			float dstParams_x0 = toeLength * 0.5f;
+			float dstParams_y0 = (1.f - toeStrength) * dstParams_x0;
+			rgb *= (0.017f / dstParams_y0);
+		}
+	 } else { // ACESFitted/Parametric
+		// Original ACES has blown out highlights. Not worth completely replicating
+		rgb *=  0.50f   * 4.f;      // HdrDllPluginConstants.DevSetting01 * 4.f;
+		exposureAdjustment *= 0.80f   * 4.f;      // HdrDllPluginConstants.DevSetting02 * 4.f;
+		contrast *=  0.35f  * 4.f;      // HdrDllPluginConstants.DevSetting03 * 4.f;
+		highlightsScaling *=  0.35f   * 4.f;      // HdrDllPluginConstants.DevSetting04 * 4.f;
+		shadowsScaling *=  0.50f  * 4.f;      // HdrDllPluginConstants.DevSetting05 * 4.f;
+	}
+	
+
+
+	if (HdrDllPluginConstants.DisplayMode <= 0.f
+		|| HdrDllPluginConstants.ColorGradingStrength == 0.f) {
 		tmParams.outputHDRColor = open_drt_transform_single(
-			tmParams.inputColor * exposureAdjustment,
+			rgb,
 			peakNits,
+			exposureAdjustment,
 			shadowsScaling,
 			highlightsScaling,
 			contrast
@@ -1585,11 +1579,9 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 
 		tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
 		tmParams.outputSDRLuminance = tmParams.outputHDRLuminance;
-	}
-	else
-	{
+	} else {
 		open_drt_transform_dual(
-			tmParams.inputColor,
+			rgb,
 			tmParams.outputSDRColor,
 			tmParams.outputHDRColor,
 			peakNits,
@@ -1625,7 +1617,6 @@ void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tm
 	}
 
 	params.outputColor *= scaledRatio;
-
 	ApplyUserSettingExtendGamut(params.outputColor);
 	ApplyUserSettingSaturation(params.outputColor);
 

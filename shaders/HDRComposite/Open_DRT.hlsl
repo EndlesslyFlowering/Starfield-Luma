@@ -15,6 +15,17 @@
 #define LOG_OF_2 0.6931471805599453f
 #define LOG_OF_100 4.605170185988092f
 
+struct OpenDRTParams
+{
+	float Lp;
+	float fl;
+  float contrast;
+  float m;
+  float s;
+  float c;
+};
+
+
 // // Safe division of float a by float b
 // float sdivf(float a, float b) {
 //   if (b == 0.0f) return 0.0f;
@@ -157,7 +168,7 @@ float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
 }
 
 float3 apply_user_highlights(float3 rgb, float highlights = 1.f) {
-  rgb = hl_con(rgb, 0.10f + highlights - 1.f, 203.f / 100.f);
+  rgb = hl_con(rgb, highlights - 0.5f, 2.f);
   return rgb;
 }
 
@@ -165,7 +176,11 @@ float3 open_drt_transform(
   float3 rgb,
   float Lp = 100.f,
   float gb = 0.12,
-  float contrast = 1.f
+  float contrast = 1.f,
+  float dechroma = 0.10f,
+  float redWeight = 0.03f,
+  float greenWeight = 0.40f,
+  float blueWeight = 0.20f
   )
 {
 
@@ -175,7 +190,7 @@ float3 open_drt_transform(
 
   // Dechroma
 
-  const static float dch = 0.10f;
+  const static float dch = dechroma; // 0.40
 
   // Chroma contrast
   const static float chc_p = 1.1f; // 1.2 // amount of contrast
@@ -188,9 +203,9 @@ float3 open_drt_transform(
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
   const float3 static weights = float3(
-    0.001f, // 0.25
-    0.40f, // 0.45
-    0.20f   // 0.30
+    redWeight, // 0.25
+    greenWeight, // 0.45
+    blueWeight   // 0.30
   );
 
   // Weights are assumed add to 1, but also affect vibrancy.
@@ -199,7 +214,7 @@ float3 open_drt_transform(
 
   // Hue Shift RGB controls
   float3 static hs = float3(
-    0.3f,   // 0.3f
+    0.35f,   // 0.3f
     0.1f,   // -0.1f
     -0.2f   // -0.5f
   );
@@ -460,15 +475,16 @@ float3 open_drt_transform(
   return rgb;
 }
 
-// Very simple luminance-based srgb transform
-// No hue correction or desaturation control
-float3 open_drt_transform_luminance_only(
-  float3 rgb,
-  float Lp = 100.f,
-  float gb = 0.12,
-  float contrast = 1.f
-) {
-  const float c = 0.8f * contrast; // 1.1 contrast
+
+OpenDRTParams buildOpenDRTParams(float Lp, float gb, float contrast) {
+  OpenDRTParams params = {
+    Lp,
+    0.01f,
+    contrast,
+    0,
+    0,
+    0.8f * contrast
+  };
   const static float fl = 0.01f; // flare/glare compensation
 
   // input scene-linear peak x intercept
@@ -483,76 +499,96 @@ float3 open_drt_transform_luminance_only(
   // m0 and m are output y scale for peak white intersection constraint
   float s0 = flare_invert(gy, fl); // [0+]
   float m0 = flare_invert(py, fl); // [0+]
-  const float ip = 1.0f/c;
+  const float ip = 1.0f/params.c;
   float m0_ip = pow(m0, ip); // [0+]
   float s0_ip = pow(s0, ip); // [0+]
   // Perf: Store pow(m0, ip) and pow(s0, ip)
   // float s = (px*gx*(m0_ip - s0_ip))/(px*s0_ip - gx*m0_ip);
-  float s = (px*gx*(m0_ip - s0_ip))/(px*s0_ip - gx*m0_ip);
-  float m = m0_ip*(s + px)/px;
+  params.s = (px*gx*(m0_ip - s0_ip))/(px*s0_ip - gx*m0_ip);
+  params.m = m0_ip*(params.s + px)/px;
 
+  return params;
+}
+
+
+
+float3 toneScaleOKLab(float3 rgb, OpenDRTParams params) {
+  const static float fl = 0.01f; // flare/glare compensation
+
+  float m = params.m;
+  float s = params.s;
+  float c = params.c;
+
+  float3 okLabColor = linear_srgb_to_oklab(rgb);
+
+  float lum = pow(okLabColor[0], 3.f);
+  
+  float ts = tonescale(lum, m, s, c); // [0+]
+  ts = flare(ts, fl); // [0+]
+  ts *= 100.0f/params.Lp;
+
+  ts = min(1.f, ts); // [0-1]
+
+  float newL = pow(ts, 1.f / 3.f);;
+  okLabColor[0] = newL;
+
+  // Dechroma based on luminance
+  float dechromaStrength = HdrDllPluginConstants.DevSetting02 * 4.f;
+  float3 okLChColor = oklab_to_oklch(okLabColor);
+  okLChColor[1] *= HdrDllPluginConstants.DevSetting03;
+  okLChColor[1] = lerp(okLChColor[1], 0, pow(newL, dechromaStrength));
+  okLChColor[1] *= HdrDllPluginConstants.DevSetting04 * 4.f;
+  okLabColor = oklch_to_oklab(okLChColor);
+  
+  if (okLChColor[1] <= 0.f) {
+    okLabColor[0] = newL;
+    okLabColor[1] = 0;
+    okLabColor[2] = 0;
+  }
+
+  rgb = oklab_to_linear_srgb(okLabColor);
+  
+  return rgb;
+  // rgb = saturate(rgb);
+}
+
+float3 toneScaleBT709Luminance(float3 rgb, OpenDRTParams params) {
+  const static float fl = 0.01f; // flare/glare compensation
+  float m = params.m;
+  float s = params.s;
+  float c = params.c;
   
   float lum = Luminance(rgb);
 
-  // Apply tonescale function to lum
   float ts = tonescale(lum, m, s, c); // [0+]
   ts = flare(ts, fl); // [0+]
+  ts *= 100.0f/params.Lp;
+  ts = min(1.f, ts); // [0-1]
 
-  // Normalize so peak luminance is at 1.0
-  ts *= 100.0f/Lp;
+  rgb *= lum ? ts / lum : 0;
 
-  // Clamp ts to display peak
-  // Required when using low contrast
-  ts = min(1.0f, ts); // [0-1]
-
-  rgb *= ts / lum;
-
-  // Luminance is always under 1.f but some channels may be above (1.f);
-  // First apply desaturation which may bring it down
-  // Skip gamut compression after and just clip
-  float dechromaStart = 0.60f;
-  float dechromaStrength = 1.4f;
   float newLum = Luminance(rgb);
-  float distanceFromDechromaStart = max(0, newLum - dechromaStart);
-  rgb = Saturation(rgb, 1.f - (dechromaStrength * distanceFromDechromaStart));
-  
-  rgb = saturate(rgb);
+  const float desaturationStart = 50.f;
+  rgb = lerp(rgb, newLum, pow(newLum, desaturationStart));
 
   return rgb;
 }
 
-float3 open_drt_transform_fast(
-  float3 rgb,
-  float peakNits = 1000.f,
-  float shadows = 1.f,
-  float highlights = 1.f,
-  float contrast = 1.f
-  )
-{
-  rgb = apply_aces_highlights(rgb);
-  
-  rgb = apply_user_shadows(rgb, shadows);
-  rgb = apply_user_highlights(rgb, highlights);
-
-  rgb = open_drt_transform_luminance_only(rgb, peakNits, 0, contrast);
-
-  return rgb;
-}
 
 float3 open_drt_transform_single(
   float3 rgb,
   float peakNits = 1000.f,
+  float midGrayAdjustment = 1.f,
   float shadows = 1.f,
   float highlights = 1.f,
   float contrast = 1.f
   )
 {
   rgb = apply_aces_highlights(rgb);
-  
   rgb = apply_user_shadows(rgb, shadows);
   rgb = apply_user_highlights(rgb, highlights);
 
-  rgb = open_drt_transform(rgb, peakNits, 0, contrast);
+  rgb = toneScaleBT709Luminance(rgb, buildOpenDRTParams(peakNits, (midGrayAdjustment - 1.f) / 5.f, contrast));
 
   return rgb;
 }
@@ -568,16 +604,16 @@ void open_drt_transform_dual(
   float contrast = 1.f
   )
 {
+
   sdrOutput = apply_aces_highlights(rgb);
   hdrOutput = sdrOutput;
 
   sdrOutput = apply_user_shadows(sdrOutput, 1.3f);
   hdrOutput = apply_user_shadows(hdrOutput, shadows);
-  
-  sdrOutput = apply_user_highlights(sdrOutput, 0.75f);
+
   hdrOutput = apply_user_highlights(hdrOutput, highlights);
 
-  sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.30f, 1.f);
-  hdrOutput = open_drt_transform(hdrOutput, hdrPeakNits, (midGrayAdjustment - 1.f) / 5.f, contrast);
+  sdrOutput = toneScaleBT709Luminance(sdrOutput, buildOpenDRTParams(203.f, 0, 1.f));
+  hdrOutput = toneScaleBT709Luminance(hdrOutput, buildOpenDRTParams(hdrPeakNits, (midGrayAdjustment - 1.f) / 5.f, contrast));
 }
 
