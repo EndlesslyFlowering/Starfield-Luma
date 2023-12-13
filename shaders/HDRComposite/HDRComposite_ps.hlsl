@@ -2017,14 +2017,18 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 	else // SDR
 	{
 		ApplySDRBrightness(params.outputColor);
-		//TODOFT: contast and saturation in SDR? (some of this is applied in LUTs)
-		ApplyUserSettingSaturation(params.outputColor);
-#if HDR_TONE_MAPPER_ENABLED
-		// User contrast is already baked in the DRT TM
-		if (HdrDllPluginConstants.ToneMapperType == 0)
-#endif
+		// If we allow out of gamut colors (e.g. colors beyond the 0-1 range, so chromas and brightnesses that are not available in Rec.709),
+		// allow users to change the saturation and contrast
+		if (CLAMP_INPUT_OUTPUT_TYPE == 1)
 		{
-			ApplyUserSettingContrast(params.outputColor);
+			ApplyUserSettingSaturation(params.outputColor);
+#if HDR_TONE_MAPPER_ENABLED
+			// User contrast is already baked in the DRT TM
+			if (HdrDllPluginConstants.ToneMapperType == 0)
+#endif
+			{
+				ApplyUserSettingContrast(params.outputColor);
+			}
 		}
 #if DRAW_TONEMAPPER
 		DrawToneMapperEnd(params, dtmParams);

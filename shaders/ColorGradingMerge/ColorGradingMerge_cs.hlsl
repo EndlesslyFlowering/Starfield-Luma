@@ -5,6 +5,7 @@
 
 // 0 None, 1 ShortFuse technique (normalization)
 #define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
+#define FORCE_SDR_LUTS 0
 #define LUT_DEBUG_VALUES false
 #if LUT_MAPPING_TYPE == 2
 #define DEBUG_COLOR linear_srgb_to_oklab(float3(1.f, 0.f, 1.f)) /*Magenta*/
@@ -166,7 +167,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float detintedChroma = lerp(originalLCh[1], linear_srgb_to_oklch(detintedLinear)[1], blackDistance);
 	// The saturation multiplier in LUTs is restricted to HDR (or gamut mapped SDR) as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
-	const float targetChroma = detintedChroma * saturation;
+	const float targetChroma = detintedChroma * (SDRRange ? 1.f : saturation);
 
 	// Adjust the value back to recreate a smooth Y gradient since 0 is floored
 	// Sample and hold "targetL"
@@ -341,8 +342,8 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	LUT4Color = LINEARIZE(LUT4Color);
 #endif // LUT_IMPROVEMENT_TYPE
 
-	// NOTE: we could ignore clamping to the SDR range if "CLAMP_INPUT_OUTPUT_TYPE" was 1 (gamut mapping)
-	const bool SDRRange = HdrDllPluginConstants.DisplayMode <= 0 || (bool)FORCE_SDR_LUTS;
+	// NOTE: ignore clamping to the SDR range if "CLAMP_INPUT_OUTPUT_TYPE" was set to do gamut mapping
+	const bool SDRRange = (HdrDllPluginConstants.DisplayMode <= 0 && CLAMP_INPUT_OUTPUT_TYPE != 1) || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE == 1
 	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
 	float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);

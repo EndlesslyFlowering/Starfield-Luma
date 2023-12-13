@@ -130,8 +130,8 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
-		CreateSliderSetting(a_settingList, settings->Saturation, true);
-		CreateSliderSetting(a_settingList, settings->Contrast, true);
+		CreateSliderSetting(a_settingList, settings->Saturation, true); // Requires "CLAMP_INPUT_OUTPUT_TYPE" 1 in shaders (gamut mapping) if we are rendering to SDR
+		CreateSliderSetting(a_settingList, settings->Contrast, true); // Requires "CLAMP_INPUT_OUTPUT_TYPE" 1 in shaders (gamut mapping) if we are rendering to SDR
 		CreateSliderSetting(a_settingList, settings->Highlights, settings->IsCustomToneMapper());
 		CreateSliderSetting(a_settingList, settings->Shadows, settings->IsCustomToneMapper());
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
