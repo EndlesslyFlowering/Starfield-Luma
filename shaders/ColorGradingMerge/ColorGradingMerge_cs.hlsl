@@ -132,6 +132,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float blackScaling = 1.f;
 #endif
 
+	// Create a detinted and darkened color.
 	// On full black (neutralLUTColor coordinates 0 0 0) this will always result in 0 0 0.
 	float3 detintedLinear = 1.f - ((1.f - originalLinear) * blackScaling);
 
@@ -156,8 +157,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 		detintedLinear = 0.f;
 	}
 
-	// The saturation multiplier in LUTs is restricted to HDR as it easily goes beyond Rec.709
-	const float detintedChroma = linear_srgb_to_oklch(detintedLinear)[1];
+	const static float LUTDistanceNormalization = sqrt(3.f);
+	const float blackDistance = length(neutralLUTColor) / LUTDistanceNormalization;
+	const float whiteDistance = length(1.f - neutralLUTColor) / LUTDistanceNormalization;
+	const float totalRange = blackDistance + whiteDistance;
+
+	// Detint less near black, to avoid LUTs all going to grey/black
+	const float detintedChroma = lerp(originalLCh[1], linear_srgb_to_oklch(detintedLinear)[1], blackDistance);
+	// The saturation multiplier in LUTs is restricted to HDR (or gamut mapped SDR) as it easily goes beyond Rec.709
 	const float saturation = linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
 	const float targetChroma = detintedChroma * saturation;
 
@@ -185,7 +192,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	if (targetL < 0.f) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
 
-	// Texels exista as points in 3D cube. We are moving two heavily weighted
+	// Texels exist as points in 3D cube. We are moving two heavily weighted
 	// points and need to compute the net force to be applied.
 	// Black texel is 0 from itself and sqrt(3) from white
 	// White texel is 0 from itself and sqrt(3) from black
@@ -193,10 +200,6 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// This can also be represented as [-1 to 1] or [-B to +W].
 	// For interpolation between 0 and a maximum, it become [0, ..., W, ..., W+B]
 	// Distances do not always add up to sqrt(3) (eg: 1,0,0)
-
-	const float blackDistance = length(neutralLUTColor);
-	const float whiteDistance = length(1.f - neutralLUTColor);
-	const float totalRange = blackDistance + whiteDistance;
 
 #if LUT_DEBUG_VALUES
 	// whiteL most always be > 0
