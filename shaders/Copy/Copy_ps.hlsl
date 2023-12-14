@@ -3,7 +3,7 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-// clamp max brightness to a percentage of the user chosen peak brightness when not developing
+// clamp max brightness to an empirically found percentage of the user chosen peak brightness when not developing
 // so it doesn't overshoot too much (film grain can go beyond the limit). Useful in case the user
 // had set a lower peak than their display supports just because they don't want the game too bright.
 #if !DEVELOPMENT
@@ -48,15 +48,22 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
+			color.rgb *= saturate((HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB) / Luminance(color.rgb));
+#if CLAMP_INPUT_OUTPUT_TYPE == 1
+			// Theoretically there would be nothing to clamp here, as this mode mode should allow any possible color, even if they are currently not within BT.2020 (scRGB is future proof).
+			// In reality, this could cause black pixels in software composition (Composed Flip) (that's a user problem, they could always use HDR10),
+			// but most importantly, it would likely fall back on Windows implementation of gamut mapping, which is very likely a raw rgb clip,
+			// thus we prefer manually gamut mapped BT.2020 colors for now.
+#if 1
+			color.rgb = BT709_To_BT2020(color.rgb);
+			color.rgb = SimpleGamutClip(color.rgb, true);
+			color.rgb = BT2020_To_BT709(color.rgb);
+#endif
+#elif CLAMP_INPUT_OUTPUT_TYPE >= 2
 			// safety clamp to BT.2020 as Windows may turn pixels that are low brightness (Rec.601 luminance <= 0) and outside of BT.2020 into black pixels
 			// this only happens in software composition though (Composed Flip).
-#if CLAMP_INPUT_OUTPUT_TYPE == 1
-			//TODO: proper gamut mapping here and in the other cases (try gamut_clip_preserve_chroma()). Also maybe expose a setting to whether gamut clip to BT.2020 or not for scRGB
-			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, true, false);
-#elif CLAMP_INPUT_OUTPUT_TYPE >= 2
 			color.rgb = BT709_To_BT2020(color.rgb);
-			// Note: this might cause a little hue shift
-			color.rgb = clamp(color.rgb, 0.f, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB);
+			color.rgb = max(color.rgb, 0.f);
 			color.rgb = BT2020_To_BT709(color.rgb);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
 		}
@@ -67,9 +74,10 @@ float4 PS(PSInputs inputs) : SV_Target
 #endif // !SDR_LINEAR_INTERMEDIARY
 
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, false, false);
+			color.rgb = SimpleGamutClip(color.rgb, false, /*ClampToSDRRange*/ true);
+#else
+			color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
 #endif // CLAMP_INPUT_OUTPUT_TYPE
-			color.rgb = saturate(color.rgb); // Remove any non SDR color (independently of CLAMP_INPUT_OUTPUT_TYPE), this mode is just meant for debugging SDR in HDR
 			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			color.rgb *= paperWhite;
 		}
@@ -78,23 +86,21 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R10G10B10A2)
 		if (HdrDllPluginConstants.DisplayMode == 1) // HDR10 PQ BT.2020
 		{
+			color.rgb *= saturate((HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB) / Luminance(color.rgb));
+            color.rgb = BT709_To_BT2020(color.rgb);
+#if CLAMP_INPUT_OUTPUT_TYPE == 1
+			color.rgb = SimpleGamutClip(color.rgb, true);
+#endif // CLAMP_INPUT_OUTPUT_TYPE
+			color.rgb /= PQMaxWhitePoint;
 			// There is no need to clamp values above 1 here as the output buffer is unorm10 so it will clip anything beyond 0-1.
 			// Negative values need to be clamped though to avoid doing pow on a negative values ("Linear_to_PQ()"" already does this).
-			color.rgb /= PQMaxWhitePoint;
-#if CLAMP_INPUT_OUTPUT_TYPE == 1
-			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, true, true);
-#elif CLAMP_INPUT_OUTPUT_TYPE >= 2
-            color.rgb = BT709_To_BT2020(color.rgb);
-			// Note: this might cause a little hue shift
-			color.rgb = min(color.rgb, HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_HDR10);
-#endif // CLAMP_INPUT_OUTPUT_TYPE
 			color.rgb = Linear_to_PQ(color.rgb);
 		}
 #if SDR_LINEAR_INTERMEDIARY
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)
 		{
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			color.rgb = gamut_clip_project_to_L_cusp(color.rgb, false, false, false);
+			color.rgb = SimpleGamutClip(color.rgb, false, /*ClampToSDRRange*/ true);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
 #if SDR_USE_GAMMA_2_2 // Avoid negative pow
 			color.rgb = max(color.rgb, 0.f);

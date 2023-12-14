@@ -204,9 +204,11 @@ T PQ_to_Linear(T ST2084Color, const float PQMaxValue)
 	return linearColor;
 }
 
+// sRGB/BT.709
 float Luminance(float3 color)
 {
 	// Fixed from "wrong" values: 0.2125 0.7154 0.0721f
+	// Note: this might sum up to exactly 1, but it's pretty much fine either way
 	return dot(color, float3(0.2126390039920806884765625f, 0.715168654918670654296875f, 0.072192318737506866455078125f));
 }
 
@@ -789,15 +791,22 @@ static const float2 R2020xy = float2(0.708f, 0.292f);
 static const float2 G2020xy = float2(0.170f, 0.797f);
 static const float2 B2020xy = float2(0.131f, 0.046f);
 
+static const float2 R709xy = float2(0.64f, 0.33f);
+static const float2 G709xy = float2(0.30f, 0.60f);
+static const float2 B709xy = float2(0.15f, 0.06f);
+
 static const float3x3 BT2020_To_XYZ = {
 	0.636958062648773193359375f,                                                       0.144616901874542236328125f,    0.1688809692859649658203125f,
 	0.26270020008087158203125f,                                                        0.677998065948486328125f,       0.0593017153441905975341796875f,
 	0.000000000000000049941065878835998203578994125706458362401463091373443603515625f, 0.028072692453861236572265625f, 1.060985088348388671875f};
-
 static const float3x3 XYZ_To_BT2020 = {
 	 1.7166512012481689453125f,       -0.3556707799434661865234375f,   -0.253366291522979736328125f,
 	-0.666684329509735107421875f,      1.61648118495941162109375f,      0.0157685466110706329345703125f,
 	 0.0176398567855358123779296875f, -0.0427706129848957061767578125f, 0.9421031475067138671875f};
+
+//TODO: find direct values without passing through BT.2020
+static const float3x3 BT709_To_XYZ = mul(BT2020_To_XYZ, BT709_2_BT2020);
+static const float3x3 XYZ_To_BT709 = mul(BT2020_2_BT709, XYZ_To_BT2020);
 
 float3 XYZToxyY(float3 XYZ)
 {
@@ -827,119 +836,137 @@ float GetM(float2 A, float2 B)
 	     / (B.x - A.x);
 }
 
+#if 0
 //other way to check for segment intersection
 //
 //https://bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
 //is counter clock wise?
-//bool CCW(float2 A, float2 B, float2 C)
-//{
-//  return (C.y - A.y) * (B.x - A.x) > (B.y - A.y) * (C.x - A.x);
-//}
-//
-//bool SegmentIntersects(float2 A, float2 B, float2 C, float2 D)
-//{
-//	return CCW(A, C, D) != CCW(B, C, D)
-//	    && CCW(A, B, C) != CCW(A, B, D);
-//}
-//
-//bool SegmentIntersects(float2 Point, float2 Primary0, float2 Primary1)
-//{
-//	return SegmentIntersects(Point, D65xy, Primary0, Primary1);
-//}
-//
-//bool RGSegmentIntersects(float2 Point)
-//{
-//	return SegmentIntersects(Point, D65xy, G2020xy, B2020xy);
-//}
-//
-//bool GBSegmentIntersects(float2 Point)
-//{
-//	return SegmentIntersects(Point, D65xy, G2020xy, B2020xy);
-//}
-//
-//bool BRSegmentIntersects(float2 Point)
-//{
-//	return SegmentIntersects(Point, D65xy, B2020xy, R2020xy);
-//}
-
-float2 RGLineIntercept(float MP)
+bool CCW(float2 A, float2 B, float2 C)
 {
-	static const float mRG = GetM(R2020xy, G2020xy);
+	return (C.y - A.y) * (B.x - A.x) > (B.y - A.y) * (C.x - A.x);
+}
 
-	static const float mRG_mul_G2020xyx = mRG * R2020xy.x;
+bool SegmentIntersects(float2 A, float2 B, float2 C, float2 D)
+{
+	return CCW(A, C, D) != CCW(B, C, D)
+	    && CCW(A, B, C) != CCW(A, B, D);
+}
+
+bool SegmentIntersects(float2 Point, float2 Primary0, float2 Primary1)
+{
+	return SegmentIntersects(Point, D65xy, Primary0, Primary1);
+}
+
+bool RGSegmentIntersects(float2 Point)
+{
+	return SegmentIntersects(Point, D65xy, G2020xy, B2020xy);
+}
+
+bool GBSegmentIntersects(float2 Point)
+{
+	return SegmentIntersects(Point, D65xy, G2020xy, B2020xy);
+}
+
+bool BRSegmentIntersects(float2 Point)
+{
+	return SegmentIntersects(Point, D65xy, B2020xy, R2020xy);
+}
+
+float2 RGLineIntercept(float MP, bool BT2020)
+{
+	static const float mRG_709 = GetM(R709xy, G709xy);
+	static const float mRG_mul_R709xyx = mRG_709 * R709xy.x;
+	static const float mRG_2020 = GetM(R2020xy, G2020xy);
+	static const float mRG_mul_R2020xyx = mRG_2020 * R2020xy.x;
+
+	const float mRG = BT2020 ? mRG_2020 : mRG_709;
+	const float mRG_mul_Rxyx = BT2020 ? mRG_mul_R2020xyx : mRG_mul_R709xyx;
 
 	const float mRG_minus_MP = mRG - MP;
-
 	const float MP_mul_D65xyx = MP * D65xy.x;
 
-  float x = (-MP_mul_D65xyx + D65xy.y - R2020xy.y + mRG_mul_G2020xyx) / mRG_minus_MP;
-
-  float y = (-D65xy.y * mRG + mRG * MP_mul_D65xyx + R2020xy.y * MP - mRG_mul_G2020xyx * MP) / (-mRG_minus_MP);
-
-  return float2(x, y);
+	float x = (-MP_mul_D65xyx + D65xy.y - R2020xy.y + mRG_mul_Rxyx) / mRG_minus_MP;
+	float y = (-D65xy.y * mRG + mRG * MP_mul_D65xyx + R2020xy.y * MP - mRG_mul_Rxyx * MP) / -mRG_minus_MP;
+	return float2(x, y);
 }
 
-float2 GBLineIntercept(float MP)
+float2 GBLineIntercept(float MP, bool BT2020)
 {
-	static const float mGB = GetM(G2020xy, B2020xy);
+	static const float mGB_709 = GetM(G709xy, B709xy);
+	static const float mGB_mul_G709xyx = mGB_709 * G709xy.x;
+	static const float mGB_2020 = GetM(G2020xy, B2020xy);
+	static const float mGB_mul_G2020xyx = mGB_2020 * G2020xy.x;
 
-	static const float mGB_mul_G2020xyx = mGB * G2020xy.x;
+	const float mGB = BT2020 ? mGB_2020 : mGB_709;
+	const float mGB_mul_Gxyx = BT2020 ? mGB_mul_G2020xyx : mGB_mul_G709xyx;
 
 	const float mGB_minus_MP = mGB - MP;
-
 	const float MP_mul_D65xyx = MP * D65xy.x;
 
-  float x = (-MP_mul_D65xyx + D65xy.y - G2020xy.y + mGB_mul_G2020xyx) / mGB_minus_MP;
-
-  float y = (-D65xy.y * mGB + mGB * MP_mul_D65xyx + G2020xy.y * MP - mGB_mul_G2020xyx * MP) / (-mGB_minus_MP);
-
-  return float2(x, y);
+	float x = (-MP_mul_D65xyx + D65xy.y - G2020xy.y + mGB_mul_Gxyx) / mGB_minus_MP;
+	float y = (-D65xy.y * mGB + mGB * MP_mul_D65xyx + G2020xy.y * MP - mGB_mul_Gxyx * MP) / -mGB_minus_MP;
+	return float2(x, y);
 }
 
-float2 BRLineIntercept(float MP)
+float2 BRLineIntercept(float MP, bool BT2020)
 {
-	static const float mBR = GetM(B2020xy, R2020xy);
+	static const float mBR_709 = GetM(B709xy, R709xy);
+	static const float mBR_mul_B709xyx = mBR_709 * B709xy.x;
+	static const float mBR_2020 = GetM(B2020xy, R2020xy);
+	static const float mBR_mul_B2020xyx = mBR_2020 * B2020xy.x;
 
-	static const float mBR_mul_B2020xyx = mBR * B2020xy.x;
+	const float mBR = BT2020 ? mBR_2020 : mBR_709;
+	const float mBR_mul_Bxyx = BT2020 ? mBR_mul_B2020xyx : mBR_mul_B709xyx;
 
 	const float mBR_minus_MP = mBR - MP;
-
 	const float MP_mul_D65xyx = MP * D65xy.x;
 
-  float x = (-MP_mul_D65xyx + D65xy.y - B2020xy.y + mBR_mul_B2020xyx) / mBR_minus_MP;
+	float x = (-MP_mul_D65xyx + D65xy.y - B2020xy.y + mBR_mul_Bxyx) / mBR_minus_MP;
+	float y = (-D65xy.y * mBR + mBR * MP_mul_D65xyx + B2020xy.y * MP - mBR_mul_Bxyx * MP) / -mBR_minus_MP;
+	return float2(x, y);
+}
+#endif
 
-  float y = (-D65xy.y * mBR + mBR * MP_mul_D65xyx + B2020xy.y * MP - mBR_mul_B2020xyx * MP) / (-mBR_minus_MP);
+float2 LineIntercept(float MP, float2 FromXYCoords, float2 ToXYCoords, float2 WhitePointXYCoords = D65xy)
+{
+	const float m = GetM(FromXYCoords, ToXYCoords);
+	const float m_mul_xyx = m * FromXYCoords.x;
 
-  return float2(x, y);
+	const float m_minus_MP = m - MP;
+	const float MP_mul_WhitePoint_xyx = MP * WhitePointXYCoords.x;
+
+	float x = (-MP_mul_WhitePoint_xyx + WhitePointXYCoords.y - FromXYCoords.y + m_mul_xyx) / m_minus_MP;
+	float y = (-WhitePointXYCoords.y * m + m * MP_mul_WhitePoint_xyx + FromXYCoords.y * MP - m_mul_xyx * MP) / -m_minus_MP;
+	return float2(x, y);
 }
 
 //not 100% hue conservering but better than just max(color, 0.f)
 //this ignores negative luminance in favor of preserving the color the pixel might once had
-//this also doesn't cause sudden black pixels
-float3 SimpleGamutClip(float3 Color)
+//this also doesn't cause sudden black pixels.
+//Supports either BT.2020 or BT.709 (sRGB/scRGB) (input and output need to be in the same color space). Hardcoded for D65 white point.
+float3 SimpleGamutClip(float3 Color, bool BT2020, bool ClampToSDRRange = false)
 {
-	bool3 isNegative = asuint(Color) & 0x80000000; //0x80000000 is the signing bit in fp32
+	const bool3 isNegative = Color < 0.f;
+	const bool allArePositive = !any(isNegative);
+	const bool allAreNegative = all(isNegative);
 
-	bool allAreNegative = all(isNegative);
-
-	if (!allAreNegative) // all are positive
+	if (allArePositive)
 	{
-		return Color;
 	}
 	else if (allAreNegative)
 	{
-		return float3(0.f, 0.f, 0.f);
+		return 0.f;
 	}
 	else
 	{
-		float3 XYZ = mul(BT2020_To_XYZ, Color);
-
+		float3 XYZ = mul(BT2020 ? BT2020_To_XYZ : BT709_To_XYZ, Color);
 		float3 xyY = XYZToxyY(XYZ);
-
 		float m = GetM(xyY.xy, D65xy);
+		const float2 Rxy = BT2020 ? R2020xy : R709xy;
+		const float2 Gxy = BT2020 ? G2020xy : G709xy;
+		const float2 Bxy = BT2020 ? B2020xy : B709xy;
 
-		float2 gamutClippedxy;
-
+		float2 gamutClippedXY;
 		// we can determine on which side we need to do the intercept based on where the negative number/s is/are
 		// the intercept needs to happen on the opposite side of where the primary of the smallest negative number is
 		// with 2 negative numbers the smaller one determines the side to check
@@ -947,50 +974,56 @@ float3 SimpleGamutClip(float3 Color)
 		{
 			if (Color.r <= Color.g)
 			{
-				gamutClippedxy = GBLineIntercept(m);
+				gamutClippedXY = LineIntercept(m, Gxy, Bxy); // GB
 			}
 			else
 			{
-				gamutClippedxy = BRLineIntercept(m);
+				gamutClippedXY = LineIntercept(m, Bxy, Rxy); // BR
 			}
 		}
 		else if (all(isNegative.rb))
 		{
 			if (Color.r <= Color.b)
 			{
-				gamutClippedxy = GBLineIntercept(m);
+				gamutClippedXY = LineIntercept(m, Gxy, Bxy); // GB
 			}
 			else
 			{
-				gamutClippedxy = RGLineIntercept(m);
+				gamutClippedXY = LineIntercept(m, Rxy, Gxy); // RG
 			}
 		}
 		else if (all(isNegative.gb))
 		{
 			if (Color.g <= Color.b)
 			{
-				gamutClippedxy = BRLineIntercept(m);
+				gamutClippedXY = LineIntercept(m, Bxy, Rxy); // BR
 			}
 			else
 			{
-				gamutClippedxy = RGLineIntercept(m);
+				gamutClippedXY = LineIntercept(m, Rxy, Gxy); // RG
 			}
 		}
 		else if (isNegative.r)
 		{
-			gamutClippedxy = GBLineIntercept(m);
+			gamutClippedXY = LineIntercept(m, Gxy, Bxy); // GB
 		}
 		else if (isNegative.g)
 		{
-			gamutClippedxy = BRLineIntercept(m);
+			gamutClippedXY = LineIntercept(m, Bxy, Rxy); // BR
 		}
 		else //if (isNegative.b)
 		{
-			gamutClippedxy = RGLineIntercept(m);
+			gamutClippedXY = LineIntercept(m, Rxy, Gxy); // RG
 		}
 
-		float3 gamutClippedXYZ = xyYToXYZ(float3(gamutClippedxy, xyY.z));
-
-		return mul(XYZ_To_BT2020, gamutClippedXYZ);
+		float3 gamutClippedXYZ = xyYToXYZ(float3(gamutClippedXY, xyY.z)); // Maintains the old luminance
+		Color = mul(BT2020 ? XYZ_To_BT2020 : XYZ_To_BT709, gamutClippedXYZ);
 	}
+	// Reduce brightness instead of reducing saturation
+	if (ClampToSDRRange)
+	{
+		const float maxChannel = max(1.f, max(Color.r, max(Color.g, Color.b)));
+		Color /= maxChannel;
+	}
+	return Color;
 }
