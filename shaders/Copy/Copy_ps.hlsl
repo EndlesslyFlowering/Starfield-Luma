@@ -48,7 +48,9 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R16G16B16A16_SFLOAT)
 		if (HdrDllPluginConstants.DisplayMode == 2) // HDR scRGB
 		{
+#if CLAMP_INPUT_OUTPUT_TYPE > 0
 			color.rgb *= saturate((HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB) / Luminance(color.rgb));
+#endif // CLAMP_INPUT_OUTPUT_TYPE
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
 			// Theoretically there would be nothing to clamp here, as this mode mode should allow any possible color, even if they are currently not within BT.2020 (scRGB is future proof).
 			// In reality, this could cause black pixels in software composition (Composed Flip) (that's a user problem, they could always use HDR10),
@@ -86,7 +88,9 @@ float4 PS(PSInputs inputs) : SV_Target
 #if defined(OUTPUT_TO_R10G10B10A2)
 		if (HdrDllPluginConstants.DisplayMode == 1) // HDR10 PQ BT.2020
 		{
+#if CLAMP_INPUT_OUTPUT_TYPE > 0
 			color.rgb *= saturate((HdrDllPluginConstants.HDRPeakBrightnessNits * PEAK_BRIGHTNESS_THRESHOLD_SCRGB) / Luminance(color.rgb));
+#endif // CLAMP_INPUT_OUTPUT_TYPE
             color.rgb = BT709_To_BT2020(color.rgb);
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
 			color.rgb = SimpleGamutClip(color.rgb, true);
