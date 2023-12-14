@@ -836,7 +836,6 @@ float GetM(float2 A, float2 B)
 	     / (B.x - A.x);
 }
 
-#if 0
 //other way to check for segment intersection
 //
 //https://bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
@@ -848,84 +847,8 @@ bool CCW(float2 A, float2 B, float2 C)
 
 bool SegmentIntersects(float2 A, float2 B, float2 C, float2 D)
 {
-	return CCW(A, C, D) != CCW(B, C, D)
-	    && CCW(A, B, C) != CCW(A, B, D);
+	return CCW(A, C, D) != CCW(B, C, D) && CCW(A, B, C) != CCW(A, B, D);
 }
-
-bool SegmentIntersects(float2 Point, float2 Primary0, float2 Primary1)
-{
-	return SegmentIntersects(Point, D65xy, Primary0, Primary1);
-}
-
-bool RGSegmentIntersects(float2 Point)
-{
-	return SegmentIntersects(Point, D65xy, G2020xy, B2020xy);
-}
-
-bool GBSegmentIntersects(float2 Point)
-{
-	return SegmentIntersects(Point, D65xy, G2020xy, B2020xy);
-}
-
-bool BRSegmentIntersects(float2 Point)
-{
-	return SegmentIntersects(Point, D65xy, B2020xy, R2020xy);
-}
-
-float2 RGLineIntercept(float MP, bool BT2020)
-{
-	static const float mRG_709 = GetM(R709xy, G709xy);
-	static const float mRG_mul_R709xyx = mRG_709 * R709xy.x;
-	static const float mRG_2020 = GetM(R2020xy, G2020xy);
-	static const float mRG_mul_R2020xyx = mRG_2020 * R2020xy.x;
-
-	const float mRG = BT2020 ? mRG_2020 : mRG_709;
-	const float mRG_mul_Rxyx = BT2020 ? mRG_mul_R2020xyx : mRG_mul_R709xyx;
-
-	const float mRG_minus_MP = mRG - MP;
-	const float MP_mul_D65xyx = MP * D65xy.x;
-
-	float x = (-MP_mul_D65xyx + D65xy.y - R2020xy.y + mRG_mul_Rxyx) / mRG_minus_MP;
-	float y = (-D65xy.y * mRG + mRG * MP_mul_D65xyx + R2020xy.y * MP - mRG_mul_Rxyx * MP) / -mRG_minus_MP;
-	return float2(x, y);
-}
-
-float2 GBLineIntercept(float MP, bool BT2020)
-{
-	static const float mGB_709 = GetM(G709xy, B709xy);
-	static const float mGB_mul_G709xyx = mGB_709 * G709xy.x;
-	static const float mGB_2020 = GetM(G2020xy, B2020xy);
-	static const float mGB_mul_G2020xyx = mGB_2020 * G2020xy.x;
-
-	const float mGB = BT2020 ? mGB_2020 : mGB_709;
-	const float mGB_mul_Gxyx = BT2020 ? mGB_mul_G2020xyx : mGB_mul_G709xyx;
-
-	const float mGB_minus_MP = mGB - MP;
-	const float MP_mul_D65xyx = MP * D65xy.x;
-
-	float x = (-MP_mul_D65xyx + D65xy.y - G2020xy.y + mGB_mul_Gxyx) / mGB_minus_MP;
-	float y = (-D65xy.y * mGB + mGB * MP_mul_D65xyx + G2020xy.y * MP - mGB_mul_Gxyx * MP) / -mGB_minus_MP;
-	return float2(x, y);
-}
-
-float2 BRLineIntercept(float MP, bool BT2020)
-{
-	static const float mBR_709 = GetM(B709xy, R709xy);
-	static const float mBR_mul_B709xyx = mBR_709 * B709xy.x;
-	static const float mBR_2020 = GetM(B2020xy, R2020xy);
-	static const float mBR_mul_B2020xyx = mBR_2020 * B2020xy.x;
-
-	const float mBR = BT2020 ? mBR_2020 : mBR_709;
-	const float mBR_mul_Bxyx = BT2020 ? mBR_mul_B2020xyx : mBR_mul_B709xyx;
-
-	const float mBR_minus_MP = mBR - MP;
-	const float MP_mul_D65xyx = MP * D65xy.x;
-
-	float x = (-MP_mul_D65xyx + D65xy.y - B2020xy.y + mBR_mul_Bxyx) / mBR_minus_MP;
-	float y = (-D65xy.y * mBR + mBR * MP_mul_D65xyx + B2020xy.y * MP - mBR_mul_Bxyx * MP) / -mBR_minus_MP;
-	return float2(x, y);
-}
-#endif
 
 float2 LineIntercept(float MP, float2 FromXYCoords, float2 ToXYCoords, float2 WhitePointXYCoords = D65xy)
 {
@@ -973,48 +896,30 @@ float3 SimpleGamutClip(float3 Color, bool BT2020, bool ClampToSDRRange = false)
 		if (all(isNegative.rg))
 		{
 			if (Color.r <= Color.g)
-			{
 				gamutClippedXY = LineIntercept(m, Gxy, Bxy); // GB
-			}
 			else
-			{
 				gamutClippedXY = LineIntercept(m, Bxy, Rxy); // BR
-			}
 		}
 		else if (all(isNegative.rb))
 		{
 			if (Color.r <= Color.b)
-			{
 				gamutClippedXY = LineIntercept(m, Gxy, Bxy); // GB
-			}
 			else
-			{
 				gamutClippedXY = LineIntercept(m, Rxy, Gxy); // RG
-			}
 		}
 		else if (all(isNegative.gb))
 		{
 			if (Color.g <= Color.b)
-			{
 				gamutClippedXY = LineIntercept(m, Bxy, Rxy); // BR
-			}
 			else
-			{
 				gamutClippedXY = LineIntercept(m, Rxy, Gxy); // RG
-			}
 		}
 		else if (isNegative.r)
-		{
 			gamutClippedXY = LineIntercept(m, Gxy, Bxy); // GB
-		}
 		else if (isNegative.g)
-		{
 			gamutClippedXY = LineIntercept(m, Bxy, Rxy); // BR
-		}
 		else //if (isNegative.b)
-		{
 			gamutClippedXY = LineIntercept(m, Rxy, Gxy); // RG
-		}
 
 		float3 gamutClippedXYZ = xyYToXYZ(float3(gamutClippedXY, xyY.z)); // Maintains the old luminance
 		Color = mul(BT2020 ? XYZ_To_BT2020 : XYZ_To_BT709, gamutClippedXYZ);
