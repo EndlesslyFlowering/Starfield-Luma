@@ -175,7 +175,7 @@ float3 open_drt_transform(
 
   // Dechroma
 
-  const static float dch = 0.10f;
+  const static float dch = 0.10f; // 0.40f
 
   // Chroma contrast
   const static float chc_p = 1.1f; // 1.2 // amount of contrast
@@ -187,21 +187,28 @@ float3 open_drt_transform(
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
   
-  const float3 static weights = float3(
-    0.001f, // 0.25
-    0.40f, // 0.45
-    0.20f   // 0.30
+  
+  const float3 static BT709_WEIGHTS = float3(
+    0.2126390039920806884765625f,
+    0.715168654918670654296875f,
+    0.072192318737506866455078125f
   );
+  
+  // const float3 static weights = float3(
+  //   0.001f, // 0.25
+  //   0.40f, // 0.45
+  //   0.20f   // 0.30
+  // );
 
   // Weights are assumed add to 1, but also affect vibrancy.
   // Use sum to later correct lum
-  float weightSum = weights.x + weights.y + weights.z;
+  // float weightSum = weights.x + weights.y + weights.z;
 
   // Hue Shift RGB controls
   float3 static hs = float3(
-    0.3f,   // 0.3f
-    0.1f,   // -0.1f
-    -0.2f   // -0.5f
+    0.3f,
+    -0.1f,
+    -0.5f
   );
   
   /* Tonescale Parameters 
@@ -272,10 +279,11 @@ float3 open_drt_transform(
   // weights *= rgb; // multiply rgb by weights
   // float lum = max(1e-8f, weights.x + weights.y + weights.z); // take the norm
   // Perf: Use safe division later instead of max
-  float lum = dot(rgb, weights); // take the norm
-  
+  // float lum = dot(rgb, weights); // take the norm
+  float lum = dot(rgb, BT709_WEIGHTS);
+
   // Correct the unbalanced weights
-  lum *= 1.f / weightSum;
+  // lum *= 1.f / weightSum;
 
   // RGB Ratios
   // Perf: lum is > 0 (1e-8f)
@@ -388,7 +396,8 @@ float3 open_drt_transform(
       This factor is driven by ts, biased by a power function to control chroma compression amount `dch`.
   */
   // float ccf = 1.0f - pow(ts, 1.0f/dch);
-  float ccf = 1.0f - (pow(ts, 1.0f/dch)*(1.0f-ts) + ts*ts);
+  // float ccf = 1.0f - (pow(ts, 1.0f/dch)*(1.0f-ts) + ts*ts);
+  float ccf = 1.0f - 0.5f*(pow(ts, 2.f/dch)*(1.0f-ts*0.20f) + ts*ts);
 
   // Apply chroma compression to RGB Ratios
   rats = rats*ccf + 1.0f - ccf;
@@ -440,8 +449,8 @@ float3 open_drt_transform(
   float chc_sa = min(2.0f, lum / (chc_m * pow(lum / chc_m, chc_p)*chc_f + lum*(1.0f - chc_f)));
   // Perf: use dot for mult+add
   // float chc_L = 0.23f*rats.x + 0.69f*rats.y + 0.08f*rats.z; // Roughly P3 weights, doesn't matter
-  const static float3 chc_L_weights = float3(0.23f, 0.69f, 0.08f); // Roughly P3 weights, doesn't matter
-  float chc_L = dot(rats, chc_L_weights);
+  // const static float3 chc_L_weights = float3(0.21f, 0.71f, 0.072f); // Roughly P3 weights, doesn't matter
+  float chc_L = dot(rats, BT709_WEIGHTS);
 
   // Apply mid-range chroma contrast saturation boost
   rats = chc_L*(1.0f - chc_sa) + rats*chc_sa;
