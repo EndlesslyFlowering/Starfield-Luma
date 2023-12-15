@@ -186,11 +186,10 @@ float3 open_drt_transform(
   const static float fl = 0.01f; // flare/glare compensation
 
   // Weights: controls the "vibrancy" of each channel, and influences all other aspects of the display-rendering.
-  
   const float3 static weights = float3(
-    0.0001f, // 0.25
-    0.23f,   // 0.45
-    0.17f    // 0.30
+    0.10f, // 0.25
+    0.60f, // 0.45
+    0.30f   // 0.30
   );
 
   // Weights are assumed add to 1, but also affect vibrancy.
@@ -199,8 +198,8 @@ float3 open_drt_transform(
 
   // Hue Shift RGB controls
   float3 static hs = float3(
-    -0.10f, // 0.30f
-    -0.10f,   // -0.1f
+    0.10f, // 0.30f
+    -0.20f,   // -0.1f
     -0.10f   // -0.5f
   );
   
@@ -459,7 +458,7 @@ float3 open_drt_transform(
   // Colors past 1 could introduce hue shift but should be done externally
   // Despite being 0-1, output range does not mean SDR range.
   // Output is still scene-linear, only compressed to output range.
-  rgb = max(0, rgb);
+  rgb = saturate(rgb);
 
 
   return rgb;
@@ -552,14 +551,18 @@ float3 open_drt_transform_single(
   float contrast = 1.f
   )
 {
+  // Replicate per-channel by clamping
+  float preClampledY = Luminance(rgb);
+  rgb = clamp(rgb, 0, 12.5f);
+  float postClampedY = Luminance(rgb);
+  rgb *= postClampedY ? preClampledY / postClampedY : 0;
+
   rgb = apply_aces_highlights(rgb);
   
   rgb = apply_user_shadows(rgb, shadows);
   rgb = apply_user_highlights(rgb, highlights);
 
   rgb = open_drt_transform(rgb, peakNits, 0, contrast);
-
-  rgb = saturate(rgb);
 
   return rgb;
 }
@@ -575,6 +578,12 @@ void open_drt_transform_dual(
   float contrast = 1.f
   )
 {
+  // Replicate per-channel by clamping
+  float preClampledY = Luminance(rgb);
+  rgb = clamp(rgb, 0, 12.5f);
+  float postClampedY = Luminance(rgb);
+  rgb *= postClampedY ? preClampledY / postClampedY : 0;
+
   sdrOutput = apply_aces_highlights(rgb);
   hdrOutput = sdrOutput;
 
@@ -587,6 +596,5 @@ void open_drt_transform_dual(
   sdrOutput = open_drt_transform(sdrOutput, 400.f, 0.30f, 1.f);
   hdrOutput = open_drt_transform(hdrOutput, hdrPeakNits, (midGrayAdjustment - 1.f) / 5.f, contrast);
 
-  sdrOutput = saturate(sdrOutput);
 }
 
