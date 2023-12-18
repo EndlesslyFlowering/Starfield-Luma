@@ -303,14 +303,15 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	outputLab = lerp(originalLab, outputLab, HdrDllPluginConstants.LUTCorrectionStrength);
 
 #if LUT_MAPPING_TYPE == 2
-	return outputLab;
+	// Note: we partially ignore "SDRRange" clamping here (you can't simply clamp Oklab to SDR sRGB without gamut mapping)
+	return float3(SDRRange ? min(outputLab.x, 1.f) : outputLab.x, outputLab.yz);
 #else
 	float3 outputLinear = oklab_to_linear_srgb(outputLab);
 	if (SDRRange) {
 		// Optional step to keep colors in the SDR range.
 		outputLinear = saturate(outputLinear);
 	}
-#if 0 // Disabled out as this can cause "black dot issues" (???)
+#if 0 // Disabled out as this can cause "black dot issues" (???) (it just doesn't seem necessary)
 	// To note, color channels may be negative, even if -0.00001, probably due to multiple color space conversions.
 	else if (Luminance(outputLinear) < 0.f) {
 		outputLinear = 0.f;
