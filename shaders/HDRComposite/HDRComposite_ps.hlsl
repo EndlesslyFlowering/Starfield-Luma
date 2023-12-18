@@ -1562,10 +1562,12 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 #endif
 	)
 	{
-		// NOTE: any negative scRGB color might get lost (clipped or gamut mapped to Rec.709) with OpenDRT, though this doesn't really matter as there seems to be none to begin with
+		// NOTE: any negative scRGB color might get lost (clipped or gamut mapped to Rec.709) with OpenDRT,
+		// though this doesn't really matter as there seems to be none to begin with
 		tmParams.outputHDRColor = open_drt_transform_single(
-			tmParams.inputColor * exposureAdjustment,
+			tmParams.inputColor,
 			peakNits,
+			exposureAdjustment,
 			shadowsScaling,
 			highlightsScaling,
 			contrast
