@@ -16,7 +16,6 @@
 	#define PEAK_BRIGHTNESS_THRESHOLD_HDR10 FLT_MAX
 #endif
 
-
 Texture2D<float4> inputTexture  : register(t0, space8);
 SamplerState inputSampler : register(s0, space8);
 
@@ -33,6 +32,13 @@ struct PSInputs
 	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
 #endif
+
+// Theoretically this should be "true" with "CLAMP_INPUT_OUTPUT_TYPE" == 1,
+// as the game already produces values beyond 0-1 even in SDR,
+// and gamut mapping hues to Rec.709 will produce even more values beyond 1,
+// though to retain the vanilla SDR look, it's generally better to clip it:
+// highlights will retain more detail, at the cost of having a wrong hue.
+static const bool TonemapSDRToSDRRange = false;
 
 [RootSignature(ShaderRootSignature)]
 float4 PS(PSInputs inputs) : SV_Target
@@ -74,12 +80,13 @@ float4 PS(PSInputs inputs) : SV_Target
 #if !SDR_LINEAR_INTERMEDIARY
 			color.rgb = GAMMA_TO_LINEAR(color.rgb);
 #endif // !SDR_LINEAR_INTERMEDIARY
-
+			bool needsClamp = true;
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			color.rgb = SimpleGamutClip(color.rgb, false, /*ClampToSDRRange*/ true);
-#else
-			color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
+			needsClamp = !TonemapSDRToSDRRange;
+			color.rgb = SimpleGamutClip(color.rgb, false, TonemapSDRToSDRRange);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
+			if (needsClamp)
+				color.rgb = saturate(color.rgb); // Remove any non SDR color, this mode is just meant for debugging SDR in HDR
 			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
 			color.rgb *= paperWhite;
 		}
@@ -104,7 +111,7 @@ float4 PS(PSInputs inputs) : SV_Target
 		else if (HdrDllPluginConstants.DisplayMode == 0) // SDR (linear to gamma space conversion)
 		{
 #if CLAMP_INPUT_OUTPUT_TYPE == 1
-			color.rgb = SimpleGamutClip(color.rgb, false, /*ClampToSDRRange*/ true);
+			color.rgb = SimpleGamutClip(color.rgb, false, TonemapSDRToSDRRange);
 #endif // CLAMP_INPUT_OUTPUT_TYPE
 #if SDR_USE_GAMMA_2_2 // Avoid negative pow
 			color.rgb = max(color.rgb, 0.f);
