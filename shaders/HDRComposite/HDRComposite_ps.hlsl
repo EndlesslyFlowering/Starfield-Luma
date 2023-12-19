@@ -1570,9 +1570,6 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 	// Compute ungraded tone map for exact nits
 	if (HdrDllPluginConstants.DisplayMode <= 0
 		|| HdrDllPluginConstants.ColorGradingStrength == 0.f // No LUTs (this branch is more optimized and produces identical results if we have no LUT)
-#if LUT_EXTRAPOLATION_TYPE > 0
-		|| HdrDllPluginConstants.StrictLUTApplication // Use LUT Extrapolation
-#endif
 	)
 	{
 		// NOTE: any negative scRGB color might get lost (clipped or gamut mapped to Rec.709) with OpenDRT,
