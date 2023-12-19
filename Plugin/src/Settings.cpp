@@ -237,11 +237,15 @@ namespace Settings
 		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 
 		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
-		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                        // 0-100 to 0-2
-		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                            // 0-100 to 0-2
-		a_outShaderConstants.Highlights = static_cast<float>(Highlights.value.get_data() * 0.01f);                        // 0-100 to 0-1
-		a_outShaderConstants.Shadows = static_cast<float>(Shadows.value.get_data() * 0.01f);                              // 0-100 to 0-1
-		a_outShaderConstants.Bloom = static_cast<float>(Bloom.value.get_data() * 0.01f);                              // 0-100 to 0-1
+		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                          // 0-100 to 0-2
+		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                              // 0-100 to 0-2
+		a_outShaderConstants.Highlights = IsCustomToneMapper()
+			? static_cast<float>(Highlights.value.get_data() * 0.01f) // 0-100 to 0-1
+			: 0.5f;                          
+		a_outShaderConstants.Shadows = IsCustomToneMapper() 
+			? static_cast<float>(Shadows.value.get_data() * 0.01f)    // 0-100 to 0-1
+			: 0.5f;
+		a_outShaderConstants.Bloom = static_cast<float>(Bloom.value.get_data() * 0.01f);                                    // 0-100 to 0-1
 
 		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
 		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
