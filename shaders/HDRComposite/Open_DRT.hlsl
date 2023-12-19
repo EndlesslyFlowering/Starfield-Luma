@@ -148,9 +148,10 @@ float3 apply_aces_highlights(float3 rgb) {
 }
 
 float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
-  rgb = shd_con(rgb, -1.8f, 0.06f * (2.f - shadows));
-  // More visibility in shadows
-  rgb = shd_con(rgb, 0.05f * lerp(4.f, -4.f, 0.26f * (2.f - shadows) / 2.f), 0.27f * shadows);
+  // Perf: explicit cube
+  // rgb = shd_con(rgb, -1.8f, pow(2.f - shadows, 3) * 0.04); // 0.04 @ 1
+  rgb = shd_con(rgb, -1.8f, (2.f - shadows) * (2.f - shadows) * (2.f - shadows) * 0.04); // 0.04 @ 1
+  rgb = shd_con(rgb, -shadows * (1.f - shadows), 0.25f); // 0 @ 1
 
   return rgb;
 }
