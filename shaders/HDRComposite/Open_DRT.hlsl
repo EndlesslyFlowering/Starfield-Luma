@@ -151,7 +151,7 @@ float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
   // Perf: explicit cube
   // rgb = shd_con(rgb, -1.8f, pow(2.f - shadows, 3) * 0.04); // 0.04 @ 1
   rgb = shd_con(rgb, -1.8f, (2.f - shadows) * (2.f - shadows) * (2.f - shadows) * 0.04); // 0.04 @ 1
-  rgb = shd_con(rgb, -shadows * (1.f - shadows), 0.25f); // 0 @ 1
+  rgb = shd_con(rgb, -0.50f * shadows * (1.f - shadows), 0.25f); // 0 @ 1
 
   return rgb;
 }
