@@ -3,7 +3,7 @@
 #include "math.hlsl"
 
 // Note: this might start to look bad if any of the negative colors goes beyond 1 (which usually shouldn't happen with ~SDR colors)
-static const bool ApplyGammaBelowZeroDefault = true;
+static const bool ApplyGammaBelowZeroDefault = false;
 
 // sRGB SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_sRGB = 80.f;
