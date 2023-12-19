@@ -2,6 +2,9 @@
 
 #include "math.hlsl"
 
+// Note: this might start to look bad if any of the negative colors goes beyond 1 (which usually shouldn't happen with ~SDR colors)
+static const bool ApplyGammaBelowZeroDefault = true;
+
 // sRGB SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_sRGB = 80.f;
 static const float ReferenceWhiteNits_BT2408 = 203.f;
@@ -130,9 +133,15 @@ float3 gamma_linear_to_sRGB_mirrored(float3 Color)
 }
 
 template<class T>
+T linear_to_gamma(T Color, float Gamma = 2.2f)
+{
+	return pow(Color, 1.f / Gamma);
+}
+
+template<class T>
 T linear_to_gamma_mirrored(T Color, float Gamma = 2.2f)
 {
-	return pow(abs(Color), 1.f / Gamma) * sign(Color);
+	return linear_to_gamma(abs(Color), Gamma) * sign(Color);
 }
 
 float gamma_sRGB_to_linear(float channel)
@@ -161,9 +170,139 @@ float3 gamma_sRGB_to_linear_mirrored(float3 Color)
 }
 
 template<class T>
+T gamma_to_linear(T Color, float Gamma = 2.2f)
+{
+	return pow(Color, Gamma);
+}
+
+template<class T>
 T gamma_to_linear_mirrored(T Color, float Gamma = 2.2f)
 {
-	return pow(abs(Color), Gamma) * sign(Color);
+	return gamma_to_linear(abs(Color), Gamma) * sign(Color);
+}
+
+float3 gamma_linear_to_sRGB_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+{
+	const float3 SDRColor = saturate(Color);
+	const float3 BeyondZeroColor = max(Color, 0.f);
+	const float3 BelowOneColor = min(Color, 1.f);
+	const float3 SDRExcessColor = Color - SDRColor;
+	const float3 BelowZeroColor = Color - BeyondZeroColor;
+	const float3 BeyondOneColor = Color - BelowOneColor;
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color = SDRColor;
+	else if (!ApplyBelowZero)
+		Color = BeyondZeroColor;
+	else if (!ApplyBeyondOne)
+		Color = BelowOneColor;
+
+	if (MirrorBelowZero && ApplyBelowZero)
+		Color = gamma_linear_to_sRGB_mirrored(Color);
+	else
+		Color = gamma_linear_to_sRGB(Color);
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color += SDRExcessColor;
+	else if (!ApplyBelowZero)
+		Color += BelowZeroColor;
+	else if (!ApplyBeyondOne)
+		Color += BeyondOneColor;
+
+	return Color;
+}
+
+float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+{
+	const float3 SDRColor = saturate(Color);
+	const float3 BeyondZeroColor = max(Color, 0.f);
+	const float3 BelowOneColor = min(Color, 1.f);
+	const float3 SDRExcessColor = Color - SDRColor;
+	const float3 BelowZeroColor = Color - BeyondZeroColor;
+	const float3 BeyondOneColor = Color - BelowOneColor;
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color = SDRColor;
+	else if (!ApplyBelowZero)
+		Color = BeyondZeroColor;
+	else if (!ApplyBeyondOne)
+		Color = BelowOneColor;
+
+	if (MirrorBelowZero && ApplyBelowZero)
+		Color = gamma_sRGB_to_linear_mirrored(Color);
+	else
+		Color = gamma_sRGB_to_linear(Color);
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color += SDRExcessColor;
+	else if (!ApplyBelowZero)
+		Color += BelowZeroColor;
+	else if (!ApplyBeyondOne)
+		Color += BeyondOneColor;
+
+	return Color;
+}
+
+float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+{
+	const float3 SDRColor = saturate(Color);
+	const float3 BeyondZeroColor = max(Color, 0.f);
+	const float3 BelowOneColor = min(Color, 1.f);
+	const float3 SDRExcessColor = Color - SDRColor;
+	const float3 BelowZeroColor = Color - BeyondZeroColor;
+	const float3 BeyondOneColor = Color - BelowOneColor;
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color = SDRColor;
+	else if (!ApplyBelowZero)
+		Color = BeyondZeroColor;
+	else if (!ApplyBeyondOne)
+		Color = BelowOneColor;
+
+	if (MirrorBelowZero && ApplyBelowZero)
+		Color = linear_to_gamma_mirrored(Color, Gamma);
+	else
+		Color = linear_to_gamma(Color, Gamma);
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color += SDRExcessColor;
+	else if (!ApplyBelowZero)
+		Color += BelowZeroColor;
+	else if (!ApplyBeyondOne)
+		Color += BeyondOneColor;
+
+	return Color;
+}
+
+float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+{
+	const float3 SDRColor = saturate(Color);
+	const float3 BeyondZeroColor = max(Color, 0.f);
+	const float3 BelowOneColor = min(Color, 1.f);
+	const float3 SDRExcessColor = Color - SDRColor;
+	const float3 BelowZeroColor = Color - BeyondZeroColor;
+	const float3 BeyondOneColor = Color - BelowOneColor;
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color = SDRColor;
+	else if (!ApplyBelowZero)
+		Color = BeyondZeroColor;
+	else if (!ApplyBeyondOne)
+		Color = BelowOneColor;
+
+	if (MirrorBelowZero && ApplyBelowZero)
+		Color = gamma_to_linear_mirrored(Color, Gamma);
+	else
+		Color = gamma_to_linear(Color, Gamma);
+
+	if (!ApplyBelowZero && !ApplyBeyondOne)
+		Color += SDRExcessColor;
+	else if (!ApplyBelowZero)
+		Color += BelowZeroColor;
+	else if (!ApplyBeyondOne)
+		Color += BeyondOneColor;
+		
+	return Color;
 }
 
 // PQ (Perceptual Quantizer - ST.2084) encode/decode used for HDR10 BT.2100

@@ -23,9 +23,6 @@
 // This is desired for output quality as we store colors on float buffers, which are based kept in linear space,
 // it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
 #define SDR_LINEAR_INTERMEDIARY (FORCE_VANILLA_LOOK ? 0 : 1)
-// Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
-// NOTE: we might want to try correcting values < 0 but not ones > 1, as near black is what we want to be affected by gamma correction.
-#define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
 // 0) sRGB gamma mapping (Vanilla): the most mathematically correct way of mapping LUTs.
