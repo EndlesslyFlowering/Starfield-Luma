@@ -235,19 +235,23 @@ namespace Settings
 		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data() * 0.01f);                      // 0-100 to 0-1
 		// There is no reason this wouldn't work in HDR, but for now it's disabled
 		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
+
 		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
 		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                        // 0-100 to 0-2
 		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                            // 0-100 to 0-2
 		a_outShaderConstants.Highlights = static_cast<float>(Highlights.value.get_data() * 0.01f);                        // 0-100 to 0-1
 		a_outShaderConstants.Shadows = static_cast<float>(Shadows.value.get_data() * 0.01f);                              // 0-100 to 0-1
 		a_outShaderConstants.Bloom = static_cast<float>(Bloom.value.get_data() * 0.01f);                              // 0-100 to 0-1
+
+		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
 		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
 		a_outShaderConstants.StrictLUTApplication = static_cast<uint32_t>(StrictLUTApplication.value.get_data());
-		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
+
 		a_outShaderConstants.GammaCorrectionStrength = static_cast<float>(GammaCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
 		a_outShaderConstants.FilmGrainFPSLimit = static_cast<float>(FilmGrainFPSLimit.value.get_data());
 		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
+
 		a_outShaderConstants.bIsAtEndOfFrame = static_cast<uint32_t>(bIsAtEndOfFrame.load());
 		a_outShaderConstants.RuntimeMS = *Offsets::g_durationOfApplicationRunTimeMS;
 		a_outShaderConstants.DevSetting01 = static_cast<float>(DevSetting01.value.get_data() * 0.01f);  // 0-100 to 0-1
@@ -280,24 +284,32 @@ namespace Settings
 	{
 		static std::once_flag ConfigInit;
 		std::call_once(ConfigInit, [&]() {
+			// HDR
 			config->Bind(DisplayMode.value, DisplayMode.defaultValue);
 			config->Bind(ForceSDROnHDR.value, ForceSDROnHDR.defaultValue);
 			config->Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config->Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config->Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
 			config->Bind(ExtendGamut.value, ExtendGamut.defaultValue);
+
+			// SDR
 			config->Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
+
+			// Tone-mapper
 			config->Bind(ToneMapperType.value, ToneMapperType.defaultValue);
 			config->Bind(Saturation.value, Saturation.defaultValue);
 			config->Bind(Contrast.value, Contrast.defaultValue);
 			config->Bind(Highlights.value, Highlights.defaultValue);
 			config->Bind(Shadows.value, Shadows.defaultValue);
 			config->Bind(Bloom.value, Bloom.defaultValue);
-			config->Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
+
+			// Color Grading
 			config->Bind(ColorGradingStrength.value, ColorGradingStrength.defaultValue);
-			config->Bind(GammaCorrectionStrength.value, GammaCorrectionStrength.defaultValue);
+			config->Bind(LUTCorrectionStrength.value, LUTCorrectionStrength.defaultValue);
 			config->Bind(VanillaMenuLUTs.value, VanillaMenuLUTs.defaultValue);
 			config->Bind(StrictLUTApplication.value, StrictLUTApplication.defaultValue);
+
+			config->Bind(GammaCorrectionStrength.value, GammaCorrectionStrength.defaultValue);
 			config->Bind(FilmGrainType.value, FilmGrainType.defaultValue);
 			config->Bind(FilmGrainFPSLimit.value, FilmGrainFPSLimit.defaultValue);
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
@@ -308,7 +320,7 @@ namespace Settings
 			config->Bind(DevSetting04.value, DevSetting04.defaultValue);
 			config->Bind(DevSetting05.value, DevSetting05.defaultValue);
 			config->Bind(RenderTargetsToUpgrade,
-			    "ImageSpaceBuffer",
+				"ImageSpaceBuffer",
 				"ScaleformCompositeBuffer",
 				"SF_ColorBuffer",
 				"HDRImagespaceBuffer",
@@ -321,7 +333,7 @@ namespace Settings
 				"ImageSpaceBufferR10G10B10A2"
 				//"NativeResolutionColorBuffer01",  // issues on AMD
 				//"ColorBuffer01",  // issues on AMD
-				);
+			);
 			config->Bind(PeakBrightnessAutoDetected, false);
 		});
 
@@ -483,6 +495,7 @@ namespace Settings
 			}
 			DrawReshadeSlider(SecondaryBrightness);
 		}
+
 		DrawReshadeEnumStepper(ToneMapperType);
 		DrawReshadeSlider(Saturation);
 		DrawReshadeSlider(Contrast);
@@ -492,13 +505,15 @@ namespace Settings
 			DrawReshadeSlider(Shadows);
 		}
 		DrawReshadeSlider(Bloom);
-		DrawReshadeSlider(GammaCorrectionStrength);
-		DrawReshadeSlider(LUTCorrectionStrength);
+
 		DrawReshadeSlider(ColorGradingStrength);
+		DrawReshadeSlider(LUTCorrectionStrength);
 		DrawReshadeCheckbox(VanillaMenuLUTs);
 		if (isGameRenderingSetToHDR) {
 			DrawReshadeCheckbox(StrictLUTApplication);
 		}
+
+		DrawReshadeSlider(GammaCorrectionStrength);
 		DrawReshadeEnumStepper(FilmGrainType);
 		if (IsFilmGrainTypeImproved()) {
 			DrawReshadeSlider(FilmGrainFPSLimit);

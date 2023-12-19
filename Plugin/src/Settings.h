@@ -26,18 +26,22 @@ namespace Settings
 		kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
 		kHDR_ExtendGamut,
+
 		kSecondaryBrightness,
+
 		kToneMapperType,
 		kToneMapperSaturation,
 		kToneMapperContrast,
 		kToneMapperHighlights,
 		kToneMapperShadows,
 		kToneMapperBloom,
-		kLUTCorrectionStrength,
+
 		kColorGradingStrength,
-		kGammaCorrectionStrength,
+		kLUTCorrectionStrength,
 		kVanillaMenuLUTs,
 		kStrictLUTApplication,
+
+		kGammaCorrectionStrength,
 		kFilmGrainType,
 		kFilmGrainFPSLimit,
 		kPostSharpen,
@@ -159,16 +163,20 @@ namespace Settings
 		float    GamePaperWhite;
 		float    UIPaperWhite;
 		float    ExtendGamut;
+
 		float    SDRSecondaryBrightness;
+
 		uint32_t ToneMapperType;
 		float    Saturation;
 		float    Contrast;
 		float    Highlights;
 		float    Shadows;
 		float    Bloom;
+
+		float    ColorGradingStrength;
 		float    LUTCorrectionStrength;
 		uint32_t StrictLUTApplication;
-		float    ColorGradingStrength;
+
 		float    GammaCorrectionStrength;
 		uint32_t FilmGrainType;
 		float    FilmGrainFPSLimit;
@@ -189,7 +197,11 @@ namespace Settings
 		EnumStepper DisplayMode {
 		    SettingID::kDisplayMode,
 		    "Display Mode",
-		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB.\n\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation.\n\nIn case Frame Generation is on, scRGB will internally fall back to HDR10 regardless of this setting.",
+		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB."
+					"\n"
+					"\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation."
+					"\n"
+					"\nIn case Frame Generation is on, scRGB will internally fall back to HDR10 regardless of this setting.",
 		    "DisplayMode", "Main",
 		    0,
 		    { "SDR", "HDR10", "HDR scRGB" }
@@ -204,7 +216,10 @@ namespace Settings
 		ValueStepper PeakBrightness{
 			SettingID::kHDR_PeakBrightness,
 			"Peak Brightness",
-			"Sets the peak brightness in HDR modes.\nThe value should match your display's peak brightness.\n\nThis does not affect the game's average brightness.",
+			"Sets the peak brightness in HDR modes."
+				"\nThe value should match your display's peak brightness."
+				"\n"
+				"\nThis does not affect the game's average brightness.",
 			"PeakBrightness", "HDR",
 			1000,
 			80,
@@ -214,78 +229,96 @@ namespace Settings
 		ValueStepper GamePaperWhite{
 			SettingID::kHDR_GamePaperWhite,
 			"Game Paper White",
-			"Sets the game paper white brightness in HDR modes.\nThis setting affects the average brightness of the image without impacting the peak brightness.\n\nThe default value is 200.",
+			"Sets the in-game brightness of white in HDR modes."
+				"\nThis setting represents the brightness of white paper (100\% diffuse white) in-game."
+				"\n"
+				"\nThe default value is 200.",
 			"GamePaperWhite", "HDR",
 			200, /*ITU reference default is 203 but we don't want to confuse users*/
-		    80,
+			80,
 			500,
 			10
 		};
 		ValueStepper UIPaperWhite{
 			SettingID::kHDR_UIPaperWhite,
 			"UI Paper White",
-			"Sets the user interface paper white brightness in HDR modes.\n\nThe default value is 200.",
+			"Sets the user-interface brightness in HDR modes."
+				"\nThis setting represents the brightness of UI elements."
+				"\n"
+				"\nThe default value is 200",
 			"UIPaperWhite", "HDR",
 			200, /*ITU reference default is 203 but we don't want to confuse users*/
 			80,
 			500,
 			10
 		};
-		Slider   ExtendGamut{
-		    SettingID::kHDR_ExtendGamut,
-		    "Extend Gamut",
-		    "Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation.\n\nNeutral at 0\%.",
-		    "ExtendGamut", "HDR",
-		    33.333f,
-		    0.f,
-		    100.f,
+		Slider ExtendGamut{
+			SettingID::kHDR_ExtendGamut,
+			"Extend Gamut",
+			"Shifts bright saturated colors from SDR to HDR, essentially acting as a \"smart\" saturation."
+				"\n"
+				"\nNeutral at 0\%.",
+			"ExtendGamut", "HDR",
+			33.333f,
+			0.f,
+			100.f,
 			"%"
 		};
-		Slider   SecondaryBrightness{
-		    SettingID::kSecondaryBrightness,
-		    "Brightness",
-		    "Modulates the brightness in SDR modes.\n\nNeutral default at 50\%.",
-		    "SecondaryBrightness", "Main",
-		    50.f,
-		    0.f,
-		    100.f,
+
+		Slider SecondaryBrightness{
+			SettingID::kSecondaryBrightness,
+			"Brightness",
+			"Modulates the brightness in SDR modes."
+				"\n"
+				"\nNeutral default at 50\%.",
+			"SecondaryBrightness", "Main",
+			50.f,
+			0.f,
+			100.f,
 			"%"
 		};
+
 		EnumStepper ToneMapperType{
 			SettingID::kToneMapperType,
-			"Tone Mapper Type",
-			"Sets the tone mapper type."
+			"Tonemapper",
+			"Selects the tonemapper."
 				"\n"
-				"\nVanilla+ uses a tone mapper inspired by the original SDR one, with enhancements to support HDR."
-				"\nOpenDRT an open-source tone mapper that supports variable output (SDR/HDR).",
+				"\nVanilla+ enhances the original tonemappers to provide an HDR experience."
+				"\nOpenDRT is a customizable SDR and HDR tonemapper modified to replicate the original look .",
 			"ToneMapperType", "ToneMapper",
 			0,
 			{ "Vanilla+", "OpenDRT" }
 		};
-		Slider   Saturation{
-		    SettingID::kToneMapperSaturation,
-		    "Saturation",
-		    "Sets the saturation strength in the tone mapper.\n\nNeutral default at 50\%.",
-		    "Saturation", "ToneMapper",
-		    50.f,
-		    0.f,
-		    100.f,
+		Slider Saturation{
+			SettingID::kToneMapperSaturation,
+			"Saturation",
+			"Sets the saturation strength in the tonemapper."
+				"\n"
+				"\nNeutral default at 50\%.",
+			"Saturation", "ToneMapper",
+			50.f,
+			0.f,
+			100.f,
 			"%"
 		};
-		Slider   Contrast{
-		    SettingID::kToneMapperContrast,
-		    "Contrast",
-		    "Sets the contrast strength in the tone mapper.\n\nNeutral default at 50\%.",
-		    "Contrast", "ToneMapper",
-		    50.f,
-		    0.f,
-		    100.f,
+		Slider Contrast{
+			SettingID::kToneMapperContrast,
+			"Contrast",
+			"Sets the contrast strength in the tonemapper."
+				"\n"
+				"\nNeutral default at 50\%.",
+			"Contrast", "ToneMapper",
+			50.f,
+			0.f,
+			100.f,
 			"%"
 		};
 		Slider Highlights{
 			SettingID::kToneMapperHighlights,
 			"Highlights",
-			"Sets the highlights strength in the tone mapper.\n\nNeutral default at 50\%.",
+			"Sets the highlights strength in the tonemapper."
+				"\n"
+				"\nNeutral default at 50\%.",
 			"Highlights", "ToneMapper",
 			50.f,
 			0.f,
@@ -295,7 +328,9 @@ namespace Settings
 		Slider Shadows{
 			SettingID::kToneMapperShadows,
 			"Shadows",
-			"Sets the shadows strength in the tone mapper.\n\nNeutral default at 50\%.",
+			"Sets the shadows strength in the tonemapper."
+				"\n"
+				"\nNeutral default at 50\%.",
 			"Shadows", "ToneMapper",
 			50.f,
 			0.f,
@@ -305,71 +340,82 @@ namespace Settings
 		Slider Bloom{
 			SettingID::kToneMapperBloom,
 			"Bloom",
-			"Sets the bloom strength in the tone mapper.\n\nNeutral default at 50\%.",
+			"Sets the bloom strength in the tonemapper."
+				"\n"
+				"\nNeutral default at 50\%.",
 			"Bloom", "ToneMapper",
 			50.f,
 			0.f,
 			100.f,
 			"%"
 		};
-		Slider   LUTCorrectionStrength{
-		    SettingID::kLUTCorrectionStrength,
-		    "LUT Correction Strength",
-		    "Sets the LUT correction (normalization) strength.\nThis removes the fogginess from the game vanilla LUTs.",
-		    "LUTCorrectionStrength", "Main",
-		    100.f,
-		    0.f,
-		    100.f,
+
+		Slider ColorGradingStrength{
+			SettingID::kColorGradingStrength,
+			"Color Grading Strength",
+			"Sets the strength of the game's color grading used to apply the game's look and feel.",
+			"ColorGradingStrength", "Main",
+			100.f,
+			0.f,
+			100.f,
 			"%"
 		};
-		Slider   ColorGradingStrength{
-		    SettingID::kColorGradingStrength,
-		    "Color Grading Strength",
-		    "Sets the color grading strength.\nThis setting determines how much the LUTs influence the final image.",
-		    "ColorGradingStrength", "Main",
-		    100.f,
-		    0.f,
-		    100.f,
-			"%"
-		};
-		Slider   GammaCorrectionStrength{
-		    SettingID::kGammaCorrectionStrength,
-		    "Gamma Correction Strength",
-		    "Sets the gamma correction strength.\nThe game used the sRGB gamma formula but was calibrated on gamma 2.2 displays.\n"
-			"This mostly affects near black colors and might cause raised blacks if not used.\n\n100\% should match the intended vanilla look."
-			"\nIn SDR, Luma is meant to be played on gamma 2.2 displays.",
-		    "GammaCorrectionStrength", "Main",
-		    100.f,
-		    0.f,
-		    100.f,
+		Slider LUTCorrectionStrength{
+			SettingID::kLUTCorrectionStrength,
+			"Color Grading Range",
+			"Expands the color grading LUTs to be full-range."
+				"\nIncreasing will remove both the low-contrast fog present in shadows and the brightness limits in highlights caused by clamped LUTs.",
+			"LUTCorrectionStrength", "Main",
+			100.f,
+			0.f,
+			100.f,
 			"%"
 		};
 		Checkbox VanillaMenuLUTs{
 			SettingID::kVanillaMenuLUTs,
-			"Vanilla Menu LUTs",
-			"When enabled, menu LUTs will be unaffected by the \"LUT Correction Strength\" and \"Color Grading Strength\" settings.",
+			"Vanilla Menu Color Grading",
+			"When enabled, menus use the vanilla color grading and will be unaffected by the \"Color Grading Strength\" and \"Color Grading Range\" settings.",
 			"VanillaMenuLUTs", "Main",
 			true
 		};
 		Checkbox StrictLUTApplication{
 			SettingID::kStrictLUTApplication,
-			"Strict LUT Application",
-			"Makes LUTs apply in a way that is more similar to the vanilla SDR look. Leave off for a more HDR look.",
+			"Strict Color Grading",
+			"Applies color grading a way that is more similar to the vanilla SDR look. Leave off for a more HDR look.",
 			"StrictLUTApplication", "HDR",
 			false
 		};
-		EnumStepper  FilmGrainType{
-		    SettingID::kFilmGrainType,
-		    "Film Grain Type",
-		    "Sets the film grain type.\nLuma offers an improved version film grain that does not raise the black floor.",
-		     "FilmGrainType", "Main",
-		    1,
-		    { "Vanilla", "Improved" }
+
+		Slider GammaCorrectionStrength{
+			SettingID::kGammaCorrectionStrength,
+			"Gamma Correction",
+			"Sets the gamma correction strength."
+				"\nThe game used the sRGB gamma formula but was calibrated on gamma 2.2 displays."
+				"\nThis mostly affects near black colors and might cause raised blacks if not used."
+				"\n"
+				"\n100\% should match the intended vanilla look."
+				"\nIn SDR, Luma is meant to be played on gamma 2.2 displays.",
+			"GammaCorrectionStrength", "Main",
+			100.f,
+			0.f,
+			100.f,
+			"%"
+		};
+		EnumStepper FilmGrainType{
+			SettingID::kFilmGrainType,
+			"Film Grain Type",
+			"Sets the film grain type."
+				"\nPerceptual applies a film grain based on how graininess is perceived in real film."
+				"\nPerceptual, noticably, does not raise the black floor or discolor highlights.",
+			"FilmGrainType", "Main",
+			1,
+			{ "Vanilla", "Perceptual" }
 		};
 		Slider FilmGrainFPSLimit{
 			SettingID::kFilmGrainFPSLimit,
 			"Film Grain FPS Limit",
-			"Sets a frame limit on the improved film grain.\nSet to 0 for uncapped film grain framerate.",
+			"Allows a frame limit on the perceptual film grain to counteract motion-senstivity."
+				"\nUse 0 for uncapped film grain framerate.",
 			"FilmGrainFPSLimit", "Main",
 			0.f,
 			0.f,
@@ -378,14 +424,15 @@ namespace Settings
 		Checkbox PostSharpen{
 			SettingID::kPostSharpen,
 			"Post Sharpening",
-			"Toggles the game's default post-sharpen pass.\nBy default, this pass always runs (forced on) after some sharpening/upscaling methods.",
+			"Toggles the game's default post-sharpen pass."
+				"\nBy default, this is ran (forced on) after certain sharpening/upscaling methods.",
 			"PostSharpen", "Main",
 			true
 		};
 		Checkbox HDRScreenshots{
 			SettingID::kHDRScreenshots,
 			"HDR Screenshots",
-			"Enable to create HDR .jxr screenshots along with SDR .png in Photo Mode while in HDR.",
+			"Capture an additional HDR screenshot (.jxr) when using Photo Mode while in HDR.",
 			"HDRScreenshots", "HDR",
 			true
 		};

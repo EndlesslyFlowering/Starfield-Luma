@@ -128,18 +128,22 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
+
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
+
 		CreateStepperSetting(a_settingList, settings->ToneMapperType, true);
 		CreateSliderSetting(a_settingList, settings->Saturation, true); // Requires "CLAMP_INPUT_OUTPUT_TYPE" 1 in shaders (gamut mapping) if we are rendering to SDR
 		CreateSliderSetting(a_settingList, settings->Contrast, true); // Requires "CLAMP_INPUT_OUTPUT_TYPE" 1 in shaders (gamut mapping) if we are rendering to SDR
 		CreateSliderSetting(a_settingList, settings->Highlights, settings->IsCustomToneMapper());
 		CreateSliderSetting(a_settingList, settings->Shadows, settings->IsCustomToneMapper());
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
-		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
+
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
-		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
+		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
 		CreateCheckboxSetting(a_settingList, settings->StrictLUTApplication, settings->IsGameRenderingSetToHDR());
+
+		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);
 		CreateSliderSetting(a_settingList, settings->FilmGrainFPSLimit, settings->IsFilmGrainTypeImproved());
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
@@ -678,6 +682,9 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kHDR_ExtendGamut):
 			HandleSetting(settings->ExtendGamut);
 			return true;
+		case static_cast<int>(Settings::SettingID::kSecondaryBrightness):
+			HandleSetting(settings->SecondaryBrightness);
+			return true;
 		case static_cast<int>(Settings::SettingID::kToneMapperSaturation):
 			HandleSetting(settings->Saturation);
 			return true;
@@ -693,17 +700,14 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kToneMapperBloom):
 			HandleSetting(settings->Bloom);
 			return true;
-		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
-			HandleSetting(settings->LUTCorrectionStrength);
-			return true;
 		case static_cast<int>(Settings::SettingID::kColorGradingStrength):
 			HandleSetting(settings->ColorGradingStrength);
 			return true;
+		case static_cast<int>(Settings::SettingID::kLUTCorrectionStrength):
+			HandleSetting(settings->LUTCorrectionStrength);
+			return true;
 		case static_cast<int>(Settings::SettingID::kGammaCorrectionStrength):
 			HandleSetting(settings->GammaCorrectionStrength);
-			return true;
-		case static_cast<int>(Settings::SettingID::kSecondaryBrightness):
-			HandleSetting(settings->SecondaryBrightness);
 			return true;
 		case static_cast<int>(Settings::SettingID::kFilmGrainFPSLimit):
 			HandleSetting(settings->FilmGrainFPSLimit);

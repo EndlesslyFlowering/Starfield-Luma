@@ -57,20 +57,25 @@ struct StructHdrDllPluginConstants
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRExtendGamut; // 0-1. 0 is neutral
+
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
+
 	uint ToneMapperType; // Overrides tonemapper type. 0 is default (not overridden)
 	float ToneMapperSaturation; // 0-2. 1 is neutral
 	float ToneMapperContrast; // 0-2. 1 is neutral
 	float ToneMapperHighlights; // 0-1. 0.5 is "neutral"
 	float ToneMapperShadows; // 0-1. 0.5 is neutral
 	float ToneMapperBloom; // 0-1. 0.5 is neutral
+
+	float ColorGradingStrength; // 1 is full strength
 	float LUTCorrectionStrength; // 1 is full strength
 	uint StrictLUTApplication; // false is default (true looks more like vanilla SDR)
-	float ColorGradingStrength; // 1 is full strength
+
 	float GammaCorrection; // Application percentage of "SDR_USE_GAMMA_2_2" correction from LUTs. 0 to 1. 1 is "neutral"
 	uint FilmGrainType; // 1 is default
 	float FilmGrainFPSLimit; // 24 and 0 are common defaults
 	uint PostSharpen; // true is default
+
 	uint IsAtEndOfFrame;
 	uint RuntimeMS;
 	float DevSetting01; // 0-1 variable for development. Default 0
