@@ -207,7 +207,7 @@ T PQ_to_Linear(T ST2084Color, const float PQMaxValue)
 // sRGB/BT.709
 float Luminance(float3 color)
 {
-	// Fixed from "wrong" values: 0.2125 0.7154 0.0721f
+	// Fixed from "wrong" values: 0.2125 0.7154 0.0721
 	// Note: this might sum up to exactly 1, but it's pretty much fine either way
 	return dot(color, float3(0.2126390039920806884765625f, 0.715168654918670654296875f, 0.072192318737506866455078125f));
 }

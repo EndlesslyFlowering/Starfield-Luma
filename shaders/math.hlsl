@@ -92,7 +92,7 @@ bool cubeCoordinatesIntersection(out float3 intersection, float3 coordinates, fl
 
 // Clamps cube coordinates (e.g. 3D LUT) within 0-1, but instead of just doing a saturate(),
 // if the coordinates go beyond the cube range, it finds their intersection point.
-float3 clampCubeCoordinates(float3 coordinates, out bool clamped)
+float3 clampCubeCoordinates(float3 coordinates, out bool clamped, bool clampFromCenter)
 {
 	clamped = false;
 	
@@ -107,11 +107,13 @@ float3 clampCubeCoordinates(float3 coordinates, out bool clamped)
 	const float3 originalCoordinates = coordinates;
 	// Shift range from [0,1] to [-1,+1]
 	// The cube will be around that exact range
-	coordinates = (coordinates - 0.5f) * 2.f;
+	if (clampFromCenter)
+		coordinates = (coordinates - 0.5f) * 2.f;
 
 	const float3 coordinatesSigns = sign(coordinates);
 	// Do abs to restrict the possible intersections from 6 to 3 cube faces
-	coordinates = abs(coordinates);
+	if (clampFromCenter)
+		coordinates = abs(coordinates);
 
 	float3 bestIntersection;
 	float3 currentIntersection;
@@ -147,9 +149,11 @@ float3 clampCubeCoordinates(float3 coordinates, out bool clamped)
 	coordinates = bestIntersection;
 	clamped = true;
 
-	// Revert abs
-	coordinates *= coordinatesSigns;
-	
-	coordinates = (coordinates * 0.5f) + 0.5f;
+	if (clampFromCenter)
+	{
+		coordinates *= coordinatesSigns; // Revert abs
+
+		coordinates = (coordinates * 0.5f) + 0.5f;
+	}
 	return coordinates;
 }
