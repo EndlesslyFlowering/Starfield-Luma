@@ -24,6 +24,7 @@
 // it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
 #define SDR_LINEAR_INTERMEDIARY (FORCE_VANILLA_LOOK ? 0 : 1)
 // Avoid applying gamma correction on colors beyond the 0-1 range, it makes them go crazy.
+// NOTE: we might want to try correcting values < 0 but not ones > 1, as near black is what we want to be affected by gamma correction.
 #define GAMMA_CORRECT_SDR_RANGE_ONLY 1
 
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
@@ -39,10 +40,12 @@
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 #define LUT_MAX_UINT (uint)(LUT_SIZE - 1u)
 // If true, we do gamma correction directly in LUTs (in sRGB, out 2.2), if not, we do it after.
+// Doing it in LUTs is quicker, but it can sensibly affect results, as LUTs only have a limited amount of precisions and they have nearly no samples around the part where 2.2 and sRGB have the biggest mismatch.
 // Requires "SDR_USE_GAMMA_2_2".
-// Cannot be set to false with "LUT_MAPPING_TYPE" == 2, as the point of doing LUTs mapping in OKLAB is for the blackest point to have no luminosity but still have a hue
-// to help out with tinting the dakest 1/16 part of the image, thus if we convert back from OKLAB to Rec.709 to OKLAB, we'd lose the hue on black, due to having no luminance. 
-#define GAMMA_CORRECTION_IN_LUTS 1
+// Cannot be set to false with "LUT_MAPPING_TYPE" == 3 (removed), as the point of doing LUTs mapping in OKLAB is for the blackest point to have no luminosity but still have a hue
+// to help out with tinting the dakest 1/16 part of the image, thus if we convert back from OKLAB to Rec.709 to OKLAB, we'd lose the hue on black, due to having no luminance.
+// NOTE: to avoid hue shift from gamma correction, we could do gamma correction by luminance instead of by channel, though the hue shift is kind of "correct".
+#define GAMMA_CORRECTION_IN_LUTS 0
 #define FORCE_SDR_LUTS 0
 
 // Brings the range roughly from 80 nits to 203 nits (~2.5)

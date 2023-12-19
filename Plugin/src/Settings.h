@@ -335,7 +335,9 @@ namespace Settings
 		Slider   GammaCorrectionStrength{
 		    SettingID::kGammaCorrectionStrength,
 		    "Gamma Correction Strength",
-		    "Sets the gamma correction strength.\nThe game used the sRGB gamma formula but was calibrated on gamma 2.2 displays.\n\n100\% should be closer to the original look.",
+		    "Sets the gamma correction strength.\nThe game used the sRGB gamma formula but was calibrated on gamma 2.2 displays.\n"
+			"This mostly affects near black colors and might cause raised blacks if not used.\n\n100\% should match the intended vanilla look."
+			"\nIn SDR, Luma is meant to be played on gamma 2.2 displays.",
 		    "GammaCorrectionStrength", "Main",
 		    100.f,
 		    0.f,

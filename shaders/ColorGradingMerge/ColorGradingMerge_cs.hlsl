@@ -29,9 +29,9 @@
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
 #else
-		// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens)
-		#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), pow(x, 2.2f), HdrDllPluginConstants.GammaCorrection)
-		//#define LINEARIZE(x) pow(x, 2.2f)
+	// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens)
+	#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), pow(x, 2.2f), HdrDllPluginConstants.GammaCorrection)
+	//#define LINEARIZE(x) pow(x, 2.2f) /*Version without "HdrDllPluginConstants.GammaCorrection"*/
 	#if GAMMA_CORRECTION_IN_LUTS // 2.2->linear->LUT normalization
 		// If we correct gamma in LUTs, there's nothing more to do than linearize (interpret) them as gamma 2.2, while the input coordinates keep using sRGB gamma.
 		// This single difference will correct the gamma on output.
