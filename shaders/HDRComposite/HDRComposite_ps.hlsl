@@ -178,7 +178,8 @@ struct CompositeParams
 	float3 renderedColor; // Source/input HDR linear color
 	float3 outputColor; // Final output color (SDR or HDR), and also the color we usually work with for any operation
 	float3 preLUTColor; // TM+PP
-	float3 finalSDRColor; // TM+PP+CG - Final "original" (vanilla, ~unmodded) linear SDR color before output transform
+	float3 postLUTColor; // TM+PP+CG
+	float3 finalSDRColor; // TM+PP+CG+GC - Final "original" (vanilla, ~unmodded) linear SDR color before output transform
 };
 
 // 1.1920928955078125e-07
@@ -1516,18 +1517,16 @@ void ApplyCinematics(inout CompositeParams params)
 
 void ApplyColorGrading(inout float3 Color, float2 UV)
 {
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP
-#if ENABLE_LUT
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
 	// We don't need to keep the hue here, a lose extrapolation is fine.
 	// Note that we also do this in SDR, to avoid further runtime branches.
 	const int LUTExtrapolationColorSpace = 1;
 	Color = GradingLUT(Color, UV, LUTExtrapolationColorSpace);
-#endif // ENABLE_LUT
-	// NOTE: for now we do this even if "APPLY_MERGED_COLOR_GRADING_LUT" is disabled.
-	// This is because the game lighting and tonemapping has likely been built with this gamma mismatch
-	// even when devs had a neutral LUT or no LUT pass at all.
-	Color = PostGradingGammaCorrect(Color);
-#endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_TONEMAP
+#endif
+}
+
+void ApplyPostColorGradingGammaCorrection(inout CompositeParams params) {
+	params.outputColor = PostGradingGammaCorrect(params.outputColor);
 }
 
 void ApplyColorGrading(inout CompositeParams params)
@@ -1622,7 +1621,7 @@ void ApplyOpenDRTHDRUpgrade(inout CompositeParams params, in ToneMapperParams tm
 	// raised to extremely high values. (eg: low contrast + uncorrected LUTs)
 	
 	float scaledRatio = 1.f;
-	float outputY = Luminance(params.outputColor);
+	float outputY = Luminance(params.postLUTColor); // Work around gamma correction
 	if (tmParams.outputHDRLuminance < tmParams.outputSDRLuminance) {
 		// If substracting (user contrast or paperwhite) scale down instead
 		scaledRatio = tmParams.outputHDRLuminance / tmParams.outputSDRLuminance;
@@ -1939,6 +1938,7 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 		renderedColor, // renderedColor
 		renderedColor, // outputColor
 		renderedColor, // preLUTColor
+		renderedColor, // postLUTColor
 		renderedColor, // finalSDRColor
 	};
 
@@ -1996,11 +1996,18 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 		params.preLUTColor = params.outputColor;
 
 		ApplyColorGrading(params);
+		params.postLUTColor = params.outputColor;
+
+		// NOTE: for now we do this even if "APPLY_MERGED_COLOR_GRADING_LUT" is disabled.
+		// This is because the game lighting and tonemapping has likely been built with this gamma mismatch
+		// even when devs had a neutral LUT or no LUT pass at all.
+		ApplyPostColorGradingGammaCorrection(params);
 		params.finalSDRColor = params.outputColor;
 	}
 	else
 	{
 		params.preLUTColor = params.outputColor;
+		params.postLUTColor = params.outputColor;
 		params.finalSDRColor = params.outputColor;
 	}
 
