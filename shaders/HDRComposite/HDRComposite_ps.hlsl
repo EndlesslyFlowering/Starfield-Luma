@@ -790,11 +790,31 @@ float3 PostProcess_Inverse(
 	return Color;
 }
 
-// Takes a linear space untonemapped HDR color and a linear space tonemapped SDR color.
-// Or simply, it takes any original color (before some post process is applied to it) and re-applies the same transformation the post process had applied to a different (but similar) color.
+// Takes any original color (before some post process is applied to it) and re-applies the same transformation the post process had applied to a different (but similar) color.
 // The images are expected to have roughly the same mid gray.
 float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 PostProcessedColor, bool ForceKeepHue = false)
 {
+#if 0
+	// Alternative Oklab based version. This doesn't seem to work as nicely, mostly because in SDR highlights are all burned to white by LUTs, and by the Vanilla SDR tonemappers,
+	// so the difference between the pre LUT and post LUT colors white in Oklch will be very big (or very small) on lightness and chroma,
+	// thus if we re-apply the same difference on the HDR tonemapped image ("ColorToPostProcess"), while retaining the post LUT SDR hue, colors will shift randomly way too much.
+	{
+		const float3 derivedPostProcessedColor = linear_srgb_to_oklch(PostProcessedColor);
+		const float3 derivedSourceColor = linear_srgb_to_oklch(SourceColor);
+		const float3 derivedColorToPostProcess = linear_srgb_to_oklch(ColorToPostProcess);
+		const float3 postProcessColorRatio = derivedPostProcessedColor / derivedSourceColor;
+		const float3 postProcessColorOffset = derivedPostProcessedColor - derivedSourceColor;
+		const float3 sourceColorRatio = ColorToPostProcess / SourceColor;
+		const float restoreChromaRatio = saturate(1.f / sourceColorRatio.y); // Not sure about this logic
+		// Restore lightness and chroma (some by ratio, some by offset)
+		float3 restoredDerivedColorToPostProcess = (derivedColorToPostProcess + float3(0.f, postProcessColorOffset.y * restoreChromaRatio, 0.f) * float3(postProcessColorRatio.x, 1.f, 1.f));
+		// Negative lightness and chroma are unwanted and can flip hue
+		restoredDerivedColorToPostProcess.x = max(restoredDerivedColorToPostProcess.x, 0.f);
+		restoredDerivedColorToPostProcess.y = max(restoredDerivedColorToPostProcess.y, 0.f);
+		return oklch_to_linear_srgb(float3(restoredDerivedColorToPostProcess.x, restoredDerivedColorToPostProcess.y, derivedPostProcessedColor.z)); // Maintain original hue
+	}
+#endif
+
 	const float3 postProcessColorRatio = safeDivision(PostProcessedColor, SourceColor);
 	const float3 postProcessColorOffset = PostProcessedColor - SourceColor;
 	const float3 postProcessedRatioColor = ColorToPostProcess * postProcessColorRatio;
@@ -809,7 +829,7 @@ float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 
 	float3 newPostProcessedColor = select(PostProcessedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
 #endif
 
-	// Force keep the original post processed color hue
+	// Force keep the original post processed color hue, this ends up shifting the hue too much, either looking too desaturated or too saturated
 	if (ForceKeepHue)
 	{
 		newPostProcessedColor = linear_srgb_to_oklch(newPostProcessedColor);
