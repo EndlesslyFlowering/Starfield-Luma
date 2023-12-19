@@ -483,7 +483,7 @@ float3 open_drt_transform_single(
   rgb = apply_user_shadows(rgb, shadows);
   rgb = apply_user_highlights(rgb, highlights * 203.f/peakNits);
 
-  rgb = open_drt_transform(rgb, peakNits, ((midGrayAdjustment - 1.f) / 5.f) + (0.12f * 203.f/peakNits), contrast);
+  rgb = open_drt_transform(rgb * midGrayAdjustment, peakNits, (0.12f * 203.f/peakNits), contrast);
 
   return rgb;
 }
@@ -512,7 +512,7 @@ void open_drt_transform_dual(
   hdrOutput = apply_user_highlights(hdrOutput, highlights * 203.f/hdrPeakNits);
 
   sdrOutput = open_drt_transform(sdrOutput, 203.f, 0.12f, 1.f);
-  hdrOutput = open_drt_transform(hdrOutput, hdrPeakNits, ((midGrayAdjustment - 1.f) / 5.f) + (0.12f * 203.f/hdrPeakNits), contrast);
+  hdrOutput = open_drt_transform(hdrOutput * midGrayAdjustment, hdrPeakNits, (0.12f * 203.f/hdrPeakNits), contrast);
 
 }
 
