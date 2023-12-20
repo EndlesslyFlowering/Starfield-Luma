@@ -245,7 +245,7 @@ float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bo
 	return Color;
 }
 
-float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
 {
 	const float3 SDRColor = saturate(Color);
 	const float3 BeyondZeroColor = max(Color, 0.f);
@@ -261,7 +261,7 @@ float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelow
 	else if (!ApplyBeyondOne)
 		Color = BelowOneColor;
 
-	if (MirrorBelowZero && ApplyBelowZero)
+	if (ApplyBelowZero)
 		Color = linear_to_gamma_mirrored(Color, Gamma);
 	else
 		Color = linear_to_gamma(Color, Gamma);
@@ -276,7 +276,7 @@ float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelow
 	return Color;
 }
 
-float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
 {
 	const float3 SDRColor = saturate(Color);
 	const float3 BeyondZeroColor = max(Color, 0.f);
@@ -292,7 +292,7 @@ float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelow
 	else if (!ApplyBeyondOne)
 		Color = BelowOneColor;
 
-	if (MirrorBelowZero && ApplyBelowZero)
+	if (ApplyBelowZero)
 		Color = gamma_to_linear_mirrored(Color, Gamma);
 	else
 		Color = gamma_to_linear(Color, Gamma);
