@@ -3,6 +3,7 @@
 #include "math.hlsl"
 
 //TODO: bring back "GAMMA_CORRECT_SDR_RANGE_ONLY" if this always stays false, as it was more optimized (it did clamps just once for the whole gamma correction pass)
+// This is technically more correct as true, but it seems to look worse (to be tested more).
 // Note: this might start to look bad if any of the negative colors goes beyond 1 (which usually shouldn't happen with ~SDR colors)
 // Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with, at least if this is true (and maybe also if it's false?)
 static const bool ApplyGammaBelowZeroDefault = false;
