@@ -28,6 +28,7 @@
 	// No need to run "gamma_sRGB_to_linear_mirrored()" as there's no HDR source colors in LUTs.
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
 	#define CORRECT_GAMMA(x) x
+	#define POST_CORRECT_GAMMA(x)
 #else
 	// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens)
 	#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), pow(x, 2.2f), HdrDllPluginConstants.GammaCorrection)
@@ -36,16 +37,18 @@
 		// If we correct gamma in LUTs, there's nothing more to do than linearize (interpret) them as gamma 2.2, while the input coordinates keep using sRGB gamma.
 		// This single difference will correct the gamma on output.
 		#define CORRECT_GAMMA(x) x
+		#define POST_CORRECT_GAMMA(x)
 	#else // 2.2->linear->LUT normalization->sRGB->linear
 		// If we don't correct gamma in LUTs, we convert them back to sRGB gamma at the end, so that it will match the input coordinates gamma, as they also use sRGB.
 		// A further correction step will be done after that to acknowledge the gamma mismatch baked into the game look.
 		// Use the custom gamma formulas to apply (and mirror) gamma on colors below 0 but not beyond 1 (based on "ApplyGammaBelowZeroDefault").
 		#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear_custom(lerp(gamma_linear_to_sRGB_custom(x), linear_to_gamma_custom(x), HdrDllPluginConstants.GammaCorrection)))
-		//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear_custom(linear_to_gamma_custom(x))) /*Version without "HdrDllPluginConstants.GammaCorrection"*/
+		//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear_custom(linear_to_gamma_custom(x))); if (Luminance(x) < 0.f) { x = 0.f } /*Version without "HdrDllPluginConstants.GammaCorrection"*/
+		#define POST_CORRECT_GAMMA(x) if (Luminance(x) < 0.f) { x = 0.f; }
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
 
-static const float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
+static const float AdditionalNeutralLUTPercentage = HdrDllPluginConstants.DevSetting01; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
@@ -376,6 +379,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	// If necessary (!GAMMA_CORRECTION_IN_LUTS), shift from gamma 2.2 to sRGB interpretation, so the LUT input and output colors
 	// are in the same gamma space, which should be more mathematically correct, and we can then instead do the gamma correction later.
 	mixedLUT = CORRECT_GAMMA(mixedLUT);
+	POST_CORRECT_GAMMA(mixedLUT);
 
 // Convert to sRGB gamma after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
 #if LUT_MAPPING_TYPE == 0

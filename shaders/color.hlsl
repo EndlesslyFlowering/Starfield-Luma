@@ -3,7 +3,7 @@
 #include "math.hlsl"
 
 // Note: this might start to look bad if any of the negative colors goes beyond 1 (which usually shouldn't happen with ~SDR colors)
-static const bool ApplyGammaBelowZeroDefault = false;
+static const bool ApplyGammaBelowZeroDefault = true;
 
 // sRGB SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_sRGB = 80.f;
@@ -181,6 +181,7 @@ T gamma_to_linear_mirrored(T Color, float Gamma = 2.2f)
 	return gamma_to_linear(abs(Color), Gamma) * sign(Color);
 }
 
+// Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with
 float3 gamma_linear_to_sRGB_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
 {
 	const float3 SDRColor = saturate(Color);
@@ -212,6 +213,7 @@ float3 gamma_linear_to_sRGB_custom(float3 Color, bool MirrorBelowZero = true, bo
 	return Color;
 }
 
+// Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with
 float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
 {
 	const float3 SDRColor = saturate(Color);
@@ -243,6 +245,7 @@ float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bo
 	return Color;
 }
 
+// Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with
 float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
 {
 	const float3 SDRColor = saturate(Color);
@@ -274,6 +277,7 @@ float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelow
 	return Color;
 }
 
+// Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with
 float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
 {
 	const float3 SDRColor = saturate(Color);
