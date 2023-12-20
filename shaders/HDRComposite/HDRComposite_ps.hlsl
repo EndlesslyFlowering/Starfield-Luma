@@ -1522,24 +1522,31 @@ void ApplyCinematics(inout CompositeParams params)
 #endif // APPLY_CINEMATICS && ENABLE_TONEMAP
 }
 
-void ApplyColorGrading(inout float3 Color, float2 UV)
+void ApplyColorGrading(inout float3 Color, out float3 NonGammaCorrectedColor, float2 UV)
 {
-#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_TONEMAP && ENABLE_LUT
+	NonGammaCorrectedColor = Color;
+#if ENABLE_TONEMAP
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
 	// We don't need to keep the hue here, a lose extrapolation is fine.
 	// Note that we also do this in SDR, to avoid further runtime branches.
 	const int LUTExtrapolationColorSpace = 1;
 	Color = GradingLUT(Color, UV, LUTExtrapolationColorSpace);
-#endif
-}
-
-void ApplyPostColorGradingGammaCorrection(inout CompositeParams params) {
-	params.outputColor = PostGradingGammaCorrect(params.outputColor);
+#endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_LUT
+	NonGammaCorrectedColor = Color;
+	// NOTE: for now we do this even if "APPLY_MERGED_COLOR_GRADING_LUT" is disabled.
+	// This is because the game lighting and tonemapping has likely been built with this gamma mismatch
+	// even when devs had a neutral LUT or no LUT pass at all.
+	Color = PostGradingGammaCorrect(Color);
+#endif // ENABLE_TONEMAP
 }
 
 void ApplyColorGrading(inout CompositeParams params)
 {
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
-	ApplyColorGrading(params.outputColor, params.psInput.TEXCOORD);
+	ApplyColorGrading(params.outputColor, params.postLUTColor, params.psInput.TEXCOORD);
+#else
+	const float2 unusedUV = 0.f;
+	ApplyColorGrading(params.outputColor, params.postLUTColor, unusedUV);
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 }
 
@@ -1775,7 +1782,8 @@ void ApplySDRToneMapperHDRUpgrade(inout CompositeParams params, in ToneMapperPar
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 	if (strictLUTApplication)
 	{
-		ApplyColorGrading(inverseTonemappedPostProcessedColor, params.psInput.TEXCOORD);
+		float3 unusedNonGammaCorrectedColor; 
+		ApplyColorGrading(inverseTonemappedPostProcessedColor, unusedNonGammaCorrectedColor, params.psInput.TEXCOORD);
 	}
 	else
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
@@ -2000,12 +2008,6 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 		params.preLUTColor = params.outputColor;
 
 		ApplyColorGrading(params);
-		params.postLUTColor = params.outputColor;
-
-		// NOTE: for now we do this even if "APPLY_MERGED_COLOR_GRADING_LUT" is disabled.
-		// This is because the game lighting and tonemapping has likely been built with this gamma mismatch
-		// even when devs had a neutral LUT or no LUT pass at all.
-		ApplyPostColorGradingGammaCorrection(params);
 		params.finalSDRColor = params.outputColor;
 	}
 	else
