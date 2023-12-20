@@ -25,17 +25,18 @@
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
 // 0 Disabled.
 // 1 "Proper" LUT extrapolation done in conservative ways to determine colors outside of the LUT range as accurately as possible. It might look flat compared to other methods.
-// 2 Fast LUT extrapolation that isn't hue conserving (works by rgb ratio) (generally looks good and is fairly accurate).
-// 3 Fast and hue conserving LUT extrapolation approach. It just scales the luminance up (it doesn't work LUTs that invert colors/brightness).
-#define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 4)
-// 0 Linear space. Gradients look wrong and there's a lot of invalid colors.
-// 1 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
-// 2 Oklab. Gradients look okish but there's a lot of invalid colors.
-// 3 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green), but looks pretty desaturated on highlights.
-// 4 Oklch - maintain hue. Gradients look off, not too many invalid colors.
-#define DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE 3
+// 2 Fast LUT extrapolation that isn't hue conserving (works by rgb ratio) (generally looks good and is fairly accurate, though it generates hues that weren't there, even from "white").
+// 3 Fast and hue conserving LUT extrapolation approach. It just scales the luminance/average up (it doesn't work LUTs that invert colors/brightness as we can't detect when to flip the luminance restoration direction).
 // 4 Fast gamut compression (by max channel) before sampling and decompression after. This isn't accurate but generally looks good.
 //   NOTE: this only compresses positive scRGB values, negative ones get clipped.
+#define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
+// 0 Linear space - maintain hue and chroma. It looks pretty good and produces correct results.
+// 1 Linear space. Gradients look wrong and there's a lot of invalid colors.
+// 2 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
+// 3 Oklab. Gradients look okish but there's a lot of invalid colors.
+// 4 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green), but looks pretty desaturated on highlights.
+// 5 Oklch - maintain hue. Gradients look off, not too many invalid colors.
+#define DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE 5
 // Meant for "LUT_IMPROVEMENT_TYPE" 1
 #define MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK 1
 // 0 inverts all of the range (the whole image), to then re-tonemap it with an HDR tonemapper.
@@ -78,25 +79,25 @@
 template<class T>
 T TO_LUT_EXTRAPOLATION_SPACE(T x, uint LUTExtrapolationColorSpace)
 {
-	if (LUTExtrapolationColorSpace <= 0)
+	if (LUTExtrapolationColorSpace <= 1)
 		return x;
-	if (LUTExtrapolationColorSpace == 1)
-		return gamma_linear_to_sRGB_mirrored(x);
 	if (LUTExtrapolationColorSpace == 2)
+		return gamma_linear_to_sRGB_mirrored(x);
+	if (LUTExtrapolationColorSpace == 3)
 		return linear_srgb_to_oklab(x);
-	/*if (LUTExtrapolationColorSpace >= 3)*/
+	/*if (LUTExtrapolationColorSpace >= 4)*/
 	return linear_srgb_to_oklch(x);
 }
 template<class T>
 T FROM_LUT_EXTRAPOLATION_SPACE(T x, uint LUTExtrapolationColorSpace)
 {
-	if (LUTExtrapolationColorSpace <= 0)
+	if (LUTExtrapolationColorSpace <= 1)
 		return x;
-	if (LUTExtrapolationColorSpace == 1)
-		return gamma_sRGB_to_linear_mirrored(x);
 	if (LUTExtrapolationColorSpace == 2)
+		return gamma_sRGB_to_linear_mirrored(x);
+	if (LUTExtrapolationColorSpace == 3)
 		return oklab_to_linear_srgb(x);
-	/*if (LUTExtrapolationColorSpace >= 3)*/
+	/*if (LUTExtrapolationColorSpace >= 4)*/
 	return oklch_to_linear_srgb(x);
 }
 
@@ -204,6 +205,8 @@ static const float PostProcessStrength = 1.f;
 // 1 is neutral. Suggested range 0.5-1.5 though 1 is heavily suggested.
 // Exposure to the user for more customization.
 static const float HDRHighlightsModulation = 1.f;
+
+static const float OklabGamma = 3.f;
 
 static const float ACES_a = 2.51f;
 static const float ACES_b = 0.03f;
@@ -1094,18 +1097,12 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 #if LUT_EXTRAPOLATION_TYPE == 4
 	const float maxChannel = max(1.f, max(unclampedNeutralLUTColor.r, max(unclampedNeutralLUTColor.g, unclampedNeutralLUTColor.b)));
 	LUTCoordinates = saturate(gamma_linear_to_sRGB(unclampedNeutralLUTColor / maxChannel));
-#elif 0 // Old flowed method, just keeping it in case it was to ever come useful
-	bool LUTCoordinatesClamped;
-	// Make sure the LUT coordinates are clamped following the normal of the color instead of just a saturate().
-	// Note that due to the coordinates being in sRGB gamma/perceptual space, this operation isn't fully correct,
-	// as we are doing math (e.g. normalization) on a non linear color, though it's the best we can do,
-	// as a LUT cube with linear coordinates mapping is extremely complicated and non appropriate for other reasons.
-	LUTCoordinates = clampCubeCoordinates(LUTCoordinates, LUTCoordinatesClamped);
-	const float3 neutralLUTColor = gamma_sRGB_to_linear_mirrored(LUTCoordinates); // We can't use "originalColor" here
-#else
+#else // LUT_EXTRAPOLATION_TYPE
 	LUTCoordinates = saturate(LUTCoordinates);
+#if LUT_EXTRAPOLATION_TYPE >= 1
 	const bool LUTCoordinatesClamped = length(unclampedLUTCoordinates - LUTCoordinates) > FLT_MIN; // Some threshold is needed here
 	const float3 neutralLUTColor = specifyOriginalColor ? saturate(originalColor) : gamma_sRGB_to_linear_mirrored(LUTCoordinates);
+#endif // LUT_EXTRAPOLATION_TYPE
 #endif // LUT_EXTRAPOLATION_TYPE
 
 	const float3 LUTCoordinatesScale = (LUT_SIZE - 1.f) / LUT_SIZE; // Also "1-(1/LUT_SIZE)"
@@ -1141,32 +1138,30 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	if (LUTCoordinatesClamped && LUTExtrapolationColorSpace >= 0) // Theoretically an optimization. The result should be valid nonetheless.
 	{
 		// Find the "next" color in the same direction (LUTCoordinates) as the target clamped color.
-		const float LUTCenteringMultiplier = 1.f; // Neutral at 1 (~one texel)
-#if 0 // Old flowed method, just keeping it in case it was to ever come useful
-		// We move the coordinates back towards the cube center by a LUT texel.
-		const float3 LUTCenterCoordinates = 0.5f;
-		const float3 LUTCenteredCoordinates = ((LUTCoordinates - LUTCenterCoordinates) * (1.f - ((2.f * LUTCenteringMultiplier) / LUT_MAX_UINT))) + LUTCenterCoordinates;
-#else
+		static const bool AccurateLUTCentering = HdrDllPluginConstants.DevSetting04 <= 0.5f; //TODOFT
+		const float LUTCenteringMultiplier = AccurateLUTCentering ? 1.f : (LUT_SIZE / 2.f); // Neutral at 1 (~one texel)
 		// We move the coordinates back by the normal of the coordinates in excess of 0-1, by a LUT texel.
 		const float3 LUTCenteredCoordinates = LUTCoordinates - (normalize(unclampedLUTCoordinates - LUTCoordinates) * (1.f - (LUTCenteringMultiplier / LUT_MAX_UINT)));
-#endif
 		float3 LUTCenteredColor = LUTTexture.Sample(Sampler0, (LUTCenteredCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
-#if LUT_MAPPING_TYPE == 0 // NOTE: this and the above gamma->linear conversion could be optimized away in the "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE" 2 case
+#if LUT_MAPPING_TYPE == 0 // NOTE: this and the above gamma->linear conversion could be optimized away in the "LUTExtrapolationColorSpace" 3 case
 		LUTCenteredColor = gamma_sRGB_to_linear_mirrored(LUTCenteredColor);
 #endif // LUT_MAPPING_TYPE
 
 		float extrapolationRatio;
 		// Shift the color in the opposite direction of the centered one, by the ratio between the centered and the extra/external offset.
-		if (LUTExtrapolationColorSpace <= 0)
+		if (LUTExtrapolationColorSpace == 1)
 		{
 			// "unclampedNeutralLUTColor" equals "gamma_sRGB_to_linear_mirrored(unclampedLUTCoordinates)" and "neutralLUTColor" equals "gamma_sRGB_to_linear_mirrored(LUTCoordinates)".
 			extrapolationRatio = length(unclampedNeutralLUTColor - neutralLUTColor) / length(neutralLUTColor - gamma_sRGB_to_linear_mirrored(LUTCenteredCoordinates));
 		}
-		else if (LUTExtrapolationColorSpace >= 2)
+		else if (LUTExtrapolationColorSpace >= 3)
 		{
 			// This ratio represents the color change in OKLAB gamma/perception space (pow 3).
 			// Note: it seems like multiplying "extrapolationRatio" by 0.5 might provide smoother results (no sudden gradient shifts when we start extrapolating)
-			extrapolationRatio = length(linear_to_gamma_mirrored(unclampedNeutralLUTColor, 3.f) - linear_to_gamma_mirrored(neutralLUTColor, 3.f)) / length(linear_to_gamma_mirrored(neutralLUTColor, 3.f) - linear_to_gamma_mirrored(gamma_sRGB_to_linear_mirrored(LUTCenteredCoordinates), 3.f));
+			if (HdrDllPluginConstants.DevSetting03 <= 0.5f || true) //TODOFT: protect both branches against division by 0
+				extrapolationRatio = length(linear_to_gamma_mirrored(unclampedNeutralLUTColor, OklabGamma) - linear_to_gamma_mirrored(neutralLUTColor, OklabGamma)) / length(linear_to_gamma_mirrored(neutralLUTColor, OklabGamma) - linear_to_gamma_mirrored(gamma_sRGB_to_linear_mirrored(LUTCenteredCoordinates), OklabGamma));
+			else
+				extrapolationRatio = length(linear_to_gamma_mirrored(unclampedNeutralLUTColor, OklabGamma) - linear_to_gamma_mirrored(neutralLUTColor, OklabGamma)) / LUTCenteringMultiplier; //TODOFT: try
 		}
 		else
 		{
@@ -1174,11 +1169,19 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 			extrapolationRatio = length(unclampedLUTCoordinates - LUTCoordinates) / length(LUTCoordinates - LUTCenteredCoordinates);
 		}
 
-		if (LUTExtrapolationColorSpace < 3)
+		if (LUTExtrapolationColorSpace == 0)
+		{
+#if 1 // This looks a bit better (more balanced)
+			LUTColor *= lerp(1.f, safeDivision(gamma_linear_to_sRGB(average(LUTColor)), gamma_linear_to_sRGB(average(LUTCenteredColor))), extrapolationRatio);
+#else
+			LUTColor *= lerp(1.f, safeDivision(gamma_linear_to_sRGB(Luminance(LUTColor)), gamma_linear_to_sRGB(Luminance(LUTCenteredColor))), extrapolationRatio);
+#endif
+		}
+		else if (LUTExtrapolationColorSpace < 4)
 		{
 			LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(lerp(TO_LUT_EXTRAPOLATION_SPACE(LUTCenteredColor, LUTExtrapolationColorSpace), TO_LUT_EXTRAPOLATION_SPACE(LUTColor, LUTExtrapolationColorSpace), extrapolationRatio + 1.f), LUTExtrapolationColorSpace);
 		}
-		else // This branch produces the same exact result as the lerp() above except in the "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE" 3 case
+		else // This branch produces the same exact result as the lerp() above except in the "LUTExtrapolationColorSpace" 4 case
 		{
 			const float3 derivedLUTColor = TO_LUT_EXTRAPOLATION_SPACE(LUTColor, LUTExtrapolationColorSpace);
 			const float3 derivedLUTCenteredColor = TO_LUT_EXTRAPOLATION_SPACE(LUTCenteredColor, LUTExtrapolationColorSpace);
@@ -1186,9 +1189,9 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 #if 0 // This doesn't help enough to enable it
 			// If the luminance/intensity changed in a direction, but the average LUT color went in the other direction,
 			// ignore luminance changes, as they'd likely not be extrapolated correctly with high "extrapolationRatio" values.
-			if (LUTExtrapolationColorSpace >= 3)
+			if (LUTExtrapolationColorSpace >= 4)
 			{
-				const float derivedLUTColorAverageChangeOffset = linear_to_gamma_mirrored(average(LUTColor), 3.f) - linear_to_gamma_mirrored(average(LUTCenteredColor), 3.f);
+				const float derivedLUTColorAverageChangeOffset = linear_to_gamma_mirrored(average(LUTColor), OklabGamma) - linear_to_gamma_mirrored(average(LUTCenteredColor), OklabGamma);
 				const float derivedLUTColorChangeRatio = safeDivision(derivedLUTColorAverageChangeOffset, derivedLUTColorChangeOffset.x);
 				// Multiply by two to allow for a 50% tolerance.
 				derivedLUTColorChangeOffset.x *= saturate(derivedLUTColorChangeRatio * 2.f);
@@ -1197,18 +1200,34 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 			// Reproject the centererd color change ratio onto the full range
 			const float3 extrapolatedDerivedLUTColorChangeOffset = derivedLUTColorChangeOffset * extrapolationRatio;
 			float3 extrapolatedDerivedLUTColor = derivedLUTColor + extrapolatedDerivedLUTColorChangeOffset;
-			if (LUTExtrapolationColorSpace >= 3)
+			if (LUTExtrapolationColorSpace >= 4)
 			{
 				// Avoid negative luminance. This can happen in case "derivedLUTColorChangeOffset" intensity/luminance was negative, even if we were at a bright/colorful LUT edge,
 				// especially if the input color is extremely bright. We can't really fix the color from ending up as black though, unless we find a way to auto detect it.
 				extrapolatedDerivedLUTColor.x = max(extrapolatedDerivedLUTColor.x, 0.f);
+				// Avoid negative chroma, as it would likely flip the hue. Theoretically this breaks the accuracy of some "LUTExtrapolationColorSpace" modes but the results would be visually bad without it.
+				extrapolatedDerivedLUTColor.y = max(extrapolatedDerivedLUTColor.y, 0.f);
 
-				if (LUTExtrapolationColorSpace == 3)
+				//TODOFT:
+				//-Try to determine whether highlights are compressed with an S filmic curve in the LUT, and if so, increase the extrapolation ratio amount...
+				//-Try increasing user saturation beyond mid tones.
+				//-Normalize extrapolationRatio around the target offset???
+				//-Try to multiply any color above 0.5 before feeding it to the LUT, if the og LUT tend to make highlights whites, we can avoid (or delay) that by lowering the LUT input color.
+				// Alternatively we could apply LUTs with less intensity on highlights... Though that won't really work on some LUTs like inverted colors.
+				if (LUTExtrapolationColorSpace == 4)
 				{
 					LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(float3(extrapolatedDerivedLUTColor.x, derivedLUTColor.yz), LUTExtrapolationColorSpace);
 				}
-				else // "DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE" 4 case
+				else // "LUTExtrapolationColorSpace" 5 case
 				{
+#if 1
+					// Increase chroma on colors outside the LUT range (in any direction)
+					//extrapolatedDerivedLUTColor.y *= 1.f + (extrapolationRatio * HdrDllPluginConstants.DevSetting05 * 1.75f / lerp(1.f, LUTCenteringMultiplier, 0.5f)); //TODOFT: re-enable
+					// Increase chroma on highlights outside the LUT range (based on perceived brightness)
+					//extrapolatedDerivedLUTColor.y *= 1.f + (extrapolatedDerivedLUTColorChangeOffset.x * HdrDllPluginConstants.HDRExtendGamut * 3.333f); //TODO: expose 3.333
+					//LUTColor = Saturation(LUTColor, 1.f + (extrapolatedDerivedLUTColorChangeOffset.x * HdrDllPluginConstants.DevSetting04)); //TODO: put this in other cases.
+#endif
+
 					// Shift luminance and chroma to the extrapolated values, keep the original LUT edge hue (we can't just apply the same hue change, hue isn't really scalable).
 					// This has problems in case the LUT color was white, so basically the hue is picked at random.
 					LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(float3(extrapolatedDerivedLUTColor.xy, derivedLUTColor.z), LUTExtrapolationColorSpace);
@@ -1216,7 +1235,7 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 			}
 			else
 			{
-				LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(extrapolatedDerivedLUTColor, LUTExtrapolationColorSpace);
+				LUTColor = FROM_LUT_EXTRAPOLATION_SPACE(extrapolatedDerivedLUTColor, LUTExtrapolationColorSpace); //TODOFT: try more
 			}
 		}
 		// LUT extrapolation could easily generate invalid colors.
@@ -1230,7 +1249,10 @@ float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int
 	// though we generally don't care about it as the positives outweight the negatives (edge cases).
 	LUTColor = RestorePostProcess(unclampedNeutralLUTColor, neutralLUTColor, LUTColor);
 #elif LUT_EXTRAPOLATION_TYPE == 3
-	LUTColor *= safeDivision(Luminance(unclampedNeutralLUTColor), Luminance(neutralLUTColor));
+	// "average()" could also be used here, though basing it on luminance seems more correct.
+	// For some reason, multiplying by this ratio works even when the value is lower than zero, though it breaks with LUTs that invert colors.
+	const float clampedNeutralLUTRatio = safeDivision(Luminance(unclampedNeutralLUTColor), Luminance(neutralLUTColor));
+	LUTColor *= clampedNeutralLUTRatio;
 #elif LUT_EXTRAPOLATION_TYPE == 4
 	LUTColor *= maxChannel;
 #endif // LUT_EXTRAPOLATION_TYPE
@@ -1549,9 +1571,9 @@ void ApplyColorGrading(inout float3 Color, out float3 NonGammaCorrectedColor, fl
 	NonGammaCorrectedColor = Color;
 #if ENABLE_TONEMAP
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
-	// We don't need to keep the hue here, a lose extrapolation is fine.
+	// We don't need to keep the hue here, a lose extrapolation is fine. //TODOFT: LUTExtrapolationColorSpace??? SDR?
 	// Note that we also do this in SDR, to avoid further runtime branches.
-	const int LUTExtrapolationColorSpace = 1;
+	const int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE; // 2
 	Color = GradingLUT(Color, UV, LUTExtrapolationColorSpace);
 #endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_LUT
 	NonGammaCorrectedColor = Color;
