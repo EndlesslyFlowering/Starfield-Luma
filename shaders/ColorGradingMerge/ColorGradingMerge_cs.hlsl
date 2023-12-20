@@ -48,7 +48,7 @@
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
 
-static const float AdditionalNeutralLUTPercentage = HdrDllPluginConstants.DevSetting01; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
+static const float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
 
 cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
 {
