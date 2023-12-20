@@ -1260,17 +1260,30 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 	// We can't do this in the LUT merge/mix shader as it would mess around with the LUT texture sampling.
 	// To do this 100% correctly we should do additional LUT samples (e.g. the first texel on the grey LUT line), but we designed it in a way to avoid it, to optimize it.
 	// Unless gamut mapping is enabled, We only do this in HDR as it creates a lot of colors beyond sRGB, which would clip in SDR unless we had gamut mapping on output. 
-	if ((CLAMP_INPUT_OUTPUT_TYPE == 1 || HdrDllPluginConstants.DisplayMode > 0) && HdrDllPluginConstants.LUTCorrectionStrength != 0.f)
+	if ((CLAMP_INPUT_OUTPUT_TYPE == 1 || HdrDllPluginConstants.DisplayMode > 0) && /*Optional check*/ HdrDllPluginConstants.LUTCorrectionStrength != 0.f)
 	{
 		const float3 neutralLUTColor = color;
+
 		// The amount our color coordinates are within the first LUT sub cube (the one around the origin/black).
-#if 0 // This returns values < 1 for coordinates like 1 0 0 or 0 1 1, which we don't really want, we only want to correct the LUT sub cube closest to the origin (we'd need to project to the sub cube closest edge for this to work as we'd like it).
+#if 1 // Pick the max LUT distance from zero, returning 1 if any coordinates touch the edges of the first LUT sub cube (we always project the LUT coordinates onto the subcube 3 outer sides and divide by that length)
+		const float3 subCubeCoordinates = abs(LUTCoordinates) * LUT_SIZE;
+		const float subCubeCoordinatesLength = length(subCubeCoordinates);
+		bool subCubeCoordinatesClamped = false;
+		// We normalize the vector and multiply it by 3, so it's guaranteed to touch one of the cube sides.
+		const float3 clampedSubCubeCoordinates = clampCubeCoordinates(normalize(subCubeCoordinates) * 3.f, subCubeCoordinatesClamped, false);
+		const float distanceFromZero = (subCubeCoordinatesLength <= FLT_MIN) ? 0.f : saturate(subCubeCoordinatesLength / length(clampedSubCubeCoordinates));
+		const float3 distanceFromZero3D = saturate(subCubeCoordinates);
+#elif 1 // Less accurate, but cheaper version of "clampCubeCoordinates()"
+		const float3 distanceFromZero3D = saturate(abs(LUTCoordinates * LUT_SIZE));
+		const float distanceFromZero = min(distanceFromZero3D.x, min(distanceFromZero3D.y, distanceFromZero3D.z));
+#else // Find the distance based on a sphere around 0
+	#if 0 // This makes the sphere circumscribed around the LUT first sub cube, meaning this returns values < 1 for coordinates like 1 0 0 or 0 1 1, which isn't great (we only want to correct the LUT sub cube closest to the origin)
 		static const float LUTRadius = length(float3(1.f, 1.f, 1.f));
-#else // This makes the sphere inscribed within the LUT first sub cube, which also isn't ideal, but is better
+	#else // This makes the sphere inscribed within the LUT first sub cube, it should be better
 		static const float LUTRadius = 1.f;
-#endif
-		// Find the distance based on a sphere around 0
+	#endif
 		const float distanceFromZero = saturate((length(LUTCoordinates) * LUT_SIZE) / LUTRadius);
+#endif
 		const float closenessToZero = 1.f - distanceFromZero;
 
 		// If the LUT color was highly deviated from black, don't correct saturation, this avoids false positive cases (e.g. inverted colors LUTs).
@@ -1284,28 +1297,37 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 		// Don't correct LUTs that are close to the neutral one.
 		// This basically represents how tinted the LUT is. If a LUT just moved the brightness around without shifting the hue or saturation, this shouldn't have any effect.
 		//
-		// We divide the LUT in and out colors to find their normalized value around one (a projection of their rate of change).
-		// Given that our color correction always makes the LUT origin texel 0 0 0, we need to normalize by the distance from the LUT origin as well
+		// We divide the LUT in and out colors to find their normalized value around one (a projection of their rate of change) (division by zero should be fine).
+		// Given that our color correction always makes the LUT origin texel 0 0 0, we need to normalize by the distance from the LUT origin as well.
+		// NOTE: to do this more accurately, we could use OKLCH, though it's too expensive.
 #if 0 // We don't use the 3D distance as it would cause a hue shift in "normalizedDeviationFromNeutralLUT", given it's per channel
-		const float3 distanceFromZero3D = saturate(abs(LUTCoordinates * LUT_SIZE));
-		const float3 normalizedDeviationFromNeutralLUT = ((LUTColor / neutralLUTColor) / distanceFromZero3D);
+		const float3 normalizedDeviationFromNeutralLUT = (LUTColor / neutralLUTColor) / distanceFromZero3D;
 #elif 0 // This is possibly more accurate, as it's all in gamma space instead of being a mix of linear and gamma spaces, though it's more expensive
-		const float3 normalizedDeviationFromNeutralLUT = ((gamma_linear_to_sRGB_mirrored(LUTColor) / LUTCoordinates) / distanceFromZero3D);
+		const float3 normalizedDeviationFromNeutralLUT = (gamma_linear_to_sRGB_mirrored(LUTColor) / LUTCoordinates) / distanceFromZero3D;
 #else
-		const float3 normalizedDeviationFromNeutralLUT = ((LUTColor / neutralLUTColor) / distanceFromZero);
+        const float3 normalizedDeviationFromNeutralLUT = (LUTColor / neutralLUTColor) / distanceFromZero;
 #endif
-		// To find the tint (chroma) deviation from 1 1 1, we use this approximate but functional method:
+		// To find the tint (chroma) deviation from 1 1 1, we use this approximate but functional method (it's not really chroma):
+#if 0 // Shift away from the average to increase the effect of outliers values (further helps to avoids brightness changes from accidentally affecting near black saturation). This seems detrimental for now
+		const float maxNormalizedDeviationFromNeutralLUT = lerp(max(normalizedDeviationFromNeutralLUT.x, max(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z)), average(normalizedDeviationFromNeutralLUT), -0.5f); 
+		const float minNormalizedDeviationFromNeutralLUT = lerp(min(normalizedDeviationFromNeutralLUT.x, min(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z)), average(normalizedDeviationFromNeutralLUT), -0.5f);
+#else
 		const float maxNormalizedDeviationFromNeutralLUT = max(normalizedDeviationFromNeutralLUT.x, max(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z));
 		const float minNormalizedDeviationFromNeutralLUT = min(normalizedDeviationFromNeutralLUT.x, min(normalizedDeviationFromNeutralLUT.y, normalizedDeviationFromNeutralLUT.z));
-		const float minNormalizedDeviationFromNeutralLUTChroma = maxNormalizedDeviationFromNeutralLUT - minNormalizedDeviationFromNeutralLUT;
-		static const float deviationFromNeutralLUTThreshold = 1.f; // Found empirically (there's no meaning to it being 1)
-		const float chromaDeviationFromNeutralLUT = saturate(minNormalizedDeviationFromNeutralLUTChroma * deviationFromNeutralLUTThreshold); // Mid gray should have chroma at 0
+#endif
+		static const float normalizationDeviationThreshold = 0.0001f; // Threshold to 0.01% to avoid false positives. Found empirically.
+		const float minNormalizedDeviationFromNeutralLUTChroma = max(maxNormalizedDeviationFromNeutralLUT - minNormalizedDeviationFromNeutralLUT - normalizationDeviationThreshold, 0.f);
+		static const float deviationFromNeutralLUTThreshold = 5.f; // Found empirically. Should be > 0. Too low values give a risk of adding saturation on netraul LUTs
+		const float chromaDeviationFromNeutralLUT = minNormalizedDeviationFromNeutralLUTChroma != 0.f ? saturate(pow(minNormalizedDeviationFromNeutralLUTChroma, deviationFromNeutralLUTThreshold)) : 0.f; // Mid gray should have chroma at 0
 
 		// Double the saturation because when near black, we are lerping between a color without hue (0 0 0 / origin) and a color with hue (the ones immediately after, > 0).
 		// Thus only half of the colors in the lerp will have a hue, which means duplicating the color chroma/saturation strength will normalize the color "tint" amount.
-		static const float saturationMultiplier = 2.f;
+		static const float saturationMultiplier = 2.f; // Anything more than 2 will cause disconnected gradients when the LUT coords shift from the first to the second texel
 		// NOTE: it would be better to do this with Oklab chroma, but it would be much more expensive
 		LUTColor = Saturation(LUTColor, lerp(1.f, saturationMultiplier, closenessToZero * luminanceDeviationFromNeutralLUT * chromaDeviationFromNeutralLUT * HdrDllPluginConstants.LUTCorrectionStrength));
+#if 0 // Use this to visualize how what pixels get increased saturation, the brighter they are, the more saturation will increase. It should be all black with 100% neutral LUT.
+		LUTColor = closenessToZero * luminanceDeviationFromNeutralLUT * chromaDeviationFromNeutralLUT;
+#endif
 	}
 #endif // MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK
 
