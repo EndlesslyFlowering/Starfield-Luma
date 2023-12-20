@@ -944,7 +944,7 @@ float3 PostGradingGammaCorrect(float3 TonemappedPostProcessedGradedColor)
 	gammaCorrected = true;
 #endif // SDR_USE_GAMMA_2_2
 	// Modulating colors around zero can create invalid luminances if there's negative scRGB colors
-	if (gammaCorrected && Luminance(TonemappedPostProcessedGradedColor) < 0.f)
+	if (ApplyGammaBelowZeroDefault && gammaCorrected && Luminance(TonemappedPostProcessedGradedColor) < 0.f)
 		TonemappedPostProcessedGradedColor = 0.f;
 
 	return TonemappedPostProcessedGradedColor;
