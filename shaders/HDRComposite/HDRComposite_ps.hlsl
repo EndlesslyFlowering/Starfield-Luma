@@ -1571,9 +1571,9 @@ void ApplyColorGrading(inout float3 Color, out float3 NonGammaCorrectedColor, fl
 	NonGammaCorrectedColor = Color;
 #if ENABLE_TONEMAP
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
-	// We don't need to keep the hue here, a lose extrapolation is fine. //TODOFT: LUTExtrapolationColorSpace??? SDR?
-	// Note that we also do this in SDR, to avoid further runtime branches.
-	const int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE; // 2
+	// Theoretically we might not need a hue conserving (accurate) LUT extrapolation method here, a more loose method would be fine, but for now we are going for accurate.
+	// Note that we also do LUT extrapolation in SDR, to avoid further runtime branches. //TODOFT: determine if we actually need accurate LUT extrapolation in SDR and maybe fall back on cheaper method 1 or 2
+	const int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE;
 	Color = GradingLUT(Color, UV, LUTExtrapolationColorSpace);
 #endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_LUT
 	NonGammaCorrectedColor = Color;
