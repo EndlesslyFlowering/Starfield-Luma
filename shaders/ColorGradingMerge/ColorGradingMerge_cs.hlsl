@@ -31,8 +31,13 @@
 	#define POST_CORRECT_GAMMA(x)
 #else
 	// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens).
-	// Note that this might cause some uneven results in Oklab, due to rgb values not mapping "linearly" to Oklab, for example changing gamma correction from 33% to 34% could drastically change
+	// 
+	// Note: if "ApplyGammaBelowZeroDefault" and gamma correction is changed, the output colors seem to wobble a bit.
+	// This might be due to rgb values not mapping "linearly" to Oklab, for example changing gamma correction from 33% to 34% might drastically change
 	// how the LUT correction plays out, and it's done in Oklab and maybe a small hue shift from gamma correction massively changes some Oklab values.
+	// Also, lerping linearly between sRGB and 2.2 gamma isn't really "correct" as they are different formulas.
+	// To work around the issue (which seems to only happen if "ApplyGammaBelowZeroDefault" is true anyway), we could simply force
+	// LUTs to be intepreted with gamma 2.2 (and outputted in sRGB) at 100% if gamma correction was > 0.
 	#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), pow(x, 2.2f), HdrDllPluginConstants.GammaCorrection)
 	//#define LINEARIZE(x) pow(x, 2.2f) /*Version without "HdrDllPluginConstants.GammaCorrection"*/
 	#if GAMMA_CORRECTION_IN_LUTS // 2.2->linear->LUT normalization
