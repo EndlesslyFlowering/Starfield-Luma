@@ -239,12 +239,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	float3 gammaColor = gamma_linear_to_sRGB(originalLinear);
 
 	// Subtract from gamma color relative to its distance to black (at black means full removal)
-	// Cutoff relative to how much was raised. blackY should be consistent enough
+	// Cutoff relative to how much was raised.
 	// Avoid using desaturing the entire length since some LUTs only use a minor shadow fog
 	// ie: lgt_lut_ui_swamp_curve.dds is mostly green but has small blue tint for black
-	float cutOff = analysis.blackY;
+	float cutOff = length(analysis.black);
 	float distance = length(neutralLUTColor);
-	float addStrength = saturate(linearNormalization(distance, 0.f, cutOff, 1.f, 0.f));
+	float addStrength = (cutOff > 0 && cutOff > distance)
+		? (cutOff - distance) / cutOff
+		: 0;
 	float3 newGamma = gammaColor - (addedGamma * addStrength);
 	
 	// Some colors in the LUT may have already been crushed and should stay crushed
