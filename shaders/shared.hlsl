@@ -61,8 +61,8 @@ struct StructHdrDllPluginConstants
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 
 	uint ToneMapperType; // Overrides tonemapper type. 0 is default (not overridden)
-	float ToneMapperSaturation; // 0-2. 1 is neutral
-	float ToneMapperContrast; // 0-2. 1 is neutral
+	float ToneMapperSaturation; // 0.5-1.5. 1 is neutral
+	float ToneMapperContrast; // 0.5-1.5. 1 is neutral
 	float ToneMapperHighlights; // 0-1. 0.5 is "neutral"
 	float ToneMapperShadows; // 0-1. 0.5 is neutral
 	float ToneMapperBloom; // 0-1. 0.5 is neutral

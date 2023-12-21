@@ -28,4 +28,6 @@ namespace Utils
 	std::string GetPhotoModeScreenshotName();
 	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_name);
 	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_name);
+	float linearNormalization(float input, float min, float max, float newMin, float newMax);
+
 }

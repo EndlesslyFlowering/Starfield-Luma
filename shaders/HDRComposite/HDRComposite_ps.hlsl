@@ -869,7 +869,7 @@ void ApplyUserSettingExtendGamut(inout float3 Color)
 void ApplyUserSettingSaturation(inout float3 Color)
 {
 #if ENABLE_TONEMAP
-	float saturation = linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
+	float saturation = HdrDllPluginConstants.ToneMapperSaturation;
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT) && ENABLE_LUT
 	saturation = lerp(saturation, 1.f, HdrDllPluginConstants.ColorGradingStrength * HdrDllPluginConstants.LUTCorrectionStrength);
 #endif // APPLY_MERGED_COLOR_GRADING_LUT && ENABLE_LUT
@@ -881,7 +881,7 @@ void ApplyUserSettingSaturation(inout float3 Color)
 void ApplyUserSettingContrast(inout float3 Color)
 {
 #if ENABLE_TONEMAP
-	const float secondaryContrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
+	const float secondaryContrast = HdrDllPluginConstants.ToneMapperContrast;
 #if 0 // By luminance (no hue shift) (looks off)
 	float outputColorLuminance = Luminance(Color);
 	Color *= safeDivision(pow(outputColorLuminance / MidGray, secondaryContrast) * MidGray, outputColorLuminance);
@@ -1632,7 +1632,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 			(HdrDllPluginConstants.DisplayMode > 0)
 				? HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408
 				: 1.f,
-			linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f),
+			HdrDllPluginConstants.ToneMapperContrast,
 			HdrDllPluginConstants.ToneMapperHighlights * 2.f,
 			HdrDllPluginConstants.ToneMapperShadows * 2.f
 		);
@@ -1677,7 +1677,7 @@ void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tm
 			tmParams.inputColor,
 			ReferenceWhiteNits_BT2408,
 			1.f,
-			linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f),
+			HdrDllPluginConstants.ToneMapperContrast,
 			HdrDllPluginConstants.ToneMapperHighlights * 2.f,
 			HdrDllPluginConstants.ToneMapperShadows * 2.f
 		);

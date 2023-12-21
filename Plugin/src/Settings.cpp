@@ -237,11 +237,11 @@ namespace Settings
 		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 
 		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
-		a_outShaderConstants.Saturation = static_cast<float>(Saturation.value.get_data() * 0.02f);                          // 0-100 to 0-2
-		a_outShaderConstants.Contrast = static_cast<float>(Contrast.value.get_data() * 0.02f);                              // 0-100 to 0-2
+		a_outShaderConstants.Saturation = Utils::linearNormalization(static_cast<float>(Saturation.value.get_data()), 0.f, 100.f, 0.5f, 1.5f); // 0-100 to 0.5 - 1.5
+		a_outShaderConstants.Contrast = Utils::linearNormalization(static_cast<float>(Contrast.value.get_data()), 0.f, 100.f, 0.5f, 1.5f);     // 0-100 to 0.5 - 1.5
 		a_outShaderConstants.Highlights = IsCustomToneMapper()
 			? static_cast<float>(Highlights.value.get_data() * 0.01f) // 0-100 to 0-1
-			: 0.5f;                          
+			: 0.5f;
 		a_outShaderConstants.Shadows = IsCustomToneMapper() 
 			? static_cast<float>(Shadows.value.get_data() * 0.01f)    // 0-100 to 0-1
 			: 0.5f;

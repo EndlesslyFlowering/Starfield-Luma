@@ -148,7 +148,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	const float whiteDistance = length(1.f - neutralLUTColor) / LUTDistanceNormalization;
 	const float totalRange = blackDistance + whiteDistance;
 	// The saturation multiplier in LUTs is restricted to HDR (or gamut mapped SDR) as it easily goes beyond Rec.709
-	const float saturation = SDRRange ? 1.f : linearNormalization(HdrDllPluginConstants.ToneMapperSaturation, 0.f, 2.f, 0.5f, 1.5f);
+	const float saturation = SDRRange ? 1.f : HdrDllPluginConstants.ToneMapperSaturation;
 
 #if LUT_IMPROVEMENT_TYPE == 1
 

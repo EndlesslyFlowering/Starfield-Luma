@@ -452,4 +452,9 @@ namespace Utils
 
 		a_resource->Release();
 	}
+
+	float linearNormalization(float input, float min, float max, float newMin, float newMax)
+	{
+		return ((input - min) * ((newMax - newMin) / (max - min))) + newMin;
+	}
 }
