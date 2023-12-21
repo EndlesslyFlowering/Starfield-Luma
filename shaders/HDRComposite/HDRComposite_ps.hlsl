@@ -1609,61 +1609,79 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 		tmParams.inputColor *= 2.8f;
 		tmParams.inputLuminance *= 2.8f;
 	}
+
+	// Replicate per-channel colors by clamping
+	tmParams.inputColor = clamp(tmParams.inputColor, 0, 12.5f);
+	float postClampedY = Luminance(tmParams.inputColor);
+	tmParams.inputColor *= postClampedY ? tmParams.inputLuminance / postClampedY : 0;
+	tmParams.inputLuminance = postClampedY;
 }
 
 void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
 	ApplyHDRToneMapperScaling(params, tmParams);
-	const float peakNits = (HdrDllPluginConstants.DisplayMode > 0)
-		? HdrDllPluginConstants.HDRPeakBrightnessNits
-		: ReferenceWhiteNits_BT2408; // 203
 
-	float exposureAdjustment = (HdrDllPluginConstants.DisplayMode > 0)
-		? HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408
+	// Don't use variables for constants, use them inline for runtime optimizations
+
+	// outputHDRColor = display-toned
+	tmParams.outputHDRColor = open_drt_transform_custom(
+			tmParams.inputColor,
+			(HdrDllPluginConstants.DisplayMode > 0)
+				? HdrDllPluginConstants.HDRPeakBrightnessNits
+				: ReferenceWhiteNits_BT2408,
+			(HdrDllPluginConstants.DisplayMode > 0)
+				? HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408
+				: 1.f,
+			linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f),
+			HdrDllPluginConstants.ToneMapperHighlights * 2.f,
+			HdrDllPluginConstants.ToneMapperShadows * 2.f
+		);
+	tmParams.outputHDRColor *= (HdrDllPluginConstants.DisplayMode > 0)
+		? HdrDllPluginConstants.HDRPeakBrightnessNits / ReferenceWhiteNits_BT2408
 		: 1.f;
-	float highlightsScaling = HdrDllPluginConstants.ToneMapperHighlights * 2.f;
-	float shadowsScaling = HdrDllPluginConstants.ToneMapperShadows * 2.f;
+	tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
 
-	float contrast = linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f);
-	// Compute ungraded tone map for exact nits
-	if (HdrDllPluginConstants.DisplayMode <= 0
-		|| HdrDllPluginConstants.ColorGradingStrength == 0.f // No LUTs (this branch is more optimized and produces identical results if we have no LUT)
-	)
-	{
-		// NOTE: any negative scRGB color might get lost (clipped or gamut mapped to Rec.709) with OpenDRT,
-		// though this doesn't really matter as there seems to be none to begin with
-		tmParams.outputHDRColor = open_drt_transform_single(
-			tmParams.inputColor,
-			peakNits,
-			exposureAdjustment,
-			shadowsScaling,
-			highlightsScaling,
-			contrast
-		);
-		// Boost by peakNits/white to exceed SDR range (when in HDR).
-		// The tonemapping should have been achored around mid gray anyway.
-		tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
+	// If not using color grading use display-toned
+	// If using SDR-like settings that match Vanilla, use display-toned
+	// If using strict, generate SDR with Vanilla params
+	// If not using strict, generate SDR with user params
+
+	// TODO: Support strict on SDR and loose on HDR
+	const bool supportStrict = false;
+	if (HdrDllPluginConstants.ColorGradingStrength == 0.f
+		|| (!supportStrict && HdrDllPluginConstants.DisplayMode <= 0)
+		|| (
+			(
+				HdrDllPluginConstants.DisplayMode <= 0
+					|| (
+						HdrDllPluginConstants.HDRGamePaperWhiteNits == ReferenceWhiteNits_BT2408
+						&& HdrDllPluginConstants.HDRPeakBrightnessNits == ReferenceWhiteNits_BT2408
+					)
+			) // SDR or HDR with 203/203
+			&& HdrDllPluginConstants.ToneMapperContrast == 1.f
+			&& HdrDllPluginConstants.ToneMapperHighlights == 1.f
+			&& HdrDllPluginConstants.ToneMapperShadows == 1.f
+		)
+	) { // Use display-toned single-pass
 		tmParams.outputSDRColor = tmParams.outputHDRColor;
-
-		tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
 		tmParams.outputSDRLuminance = tmParams.outputHDRLuminance;
-	}
-	else
-	{
-		open_drt_transform_dual(
-			tmParams.inputColor,
-			tmParams.outputSDRColor,
-			tmParams.outputHDRColor,
-			peakNits,
-			exposureAdjustment,
-			shadowsScaling,
-			highlightsScaling,
-			contrast
-		);
-		tmParams.outputHDRColor *= (peakNits / ReferenceWhiteNits_BT2408);
-
+	} else if (
+			!supportStrict
+			|| HdrDllPluginConstants.StrictLUTApplication
+		) { // Vanilla render
+		tmParams.outputSDRColor = open_drt_transform_custom(tmParams.inputColor); 
 		tmParams.outputSDRLuminance = Luminance(tmParams.outputSDRColor);
-		tmParams.outputHDRLuminance = Luminance(tmParams.outputHDRColor);
+	} else { // SDR render with user params
+		// TODO: Add support
+		tmParams.outputSDRColor = open_drt_transform_custom(
+			tmParams.inputColor,
+			ReferenceWhiteNits_BT2408,
+			1.f,
+			linearNormalization(HdrDllPluginConstants.ToneMapperContrast, 0.f, 2.f, 0.5f, 1.5f),
+			HdrDllPluginConstants.ToneMapperHighlights * 2.f,
+			HdrDllPluginConstants.ToneMapperShadows * 2.f
+		);
+		tmParams.outputSDRLuminance = Luminance(tmParams.outputSDRColor);
 	}
 
 	params.outputColor = tmParams.outputSDRColor;

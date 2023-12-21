@@ -150,14 +150,14 @@ float3 apply_aces_highlights(float3 rgb) {
 float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
   // Perf: explicit cube
   // rgb = shd_con(rgb, -1.8f, pow(2.f - shadows, 3) * 0.04); // 0.04 @ 1
-  rgb = shd_con(rgb, -1.8f, (2.f - shadows) * (2.f - shadows) * (2.f - shadows) * 0.04); // 0.04 @ 1
+  rgb = shd_con(rgb, -1.8f, pow(2.f - shadows, 4.f) * 0.025); // 0.04 @ 1
   rgb = shd_con(rgb, -0.50f * shadows * (1.f - shadows), 0.25f); // 0 @ 1
 
   return rgb;
 }
 
 float3 apply_user_highlights(float3 rgb, float highlights = 1.f) {
-  rgb = hl_con(rgb, highlights, 203.f / 100.f);
+  rgb = hl_con(rgb, highlights - 0.15f, 203.f / 100.f);
   return rgb;
 }
 
@@ -464,54 +464,23 @@ float3 open_drt_transform(
 }
 
 
-float3 open_drt_transform_single(
+float3 open_drt_transform_custom(
   float3 rgb,
-  float peakNits = 1000.f,
+  float peakNits = ReferenceWhiteNits_BT2408,
   float midGrayAdjustment = 1.f,
-  float shadows = 1.f,
+  float contrast = 1.f,
   float highlights = 1.f,
-  float contrast = 1.f
+  float shadows = 1.f
   )
 {
-  // Replicate per-channel by clamping
-  float preClampledY = Luminance(rgb);
-  rgb = clamp(rgb, 0, 12.5f);
-  float postClampedY = Luminance(rgb);
-  rgb *= postClampedY ? preClampledY / postClampedY : 0;
-  
   rgb = apply_user_shadows(rgb, shadows);
-  rgb = apply_user_highlights(rgb, highlights * 203.f/peakNits);
-
-  rgb = open_drt_transform(rgb * midGrayAdjustment, peakNits, (0.12f * 203.f/peakNits), contrast);
+  rgb = apply_user_highlights(rgb, highlights * ReferenceWhiteNits_BT2408/peakNits);
+  rgb = open_drt_transform(
+      rgb * midGrayAdjustment,
+      peakNits,
+      (0.12f * ReferenceWhiteNits_BT2408/peakNits),
+      contrast
+  );
 
   return rgb;
 }
-
-void open_drt_transform_dual(
-  float3 rgb,
-  inout float3 sdrOutput,
-  inout float3 hdrOutput,
-  float hdrPeakNits = 1000.f,
-  float midGrayAdjustment = 1.f,
-  float shadows = 1.f,
-  float highlights = 1.f,
-  float contrast = 1.f
-  )
-{
-  // Replicate per-channel by clamping
-  float preClampledY = Luminance(rgb);
-  rgb = clamp(rgb, 0, 12.5f);
-  float postClampedY = Luminance(rgb);
-  rgb *= postClampedY ? preClampledY / postClampedY : 0;
-
-  sdrOutput = rgb;
-  hdrOutput = rgb;
-
-  hdrOutput = apply_user_shadows(hdrOutput, shadows);
-  hdrOutput = apply_user_highlights(hdrOutput, highlights * 203.f/hdrPeakNits);
-
-  sdrOutput = open_drt_transform(sdrOutput, 203.f, 0.12f, 1.f);
-  hdrOutput = open_drt_transform(hdrOutput * midGrayAdjustment, hdrPeakNits, (0.12f * 203.f/hdrPeakNits), contrast);
-
-}
-
