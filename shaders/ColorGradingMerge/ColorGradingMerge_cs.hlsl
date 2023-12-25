@@ -243,7 +243,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Avoid using desaturing the entire length since some LUTs only use a minor shadow fog
 	// ie: lgt_lut_ui_swamp_curve.dds is mostly green but has small blue tint for black
 	// TODO: Improve application method and cut off definition
-	float cutOff = analysis.blackY;
+	float cutOff = length(analysis.black);
 	float distance = length(neutralLUTColor);
 	float addStrength = (cutOff > 0 && cutOff > distance)
 		? (cutOff - distance) / cutOff
@@ -276,6 +276,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	float targetL = retintedLCh[0];
 	const float targetChroma = retintedLCh[1] * saturation;
 	const float targetHue = retintedLCh[2];
+
+	// TODO: Apply same concept for white
 #endif
 
 #if LUT_DEBUG_VALUES
