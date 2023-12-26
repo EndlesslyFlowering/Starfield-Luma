@@ -157,7 +157,7 @@ float3 apply_user_shadows(float3 rgb, float shadows = 1.f) {
 }
 
 float3 apply_user_highlights(float3 rgb, float highlights = 1.f) {
-  rgb = hl_con(rgb, highlights - 0.15f, 203.f / 100.f);
+  rgb = hl_con(rgb, highlights, 2.f);
   return rgb;
 }
 
@@ -469,17 +469,17 @@ float3 open_drt_transform_custom(
   float peakNits = ReferenceWhiteNits_BT2408,
   float midGrayAdjustment = 1.f,
   float contrast = 1.f,
-  float highlights = 1.f,
+  float highlights = 0.f,
   float shadows = 1.f
   )
 {
   rgb = apply_user_shadows(rgb, shadows);
-  rgb = apply_user_highlights(rgb, highlights * ReferenceWhiteNits_BT2408/peakNits);
+  rgb = apply_user_highlights(rgb, (2.f * highlights - 1.15f) * ReferenceWhiteNits_BT2408/peakNits);
   rgb = open_drt_transform(
-      rgb * midGrayAdjustment,
-      peakNits,
-      (0.12f * ReferenceWhiteNits_BT2408/peakNits),
-      contrast
+    rgb * midGrayAdjustment,
+    peakNits,
+    (0.12f * ReferenceWhiteNits_BT2408/peakNits),
+    contrast
   );
 
   return rgb;
