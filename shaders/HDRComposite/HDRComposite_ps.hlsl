@@ -1597,6 +1597,12 @@ void ApplyColorGrading(inout CompositeParams params)
 #if HDR_TONE_MAPPER_ENABLED
 void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperParams tmParams)
 {
+	// Replicate per-channel colors by clamping
+	tmParams.inputColor = clamp(tmParams.inputColor, 0, 4.f);
+	float postClampedY = Luminance(tmParams.inputColor);
+	tmParams.inputColor *= postClampedY ? tmParams.inputLuminance / postClampedY : 0;
+	tmParams.inputLuminance = postClampedY;
+
 	//TODO: this should be lerping DRT tonemapper parameters based on the vanilla SDR tonemapper parameters, not branch on them (nor multiply the input color).
 	if (PcwHdrComposite.Tmo != 3) { // ACESFitted/Parametric
 		params.outputColor *= 3.5f; 
@@ -1610,11 +1616,6 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 		tmParams.inputLuminance *= 2.8f;
 	}
 
-	// Replicate per-channel colors by clamping
-	tmParams.inputColor = clamp(tmParams.inputColor, 0, 12.5f);
-	float postClampedY = Luminance(tmParams.inputColor);
-	tmParams.inputColor *= postClampedY ? tmParams.inputLuminance / postClampedY : 0;
-	tmParams.inputLuminance = postClampedY;
 }
 
 void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)
