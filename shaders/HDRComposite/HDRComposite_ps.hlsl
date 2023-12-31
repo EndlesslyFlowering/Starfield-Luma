@@ -37,8 +37,6 @@
 // 4 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green), but looks pretty desaturated on highlights.
 // 5 Oklch - maintain hue. Gradients look off, not too many invalid colors.
 #define DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE 5
-// Meant for "LUT_IMPROVEMENT_TYPE" 1
-#define MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK 1
 // 0 inverts all of the range (the whole image), to then re-tonemap it with an HDR tonemapper.
 // 1 keeps SDR toe/shadow, invert tonemap in the rest of the range.
 // 2 keeps SDR toe/shadow and midtones, inverts highlights only.

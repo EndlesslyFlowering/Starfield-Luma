@@ -24,6 +24,11 @@
 // it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
 #define SDR_LINEAR_INTERMEDIARY (FORCE_VANILLA_LOOK ? 0 : 1)
 
+// 0 None, 1 Scale with Black Linear 2 Remove Black SRGB Values
+#define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
+#define MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK (LUT_IMPROVEMENT_TYPE == 1)
+
+
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
 // 0) sRGB gamma mapping (Vanilla): the most mathematically correct way of mapping LUTs.
 // 1) Linear mapping: Makes LUTs sampling work in linear space. This possibly shifts colors a bit, and is less mathematically correct, though it's faster and avoids using SDR gamma on LUTs colors that might be in the HDR range (which would be fine anyway).

@@ -3,8 +3,6 @@
 #include "../math.hlsl"
 #include "RootSignature.hlsl"
 
-// 0 None, 1 Scale with Black Linear 2 Remove Black SRGB Values
-#define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
 #define FORCE_SDR_LUTS 0
 #define LUT_DEBUG_VALUES false
 #if LUT_MAPPING_TYPE == 2
