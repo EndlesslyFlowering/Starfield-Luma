@@ -469,7 +469,7 @@ float3 open_drt_transform_custom(
   float peakNits = ReferenceWhiteNits_BT2408,
   float midGrayAdjustment = 1.f,
   float contrast = 1.f,
-  float highlights = 0.f,
+  float highlights = 0.575f,
   float shadows = 1.f
   )
 {
