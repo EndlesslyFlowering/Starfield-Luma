@@ -251,20 +251,15 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 		? (cutOff - distance) / cutOff
 		: 0;
 	float3 newGamma = originalGamma - (addedGamma * addStrength);
-	
-	// Out of all the LUTs, only 5 texels may have a value dip below 0.
-	// In practice this is very small and can be ignored, but a non-Bethesda LUT
-	// may have some very wild values.
-	// Letting colors go negative would create colors never meant to be in the LUTs
-	newGamma = max(0, newGamma);
-
 
 	float3 detintedInGammaLinear = LINEARIZE(newGamma);
 
 	// Just use original LUT color with detinted Y. In practice, this keeps the
 	// original hue. OKLab appears to crush shadows.
-
-	float detintedInGammaY = Luminance(detintedInGammaLinear);
+	
+	// None of the LUTs should produce negative Luminance, but a custom LUT may
+	// be oddly constructed.
+	float detintedInGammaY = max(0, Luminance(detintedInGammaLinear));
 	float originalY = Luminance(originalLinear);
 	float3 retintedLinear = originalLinear * (originalY ? detintedInGammaY / originalY : 0);
 	float3 retintedLab = linear_srgb_to_oklab(retintedLinear);
