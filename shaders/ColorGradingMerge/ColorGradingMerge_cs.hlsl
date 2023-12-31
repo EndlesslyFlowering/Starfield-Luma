@@ -75,12 +75,13 @@ RWTexture3D<float4> OutMixedLUT : register(u0, space8);
 
 struct LUTAnalysis
 {
-	float3 black;
-	float3 white;
+	float3 blackGamma;
+	float3 blackLinear;
+	float3 whiteGamma;
+	float3 whiteLinear;
 	float whiteY;
 	float blackY;
 	float3 whiteLab;
-	float3 blackLab;
 };
 
 static const uint LUTSizeLog2 = (uint)log2(LUT_SIZE);
@@ -95,22 +96,24 @@ uint3 ThreeToTwoDimensionCoordinates(uint3 UVW)
 
 void AnalyzeLUT(Texture2D<float3> LUT, inout LUTAnalysis Analysis)
 {
-	Analysis.black = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb);
-	Analysis.white = LINEARIZE(LUT.Load(ThreeToTwoDimensionCoordinates(LUT_MAX_UINT)).rgb);
-	Analysis.blackY = Luminance(Analysis.black);
-	Analysis.whiteY = Luminance(Analysis.white);
-	Analysis.blackLab = linear_srgb_to_oklab(Analysis.black);
-	Analysis.whiteLab = linear_srgb_to_oklab(Analysis.white);
+	Analysis.blackGamma = LUT.Load(ThreeToTwoDimensionCoordinates(0u)).rgb;
+	Analysis.blackLinear = LINEARIZE(Analysis.blackGamma);
+	Analysis.whiteGamma = LUT.Load(ThreeToTwoDimensionCoordinates(LUT_MAX_UINT)).rgb;
+	Analysis.whiteLinear = LINEARIZE(Analysis.whiteGamma);
+	Analysis.blackY = Luminance(Analysis.blackLinear);
+	Analysis.whiteY = Luminance(Analysis.whiteLinear);
+	Analysis.whiteLab = linear_srgb_to_oklab(Analysis.whiteLinear);
 }
 
 // Analyzes each LUT texel and normalizes their range.
 // Slow but effective.
-float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, bool SDRRange = false)
+float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, float3 neutralLinear, bool SDRRange = false)
 {
 	LUTAnalysis analysis;
 	AnalyzeLUT(LUT, analysis);
 
-	const float3 originalLinear = LINEARIZE(LUT.Load(UVW));
+	const float3 originalGamma = LUT.Load(UVW);
+	const float3 originalLinear = LINEARIZE(originalGamma);
 	const float3 originalLab = linear_srgb_to_oklab(originalLinear);
 	const float3 originalLCh = oklab_to_oklch(originalLab);
 
@@ -144,8 +147,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// perceivable due to darkness (delta from black)
 
 	const static float LUTDistanceNormalization = sqrt(3.f);
-	const float blackDistance = length(neutralLUTColor) / LUTDistanceNormalization;
-	const float whiteDistance = length(1.f - neutralLUTColor) / LUTDistanceNormalization;
+	const float blackDistance = length(neutralLinear) / LUTDistanceNormalization;
+	const float whiteDistance = length(1.f - neutralLinear) / LUTDistanceNormalization;
 	const float totalRange = blackDistance + whiteDistance;
 	// The saturation multiplier in LUTs is restricted to HDR (or gamut mapped SDR) as it easily goes beyond Rec.709
 	const float saturation = SDRRange ? 1.f : HdrDllPluginConstants.ToneMapperSaturation;
@@ -164,16 +167,16 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Modulates how much we fix the raised blacks based on how raised they were.
 	float fixRaisedBlacksInputSmoothing = lerp(1.f, 1.333f, HdrDllPluginConstants.GammaCorrection); // Values from 1 up, greater is smoother
 	float fixRaisedBlacksOutputSmoothing = lerp(1.f, 0.666f, HdrDllPluginConstants.GammaCorrection); // Values from 0 up, smaller than 1 is smoother
-	const float3 invertedBlack = 1.f - (pow(analysis.black, lerp(1.f, fixRaisedBlacksInputSmoothing, analysis.black)) * fixRaisedBlacksStrength);
-	const float3 blackScaling = lerp(1.f / invertedBlack, 1.f, pow(neutralLUTColor, fixRaisedBlacksOutputSmoothing));
+	const float3 invertedBlack = 1.f - (pow(analysis.blackLinear, lerp(1.f, fixRaisedBlacksInputSmoothing, analysis.blackLinear)) * fixRaisedBlacksStrength);
+	const float3 blackScaling = lerp(1.f / invertedBlack, 1.f, pow(neutralLinear, fixRaisedBlacksOutputSmoothing));
 #elif 1 // Original implementation (we can't do this by luminance or in any other way really)
-	const float3 blackScaling = lerp(1.f / (1.f - analysis.black), 1.f, neutralLUTColor);
+	const float3 blackScaling = lerp(1.f / (1.f - analysis.blackLinear), 1.f, neutralLinear);
 #else // Disable for quick testing
 	const float blackScaling = 1.f;
 #endif
 
 	// Create a detinted and darkened color.
-	// On full black (neutralLUTColor coordinates 0 0 0) this will always result in 0 0 0.
+	// On full black (neutralLinear coordinates 0 0 0) this will always result in 0 0 0.
 	float3 detintedLinear = 1.f - ((1.f - originalLinear) * blackScaling);
 
 	// It might seem that "detintedColor" couldn't go below 0 by looking at the math,
@@ -235,41 +238,38 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	// Detint with gamma as this was likely how black was raised.
 	// Assume it was added to shadow range
 
-	float3 addedGamma = gamma_linear_to_sRGB(analysis.black);
-	float3 gammaColor = gamma_linear_to_sRGB(originalLinear);
+	float3 addedGamma = analysis.blackGamma;
 
 	// Subtract from gamma color relative to its distance to black (at black means full removal)
 	// Cutoff relative to how much was raised.
-	// Avoid using desaturing the entire length since some LUTs only use a minor shadow fog
+	// Avoid using desaturing the entire length since some LUTs only use a minor shadow fog:
 	// ie: lgt_lut_ui_swamp_curve.dds is mostly green but has small blue tint for black
-	// TODO: Improve application method and cut off definition
-	float cutOff = length(analysis.black);
-	float distance = length(neutralLUTColor);
+	// Working in gamma seems the most stable at preserving midtones:
+	// ie: lgt_lut_int_astralounge_curve.dds
+	// Avoid using Y/Y' since that would favor green and crush blues
+	float cutOff = length(addedGamma);
+	float distance = length(neutralGamma);
 	float addStrength = (cutOff > 0 && cutOff > distance)
 		? (cutOff - distance) / cutOff
 		: 0;
-	float3 newGamma = gammaColor - (addedGamma * addStrength);
+	float3 newGamma = originalGamma - (addedGamma * addStrength);
 	
-	// Some colors in the LUT may have already been crushed and should stay crushed
-	// Must clamp because the luminance and tint of black is not relative to all colors
-	// For example black could be raised but blue could be crushed
-	// ie: lgt_lut_ext_cydonia_day_curve.dds
+	// Out of all the LUTs, only 5 texels may have a value dip below 0.
+	// In practice this is very small and can be ignored, but a non-Bethesda LUT
+	// may have some very wild values.
 	// Letting colors go negative would create colors never meant to be in the LUTs
 	newGamma = max(0, newGamma);
 
-	float3 detintedInGammaLinear = gamma_sRGB_to_linear(newGamma);
 
-	const float3 detintedInGammaLab = linear_srgb_to_oklab(detintedInGammaLinear);
+	float3 detintedInGammaLinear = LINEARIZE(newGamma);
 
-	// This has the correct L but a and b lack the intended tint. It needs to be added back
-	// If black was not tinted, this has no effect
-	const float shadowTint = addStrength;
-	const float shadowTemp = addStrength;
-	float3 retintedLab = float3(
-		detintedInGammaLab[0],
-		detintedInGammaLab[1] + (analysis.blackLab[1] * shadowTint),
-		detintedInGammaLab[2] + (analysis.blackLab[2] * shadowTemp)
-	);
+	// Just use original LUT color with detinted Y. In practice, this keeps the
+	// original hue. OKLab appears to crush shadows.
+
+	float detintedInGammaY = Luminance(detintedInGammaLinear);
+	float originalY = Luminance(originalLinear);
+	float3 retintedLinear = originalLinear * (originalY ? detintedInGammaY / originalY : 0);
+	float3 retintedLab = linear_srgb_to_oklab(retintedLinear);
 
 	float3 retintedLCh = oklab_to_oklch(retintedLab);
 
@@ -311,7 +311,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	if (raiseL < 1.f) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
 
-	// On full white (neutralLUTColor coordinates 1 1 1) this will always result in 1 1 1.
+	// On full white (neutralLinear coordinates 1 1 1) this will always result in 1 1 1.
 	targetL *= raiseL;
 
 	const float3 targetLCh = float3(targetL, targetChroma, targetHue);
@@ -335,10 +335,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 #else
 		static const float LUTFilmicTonemapCorrection = 1.f;
 #endif
-		const float colorAverageRatio = safeDivision(average(neutralLUTColor), average(targetLinear));
+		const float colorAverageRatio = safeDivision(average(neutralLinear), average(targetLinear));
 		// (optional) Pivot adjustments around the center.
 		// Not using length() as average seems more appropriate here (especially with negative coordinates being possible).
-		const float distanceFromCenter = saturate(abs(average(neutralLUTColor) - 0.5f) * 2.f);
+		const float distanceFromCenter = saturate(abs(average(neutralLinear) - 0.5f) * 2.f);
 		targetLinear *= lerp(1.f, colorAverageRatio, LUTFilmicTonemapCorrection * distanceFromCenter);
 		outputLCh = linear_srgb_to_oklch(targetLinear);
 	}
@@ -352,11 +352,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralLUTColor, b
 	
 	float3 debugLinear = oklch_to_linear_srgb(outputLCh);
 
-	bool isBlackPoint = neutralLUTColor.r == 0.f && neutralLUTColor.g == 0.f && neutralLUTColor.b == 0.f;
+	bool isBlackPoint = neutralLinear.r == 0.f && neutralLinear.g == 0.f && neutralLinear.b == 0.f;
 
 	bool wasBlack = !any(linearColor);
 
-	// If neutralLutColor is 0,0,0, force 0
+	// If neutralLinear is 0,0,0, force 0
 
 	debugLinear *= (!isBlackPoint);
 
@@ -421,8 +421,8 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	const uint3 inUVW = ThreeToTwoDimensionCoordinates(SV_DispatchThreadID);
 	const uint3 outUVW = SV_DispatchThreadID;
 
-	float3 neutralLUTColor = float3(outUVW) / (LUT_SIZE - 1.f); // The neutral LUT is automatically generated by the coordinates, but it's baked with sRGB or 2.2 gamma
-	neutralLUTColor = LINEARIZE(neutralLUTColor); // Yes, we indeed this we want this pre-gamma corrected even on neutral LUT
+	const float3 neutralGamma = float3(outUVW) / (LUT_SIZE - 1.f); // The neutral LUT is automatically generated by the coordinates, but it's baked with sRGB or 2.2 gamma
+	float3 neutralLinear = LINEARIZE(neutralGamma); // Yes, we indeed this we want this pre-gamma corrected even on neutral LUT
 
 #if LUT_IMPROVEMENT_TYPE == 0
 	float3 LUT1Color = LUT1.Load(inUVW);
@@ -438,10 +438,10 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	// NOTE: ignore clamping to the SDR range if "CLAMP_INPUT_OUTPUT_TYPE" was set to do gamut mapping
 	const bool SDRRange = (HdrDllPluginConstants.DisplayMode <= 0 && CLAMP_INPUT_OUTPUT_TYPE != 1) || (bool)FORCE_SDR_LUTS;
 #if LUT_IMPROVEMENT_TYPE >= 1
-	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralLUTColor, SDRRange);
-	float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralLUTColor, SDRRange);
-	float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralLUTColor, SDRRange);
-	float3 LUT4Color = PatchLUTColor(LUT4, inUVW, neutralLUTColor, SDRRange);
+	float3 LUT1Color = PatchLUTColor(LUT1, inUVW, neutralGamma, neutralLinear, SDRRange);
+	float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralGamma, neutralLinear, SDRRange);
+	float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralGamma, neutralLinear, SDRRange);
+	float3 LUT4Color = PatchLUTColor(LUT4, inUVW, neutralGamma, neutralLinear, SDRRange);
 #elif LUT_MAPPING_TYPE == 2
 	LUT1Color = linear_srgb_to_oklab(LUT1Color);
 	LUT2Color = linear_srgb_to_oklab(LUT2Color);
@@ -450,7 +450,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 #endif // LUT_IMPROVEMENT_TYPE
 
 #if LUT_MAPPING_TYPE == 2
-	neutralLUTColor = linear_srgb_to_oklab(neutralLUTColor);
+	neutralLinear = linear_srgb_to_oklab(neutralLinear);
 #endif // LUT_MAPPING_TYPE
 
 	// Blend in linear space or Oklab space depending on "LUT_MAPPING_TYPE"
@@ -460,7 +460,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	float adjustedLUT3Percentage = lerp(PcwColorGradingMerge.LUT3Percentage, 0.f, AdditionalNeutralLUTPercentage);
 	float adjustedLUT4Percentage = lerp(PcwColorGradingMerge.LUT4Percentage, 0.f, AdditionalNeutralLUTPercentage);
 
-	float3 mixedLUT = (adjustedNeutralLUTPercentage * neutralLUTColor)
+	float3 mixedLUT = (adjustedNeutralLUTPercentage * neutralLinear)
 	                + (adjustedLUT1Percentage * LUT1Color)
 	                + (adjustedLUT2Percentage * LUT2Color)
 	                + (adjustedLUT3Percentage * LUT3Color)
