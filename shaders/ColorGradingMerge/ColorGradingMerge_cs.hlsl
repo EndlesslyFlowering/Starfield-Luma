@@ -290,7 +290,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 retintedLCh = oklab_to_oklch(retintedLab);
 
 	float targetL = retintedLCh[0];
-	const float targetChroma = retintedLCh[1]; 
+	const float targetChroma = retintedLCh[1] * saturation;
 	const float targetHue = retintedLCh[2];
 
 #endif
