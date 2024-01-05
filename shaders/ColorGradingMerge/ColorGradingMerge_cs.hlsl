@@ -225,54 +225,6 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	// Use hue from original LUT color
 	const float targetHue = originalLCh[2];
 
-#elif LUT_IMPROVEMENT_TYPE == 2
-
-	// Note: Removing the added SRGB values recreates lost detail instead of crushing to black
-	// Since it only affects the shadow fog, it will has nearly the same amount of
-	// contrast as neutral which is lower than black scaling, but more consistent
-	// since not all LUTs needing a recreated shadow region.
-
-
-	// Detint with gamma as this was likely how black was raised.
-	// Assume it was added to shadow range
-
-	float3 addedGamma = analysis.blackGamma;
-
-	// Subtract from gamma color relative to its distance to black (at black means full removal)
-	// Cutoff relative to how much was raised.
-	// Avoid using desaturing the entire length since some LUTs only use a minor shadow fog:
-	// ie: lgt_lut_ui_swamp_curve.dds is mostly green but has small blue tint for black
-	// Working in gamma seems the most stable at preserving midtones:
-	// ie: lgt_lut_int_astralounge_curve.dds
-	// Avoid using Y/Y' since that would favor green and crush blues
-	float cutOff = length(addedGamma);
-	float distance = length(neutralGamma);
-	float addStrength = (cutOff > 0 && cutOff > distance)
-		? (cutOff - distance) / cutOff
-		: 0;
-	float3 newGamma = originalGamma - (addedGamma * addStrength);
-
-	float3 detintedInGammaLinear = LINEARIZE(newGamma);
-
-	// Just use original LUT color with detinted Y. In practice, this keeps the
-	// original hue. OKLab appears to crush shadows.
-	
-	// None of the LUTs should produce negative Luminance, but a custom LUT may
-	// be oddly constructed.
-	float detintedInGammaY = max(0, Luminance(detintedInGammaLinear));
-	float originalY = Luminance(originalLinear);
-	float3 retintedLinear = originalLinear * (originalY ? detintedInGammaY / originalY : 0);
-	float3 retintedLab = linear_srgb_to_oklab(retintedLinear);
-
-	float3 retintedLCh = oklab_to_oklch(retintedLab);
-
-	float targetL = retintedLCh[0];
-	const float targetChroma = retintedLCh[1] * saturation;
-	const float targetHue = retintedLCh[2];
-
-	// TODO: Apply same concept for white
-#endif
-
 #if LUT_DEBUG_VALUES
 	if (targetL < 0.f) return DEBUG_COLOR;
 #endif // LUT_DEBUG_VALUES
@@ -306,6 +258,42 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 
 	// On full white (neutralLinear coordinates 1 1 1) this will always result in 1 1 1.
 	targetL *= raiseL;
+
+#elif LUT_IMPROVEMENT_TYPE == 2
+
+	float3 addedGamma = analysis.blackGamma;
+	float3 removedGamma = 1.f - analysis.whiteGamma;
+
+	float relativePosition = length(neutralGamma) / sqrt(3);
+
+	float3 removeFog = addedGamma * max(0, 0.5f - relativePosition) / 0.5f;
+	float3 liftHighlights = removedGamma * ((max(0.5f, relativePosition) - 0.5f) / 0.5f);
+
+	// Use max(0) because some texels have some channels dip below 0 (eg: single-channel colors)
+	float3 detintedInGamma = max(0, originalGamma - removeFog) + liftHighlights;
+
+	float3 detintedInGammaLinear = LINEARIZE(detintedInGamma);
+
+#if LUT_MAPPING_TYPE == 0
+	// Mixing sRGB Gamma with OKLab and LUT sample causes crushing
+	// Use linear instead
+	float detintedInGammaY = max(0, Luminance(detintedInGammaLinear));
+	float originalY = Luminance(originalLinear);
+	float3 retintedLinear = originalLinear * (originalY > 0 ? detintedInGammaY / originalY : 0);
+	float3 retintedLab = linear_srgb_to_oklab(retintedLinear);
+#else
+	float3 retintedLab = linear_srgb_to_oklab(detintedInGammaLinear);
+	retintedLab[1] = originalLab[1];
+	retintedLab[2] = originalLab[2];
+#endif
+
+	float3 retintedLCh = oklab_to_oklch(retintedLab);
+
+	float targetL = retintedLCh[0];
+	const float targetChroma = retintedLCh[1]; 
+	const float targetHue = retintedLCh[2];
+
+#endif
 
 	const float3 targetLCh = float3(targetL, targetChroma, targetHue);
 	float3 outputLCh = targetLCh;
