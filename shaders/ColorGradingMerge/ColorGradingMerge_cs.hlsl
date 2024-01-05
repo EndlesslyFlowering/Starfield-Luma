@@ -264,10 +264,13 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 addedGamma = analysis.blackGamma;
 	float3 removedGamma = 1.f - analysis.whiteGamma;
 
-	float relativePosition = length(neutralGamma) / sqrt(3);
+	float shadowLength = 0.5f;
+	float shadowStop = max(neutralGamma.r, max(neutralGamma.g, neutralGamma.b));
+	float3 removeFog = addedGamma * max(0, shadowLength - shadowStop) / shadowLength;
 
-	float3 removeFog = addedGamma * max(0, 0.5f - relativePosition) / 0.5f;
-	float3 liftHighlights = removedGamma * ((max(0.5f, relativePosition) - 0.5f) / 0.5f);
+	float highlightsStart = 0.5f;
+	float highlightsStop = min(neutralGamma.r, min(neutralGamma.g, neutralGamma.b));
+	float3 liftHighlights = removedGamma * ((max(highlightsStart, highlightsStop) - highlightsStart) / highlightsStart);
 
 	// Use max(0) because some texels have some channels dip below 0 (eg: single-channel colors)
 	float3 detintedInGamma = max(0, originalGamma - removeFog) + liftHighlights;
