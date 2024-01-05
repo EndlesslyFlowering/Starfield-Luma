@@ -264,11 +264,14 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 addedGamma = analysis.blackGamma;
 	float3 removedGamma = 1.f - analysis.whiteGamma;
 
-	float shadowLength = 0.5f;
+	float3 midGray = LUT.Load(ThreeToTwoDimensionCoordinates(LUT_MAX_UINT / 2.f)).rgb;
+	float midGrayAvg = (midGray.r + midGray.g + midGray.b) / 3.f;
+
+	float shadowLength = 1.f - midGrayAvg;
 	float shadowStop = max(neutralGamma.r, max(neutralGamma.g, neutralGamma.b));
 	float3 removeFog = addedGamma * max(0, shadowLength - shadowStop) / shadowLength;
 
-	float highlightsStart = 0.5f;
+	float highlightsStart = midGrayAvg;
 	float highlightsStop = min(neutralGamma.r, min(neutralGamma.g, neutralGamma.b));
 	float3 liftHighlights = removedGamma * ((max(highlightsStart, highlightsStop) - highlightsStart) / highlightsStart);
 
