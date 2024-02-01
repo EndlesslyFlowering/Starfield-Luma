@@ -66,7 +66,7 @@ namespace Settings
 		// check for old NativeHDR being present
 		for (auto& moduleName : moduleNamesNativeHDR) {
 			if (isModuleLoaded(moduleName)) {
-				ERROR("An old version of the Native(Auto)HDR plugin is loaded. Please remove it while using Luma. It is a successor to the previous mod.")
+				__REPORT(true, fatal, "An old version of the Native(Auto)HDR plugin is loaded. Please remove it while using Luma. It is a successor to the previous mod.")
 				return false;
 			}
 		}
@@ -80,7 +80,7 @@ namespace Settings
 		}
 
 		if (!bShaderInjectorFound) {
-			ERROR("Starfield Shader Injector is not loaded. Luma requires it to function properly. Please download and install the plugin - https://www.nexusmods.com/starfield/mods/5562")
+			__REPORT(true, fatal, "Starfield Shader Injector is not loaded. Luma requires it to function properly. Please download and install the plugin - https://www.nexusmods.com/starfield/mods/5562")
 			return false;
 		}
 
