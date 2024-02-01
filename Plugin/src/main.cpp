@@ -17,7 +17,7 @@ DLLEXPORT constinit auto SFSEPlugin_Version = []() noexcept {
 	// Uses version specific structure definitions
 	data.IsLayoutDependent(true);
 
-	data.CompatibleVersions({ RUNTIME_VERSION_1_8_86 });
+	data.CompatibleVersions({ CURRENT_RELEASE_RUNTIME });
 
 	return data;
 }();

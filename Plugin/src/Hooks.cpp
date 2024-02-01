@@ -400,7 +400,7 @@ namespace Hooks
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
-				uploadRootConstants(shaderConstants, 2, false);  // Copy
+				uploadRootConstants(shaderConstants, 3, false);  // Copy
 				break;
 			}
 

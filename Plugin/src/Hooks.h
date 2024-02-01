@@ -47,13 +47,13 @@ namespace Hooks
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
-			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x63A), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8
+			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x66C), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8, 0x63A in 1.8
 
 			// Hide vanilla brightness, contrast and hdr brightness
 			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xA94), nop5, 5);
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBEB), nop5, 5);
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD6E), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xAC6), nop5, 5);  // 0xA94 in 1.8
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xC1D), nop5, 5);  // 0xBEB in 1.8
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xDA0), nop5, 5);  // 0xD6E in 1.8
 
 			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
 			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
@@ -65,8 +65,8 @@ namespace Hooks
 			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204409, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
 			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204408, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
 
-			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F0), Hook_EndOfFrame);  // 205436, 0x3F7 pre 1.8
-			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B32), Hook_PostEndOfFrame);  // 205436, 0x7CB pre 1.8
+			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12FB), Hook_EndOfFrame);  // 205436, 0x3F7 pre 1.8, 0x12F0 in 1.8
+			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B43), Hook_PostEndOfFrame);  // 205436, 0x7CB pre 1.8, 0x1B32 in 1.8
 
 			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x17E), HookedScaleformCompositeSetRenderTarget);  // 0x174 pre 1.8
 			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x297), HookedScaleformCompositeDraw);  // 0x249 pre 1.8
