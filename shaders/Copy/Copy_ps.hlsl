@@ -16,12 +16,12 @@
 	#define PEAK_BRIGHTNESS_THRESHOLD_HDR10 FLT_MAX
 #endif
 
-cbuffer _13_15 : register(b0, space0)
+cbuffer CopyLayout : register(b0, space0)
 {
-	float4 _15_m0[1] : packoffset(c0);
+	uint UsePointSampler : packoffset(c0);
 };
 
-Texture2D<float4> inputTexture  : register(t0, space8);
+Texture2D<float4> inputTexture : register(t0, space8);
 SamplerState pointSampler : register(s0, space8);
 SamplerState linearSampler : register(s1, space8);
 
@@ -49,9 +49,8 @@ static const bool TonemapSDRToSDRRange = false;
 [RootSignature(ShaderRootSignature)]
 float4 PS(PSInputs inputs) : SV_Target
 {
-	bool useLinearSampler = (asuint(_15_m0[0u]).x == 0u);
 	float4 color;
-	if (useLinearSampler) {
+	if (UsePointSampler == 0) {
 		color = inputTexture.Sample(linearSampler, inputs.uv);
 	} else {
 		color = inputTexture.Sample(pointSampler, inputs.uv);
