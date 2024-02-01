@@ -6,10 +6,10 @@
 //#define USE_UPSCALING
 
 // shader permutations:
-// - CAS sharpening in FP32 [FF94/1FE95]
-// - CAS sharpening in FP16 with FFX_CAS_USE_PRECISE_MATH [100FF94/201FE95] (USE_PACKED_MATH)
-// - CAS upscaling in FP32 [200FF94/401FE95] (USE_UPSCALING)
-// - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [300FF94/601FE95] (USE_PACKED_MATH + USE_UPSCALING)
+// - CAS sharpening in FP32 [FF94/1FE96]
+// - CAS sharpening in FP16 with FFX_CAS_USE_PRECISE_MATH [100FF94/201FE96] (USE_PACKED_MATH)
+// - CAS upscaling in FP32 [200FF94/401FE96] (USE_UPSCALING)
+// - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [300FF94/601FE96] (USE_PACKED_MATH + USE_UPSCALING)
 
 // don't need it
 //cbuffer _16_18 : register(b0, space6)

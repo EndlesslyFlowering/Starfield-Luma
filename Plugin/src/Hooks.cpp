@@ -395,8 +395,8 @@ namespace Hooks
 				break;
 			}
 
-		case 0x801FE56:
-		case 0x4001FE56:
+		case 0x801FE57:
+		case 0x4001FE57:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -404,7 +404,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0x1FE72:
+		case 0x1FE73:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -412,8 +412,8 @@ namespace Hooks
 				break;
 			}
 
-		case 0x1FE85:
 		case 0x1FE86:
+		case 0x1FE87:
 			{
 				Settings::ShaderConstants shaderConstants;
 				const auto settings = Settings::Main::GetSingleton();
@@ -426,10 +426,10 @@ namespace Hooks
 				break;
 			}
 
-		case 0x1FE95:
-		case 0x201FE95:
-		case 0x401FE95:
-		case 0x601FE95:
+		case 0x1FE96:
+		case 0x201FE96:
+		case 0x401FE96:
+		case 0x601FE96:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -437,7 +437,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0x1FE9B:
+		case 0x1FE9C:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -445,7 +445,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0x1FEAB:
+		case 0x1FEAC:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
@@ -453,7 +453,7 @@ namespace Hooks
 				break;
 			}
 
-		case 0x1FEAC:
+		case 0x1FEAD:
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);

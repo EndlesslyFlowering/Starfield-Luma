@@ -18,34 +18,34 @@ $main =
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "1E01FE1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS", "APPLY_MERGED_COLOR_GRADING_LUT"
 
 	#Copy
-	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "801FE56"  -Defines "OUTPUT_TO_R10G10B10A2"
-	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "4001FE56" -Defines "OUTPUT_TO_R16G16B16A16_SFLOAT"
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "801FE57"  -Defines "OUTPUT_TO_R10G10B10A2"
+	Compile-Shader -Type "ps" -TechniqueName "Copy" -TechniqueId "4001FE57" -Defines "OUTPUT_TO_R16G16B16A16_SFLOAT"
 
 	#FilmGrain
-	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "1FE72" -Entry "main"
+	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "1FE73" -Entry "main"
 
 	#ColorGradingMerge
-	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE85"
+	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE86"
 	#HDRColorGradingMerge
-	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE86" -OutputName "HDRColorGradingMerge"
+	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE87" -OutputName "HDRColorGradingMerge"
 
 	#ContrastAdaptiveSharpening
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "1FE95"
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "201FE95" -Defines "USE_PACKED_MATH" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "401FE95" -Defines "USE_UPSCALING"
-	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "601FE95" -Defines "USE_PACKED_MATH", "USE_UPSCALING" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "1FE96"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "201FE96" -Defines "USE_PACKED_MATH" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "401FE96" -Defines "USE_UPSCALING"
+	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "601FE96" -Defines "USE_PACKED_MATH", "USE_UPSCALING" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 
 	#PostSharpen
-	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "1FE9B"
+	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "1FE9C"
 
 	#ScaleformComposite
-	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "1FEAB"
+	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "1FEAC"
 
 	#BinkMovie
-	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAC"
+	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAD"
 
 	#LensFlare
-	Compile-Shader -Type "ps" -TechniqueName "LensFlare" -TechniqueId "5FE83" -Entry "main"
+	Compile-Shader -Type "ps" -TechniqueName "LensFlare" -TechniqueId "5FE84" -Entry "main"
 }
 
 
