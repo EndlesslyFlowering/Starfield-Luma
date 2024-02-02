@@ -46,6 +46,7 @@ namespace Settings
 		kFilmGrainFPSLimit,
 		kPostSharpen,
 		kHDRScreenshots,
+		kHDRScreenshotsLossless,
 
 		kEND,
 
@@ -435,6 +436,13 @@ namespace Settings
 			"Capture an additional HDR screenshot (.jxr) when using Photo Mode while in HDR.",
 			"HDRScreenshots", "HDR",
 			true
+		};
+		Checkbox HDRScreenshotsLossless{
+			SettingID::kHDRScreenshotsLossless,
+			"Lossless",
+			"Enable to save the HDR screenshots with a lossless parameter. It vastly increases their filesize without a perceptible difference.",
+			"HDRScreenshotsLossless", "HDR",
+			false
 		};
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", "DevSetting01", "Dev", 0.f, 0.f, 100.f };
 		Slider DevSetting02{ SettingID::kDevSetting02, "DevSetting02", "Development setting", "DevSetting02", "Dev", 0.f, 0.f, 100.f };

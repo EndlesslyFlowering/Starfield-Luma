@@ -439,16 +439,22 @@ namespace Utils
 		DirectX::ScratchImage transformedImage;
 		DirectX::TransformImage(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), &TransformColor_HDR, transformedImage);
 
-		DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, fullPath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
-			PROPBAG2 options[1] = {};
-			options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
+		const auto settings = Settings::Main::GetSingleton();
 
-			VARIANT varValues[1] = {};
-			varValues[0].vt = VT_BOOL;
-			varValues[0].bVal = VARIANT_TRUE;
+		if (settings->HDRScreenshotsLossless.value) {
+			DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, fullPath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
+				PROPBAG2 options[1] = {};
+				options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
 
-			std::ignore = props->Write(1, options, varValues);
-		});
+				VARIANT varValues[1] = {};
+				varValues[0].vt = VT_BOOL;
+				varValues[0].bVal = VARIANT_TRUE;
+
+				std::ignore = props->Write(1, options, varValues);
+			});
+		} else {
+			DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, fullPath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, nullptr);
+		}
 
 		a_resource->Release();
 	}

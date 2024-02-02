@@ -1,37 +1,31 @@
 [Dev]
-ForceSDROnHDR = false
 DevSetting01 = 0.0
 DevSetting02 = 0.0
 DevSetting03 = 0.0
 DevSetting04 = 0.0
 DevSetting05 = 0.0
+ForceSDROnHDR = false
 
 [HDR]
+ExtendGamut = 33.3
 GamePaperWhite = 200
+HDRScreenshots = true
+HDRScreenshotsLossless = false
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
-ExtendGamut = 33.333
-UIPaperWhite = 200
 StrictLUTApplication = false
+UIPaperWhite = 200
 
 [Main]
 ColorGradingStrength = 100.0
 DisplayMode = 0
-FilmGrainType = 1
 FilmGrainFPSLimit = 0.0
+FilmGrainType = 1
 GammaCorrectionStrength = 100.0
 LUTCorrectionStrength = 100.0
 PostSharpen = true
 SecondaryBrightness = 50.0
 VanillaMenuLUTs = true
-
-[ToneMapper]
-ToneMapperType = 0
-Saturation = 50.0
-Contrast = 50.0
-Highlights = 50.0
-Shadows = 50.0
-Bloom = 50.0
 
 [RenderTargets]
 RenderTargetsToUpgrade = [
@@ -47,3 +41,11 @@ RenderTargetsToUpgrade = [
     'EnvBRDF',
     'ImageSpaceBufferR10G10B10A2'
 ]
+
+[ToneMapper]
+Bloom = 50.0
+Contrast = 50.0
+Highlights = 50.0
+Saturation = 50.0
+Shadows = 50.0
+ToneMapperType = 0

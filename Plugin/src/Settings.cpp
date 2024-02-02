@@ -329,6 +329,7 @@ namespace Settings
 			config->Bind(FilmGrainFPSLimit.value, FilmGrainFPSLimit.defaultValue);
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
 			config->Bind(HDRScreenshots.value, HDRScreenshots.defaultValue);
+			config->Bind(HDRScreenshotsLossless.value, HDRScreenshotsLossless.defaultValue);
 			config->Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config->Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config->Bind(DevSetting03.value, DevSetting03.defaultValue);
@@ -534,7 +535,12 @@ namespace Settings
 			DrawReshadeSlider(FilmGrainFPSLimit);
 		}
 		DrawReshadeCheckbox(PostSharpen);
+		ImGui::Spacing();
 		DrawReshadeCheckbox(HDRScreenshots);
+		if (HDRScreenshots.value) {
+			ImGui::SameLine();
+			DrawReshadeCheckbox(HDRScreenshotsLossless);
+		}
 
 #if DEVELOPMENT
 		DrawReshadeSlider(DevSetting01);
