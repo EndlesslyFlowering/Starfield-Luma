@@ -62,6 +62,7 @@ namespace Settings
 
 		constexpr std::array moduleNamesNativeHDR = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
 		constexpr std::array moduleNamesShaderInjector = { L"SFShaderInjector.dll", L"SFShaderInjector.asi" };
+		constexpr auto moduleNameDLSSGTOFSR3 = L"dlssg_to_fsr3_amd_is_better.dll";
 
 		// check for old NativeHDR being present
 		for (auto& moduleName : moduleNamesNativeHDR) {
@@ -82,6 +83,11 @@ namespace Settings
 		if (!bShaderInjectorFound) {
 			__REPORT(true, fatal, "Starfield Shader Injector is not loaded. Luma requires it to function properly. Please download and install the plugin - https://www.nexusmods.com/starfield/mods/5562")
 			return false;
+		}
+
+		// check if Nukem's dlssg to fsr3 is present
+		if (isModuleLoaded(moduleNameDLSSGTOFSR3)) {
+		    bIsDLSSGTOFSR3Present = true;
 		}
 
 		// check hdr support
@@ -162,9 +168,14 @@ namespace Settings
 
 		const auto value = DisplayMode.value.get_data();
 
-		if (value == 2) {
-			// fallback to HDR10 with framegen
-			if (bFramegenOn) {
+		if (bFramegenOn) {
+			// force scRGB with dlssg if dlssg_to_fsr3 is present
+			if (value == 1 && bIsDLSSGTOFSR3Present) {
+			    return 2;
+			}
+
+			// otherwise force HDR10
+			if (value == 2 && !bIsDLSSGTOFSR3Present) {
 			    return 1;
 			}
 		}

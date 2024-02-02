@@ -493,6 +493,7 @@ namespace Settings
 		RE::BGSSwapChainObject* swapChainObject = nullptr;
 
 		bool bReshadeSettingsOverlayRegistered = false;
+		bool bIsDLSSGTOFSR3Present = false;
 
 		void DrawReshadeTooltip(const char* a_desc);
 		bool DrawReshadeCheckbox(Checkbox& a_checkbox);
