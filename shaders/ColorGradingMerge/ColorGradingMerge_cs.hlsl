@@ -152,7 +152,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	const float saturation = SDRRange ? 1.f : HdrDllPluginConstants.ToneMapperSaturation;
 
 #if LUT_IMPROVEMENT_TYPE == 0
-	const float targetL = originalLCh[0];
+	float targetL = originalLCh[0];
 	const float targetChroma = originalLCh[1] * saturation;
 	const float targetHue = originalLCh[2];
 #elif LUT_IMPROVEMENT_TYPE == 1
@@ -460,6 +460,13 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	mixedLUT = oklab_to_linear_srgb(mixedLUT);
 	//TODO: make this case convert to sRGB as LUT mapping is more correct in sRGB
 #endif // LUT_MAPPINT_TYPE
+
+#if CLAMP_INPUT_OUTPUT_TYPE == 1 || CLAMP_INPUT_OUTPUT_TYPE == 2 && LUT_MAPPING_TYPE >= 1
+	// Clamp to AP1 since OKLab colors may turn black when not clamped
+	mixedLUT = mul(BT709_2_AP1D65, mixedLUT);
+	mixedLUT = max(mixedLUT, 0.f);
+	mixedLUT = mul(AP1D65_2_BT709, mixedLUT);
+#endif
 
 	// If necessary (!GAMMA_CORRECTION_IN_LUTS), shift from gamma 2.2 to sRGB interpretation, so the LUT input and output colors
 	// are in the same gamma space, which should be more mathematically correct, and we can then instead do the gamma correction later.
