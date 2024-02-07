@@ -12,7 +12,7 @@
 // 2 Clamp final output only (with raw rgb clipping).
 // 3 Clamp many shader passes input and output.
 // 4 Clamp many shader passes input and output, including the first input (HDRComposite pixel shader).
-#define CLAMP_INPUT_OUTPUT_TYPE (FORCE_VANILLA_LOOK ? 3 : 1)
+#define CLAMP_INPUT_OUTPUT_TYPE (FORCE_VANILLA_LOOK ? 3 : 3)
 // If this is true, the code makes the assumption that Bethesda developed and calibrated the game on gamma 2.2 screens, as opposed to sRGB gamma.
 // This implies there was a mismatch baked in the output colors, as they were using a ~sRGB similar formula, which would then be interpreted by screens as 2.2 gamma.
 // By turning this on, we emulate the SDR look in HDR (and out SDR) by baking that assumption into our calculations.
@@ -47,7 +47,7 @@
 // Cannot be set to false with "LUT_MAPPING_TYPE" == 3 (removed), as the point of doing LUTs mapping in OKLAB is for the blackest point to have no luminosity but still have a hue
 // to help out with tinting the dakest 1/16 part of the image, thus if we convert back from OKLAB to Rec.709 to OKLAB, we'd lose the hue on black, due to having no luminance.
 // NOTE: to avoid hue shift from gamma correction, we could do gamma correction by luminance instead of by channel, though the hue shift is kind of "correct".
-#define GAMMA_CORRECTION_IN_LUTS 0
+#define GAMMA_CORRECTION_IN_LUTS 1
 #define FORCE_SDR_LUTS 0
 
 // Brings the range roughly from 80 nits to 203 nits (~2.5)

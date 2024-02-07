@@ -151,7 +151,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	// The saturation multiplier in LUTs is restricted to HDR (or gamut mapped SDR) as it easily goes beyond Rec.709
 	const float saturation = SDRRange ? 1.f : HdrDllPluginConstants.ToneMapperSaturation;
 
-#if LUT_IMPROVEMENT_TYPE == 1
+#if LUT_IMPROVEMENT_TYPE == 0
+	const float targetL = originalLCh[0];
+	const float targetChroma = originalLCh[1] * saturation;
+	const float targetHue = originalLCh[2];
+#elif LUT_IMPROVEMENT_TYPE == 1
 
 	// Note: Black scaling implements curve in the newly created shadow region
 	// This gives it more contrast than if it were to be just restored
@@ -301,12 +305,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 
 #endif
 
+	targetL = max(0, targetL);
+
 	const float3 targetLCh = float3(targetL, targetChroma, targetHue);
 	float3 outputLCh = targetLCh;
 
-	if (targetL <= 0) {
-		outputLCh = 0; // Force black
-	}
 	
 #if 0
 	// Try to remove the S filmic tonemapper curve that is baked in inside some LUTs.

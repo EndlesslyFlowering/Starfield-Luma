@@ -937,7 +937,7 @@ float3 PostGradingGammaCorrect(float3 TonemappedPostProcessedGradedColor)
 	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
 	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, gamma_to_linear_custom(gamma_linear_to_sRGB_custom(TonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
 	gammaCorrected = true;
-#elif SDR_USE_GAMMA_2_2 && ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS
+#elif SDR_USE_GAMMA_2_2 && !ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS
 	// If gamma correction is in LUTs but LUTs are disabled, do it here.
 	// This is questionable as maybe we shouldn't correct gamma if we didn't apply any LUT? Though if we didn't, there would be a gamma difference between applying a neutral LUT and skipping the LUT completely, which is unexpected.
 	// Users can always disable gamma correction alongside color grading if they wished so.
