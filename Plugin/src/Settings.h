@@ -467,11 +467,11 @@ namespace Settings
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
 		RE::BGSSwapChainObject* GetSwapChainObject() const { return swapChainObject; }
-		int32_t GetActualDisplayMode(bool bAcknowledgeScreenshots = false) const;
-		RE::BS_DXGI_FORMAT GetDisplayModeFormat() const;
+		int32_t GetActualDisplayMode(bool bAcknowledgeScreenshots = false, std::optional<RE::FrameGenerationTech> a_frameGenerationTech = std::nullopt) const;
+		RE::BS_DXGI_FORMAT GetDisplayModeFormat(std::optional<RE::FrameGenerationTech> a_frameGenerationTech = std::nullopt) const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
 
-		void RefreshSwapchainFormat();
+		void RefreshSwapchainFormat(std::optional<RE::FrameGenerationTech> a_frameGenerationTech = std::nullopt);
 		void OnDisplayModeChanged();
 
 		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
@@ -487,7 +487,6 @@ namespace Settings
 
 		std::atomic_bool bRequestedSDRScreenshot = false;
 		std::atomic_bool bRequestedHDRScreenshot = false;
-		std::atomic_bool bFramegenOn = false;
 
     private:
 		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");

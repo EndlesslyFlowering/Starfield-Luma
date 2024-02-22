@@ -475,12 +475,11 @@ namespace Hooks
 		return _UnkFunc(a1, a_bgsSwapchainObject);
     }
 
-    void Hooks::Hook_UnkFunc2(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4)
+    void Hooks::Hook_UnkFunc2(uint64_t a1, uint64_t a2)
 	{
-		_UnkFunc2(a1, a2, a3, a4);
+		_UnkFunc2(a1, a2);
 
 		const auto settings = Settings::Main::GetSingleton();
-		settings->bFramegenOn = *Offsets::uiFrameGenerationTech > 0;
 
 		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, settings->GetDisplayModeFormat());
 	}
@@ -566,6 +565,25 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kPostSharpen):
 			HandleSetting(settings->PostSharpen);
 		    break;
+		case 24:  // Frame Generation
+			const auto prevFramegenValue = *Offsets::uiFrameGenerationTech;
+			const auto isFramegenOn = a_eventData.m_Value.Bool;
+			RE::FrameGenerationTech newFramegenValue;
+			if (isFramegenOn) {
+				if (*Offsets::uiUpscalingTechnique == RE::UpscalingTechnique::kDLSS) {
+					newFramegenValue = RE::FrameGenerationTech::kDLSSG;
+				} else {
+					newFramegenValue = RE::FrameGenerationTech::kFSR3;
+				}
+			} else {
+				newFramegenValue = RE::FrameGenerationTech::kNone;
+			}
+			if (prevFramegenValue != newFramegenValue) {
+				if (prevFramegenValue != newFramegenValue) {
+					settings->RefreshSwapchainFormat(newFramegenValue);
+				}
+			}
+			break;
 		}
 
 		_SettingsDataModelCheckboxChanged(a_arg1, a_eventData);
@@ -627,16 +645,35 @@ namespace Hooks
 				filmGrainFPSLimit->m_Enabled.SetValue(settings->IsFilmGrainTypeImproved());
 			}
 			break;
-		case 24: // Frame Generation
-		    const auto prevFramegenValue = *Offsets::uiFrameGenerationTech;
-			const auto newFramegenValue = a_eventData.m_Value.Int;
-			if (prevFramegenValue != newFramegenValue) {
-				settings->bFramegenOn.store(a_eventData.m_Value.Int > 0);
-				if (prevFramegenValue == 0 || newFramegenValue == 0) {
-					settings->RefreshSwapchainFormat();
+		case 22:  // Upscaling Technique
+			auto getUpscalingTechnique = [](int a_settingValue) {
+				switch (a_settingValue) {
+				case 0:  // off
+					return RE::UpscalingTechnique::kNone;
+				case 1:  // CAS
+					return RE::UpscalingTechnique::kCAS;
+				case 2:  // FSR3
+					return RE::UpscalingTechnique::kFSR3;
+				case 3:  // DLSS
+					return RE::UpscalingTechnique::kDLSS;
+				case 4:  // XESS
+					return RE::UpscalingTechnique::kXESS;
 				}
+			};
+			const auto prevUpscalingTechnique = *Offsets::uiUpscalingTechnique;
+			const auto newUpscalingTechnique = getUpscalingTechnique(a_eventData.m_Value.Int);
+			if (prevUpscalingTechnique != newUpscalingTechnique && *Offsets::uiFrameGenerationTech != RE::FrameGenerationTech::kNone) {
+				RE::FrameGenerationTech newFramegenValue;
+				if (newUpscalingTechnique == RE::UpscalingTechnique::kDLSS) {
+					newFramegenValue = RE::FrameGenerationTech::kDLSSG;
+				} else if (newUpscalingTechnique == RE::UpscalingTechnique::kFSR2 || newUpscalingTechnique == RE::UpscalingTechnique::kFSR3) {
+					newFramegenValue = RE::FrameGenerationTech::kFSR3;
+				} else {
+					newFramegenValue = RE::FrameGenerationTech::kNone;
+				}
+				settings->RefreshSwapchainFormat(newFramegenValue);
 			}
-			break;
+		    break;
 		}
 
 		_SettingsDataModelStepperChanged(a_arg1, a_eventData);

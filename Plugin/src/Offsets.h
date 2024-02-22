@@ -5,6 +5,26 @@
 
 #include "sfse/GameUI.h"
 
+namespace RE
+{
+	enum class UpscalingTechnique : uint32_t
+	{
+	    kNone = 1,
+		kCAS = 2,
+		kDLSS = 4,
+		kFSR2 = 8,
+		kFSR3 = 16,
+		kXESS = 32
+	};
+
+    enum class FrameGenerationTech : uint32_t
+    {
+        kNone,
+		kDLSSG,
+		kFSR3
+    };
+}
+
 class Offsets
 {
 public:
@@ -42,7 +62,8 @@ public:
 	static inline bool* bEnableVsync = nullptr;
 	static inline float* fGamma = nullptr;
 	static inline float* fGammaUI = nullptr;
-	static inline uint32_t* uiFrameGenerationTech = nullptr;
+	static inline RE::UpscalingTechnique*  uiUpscalingTechnique = nullptr;
+	static inline RE::FrameGenerationTech* uiFrameGenerationTech = nullptr;
 
 	static void Initialize()
 	{
@@ -71,6 +92,7 @@ public:
 
 		fGamma = reinterpret_cast<float*>(dku::Hook::IDToAbs(1171814));
 		fGammaUI = reinterpret_cast<float*>(dku::Hook::IDToAbs(1171816));
-		uiFrameGenerationTech = reinterpret_cast<uint32_t*>(dku::Hook::IDToAbs(1171831));
+		uiUpscalingTechnique = reinterpret_cast<RE::UpscalingTechnique*>(dku::Hook::IDToAbs(875684));
+		uiFrameGenerationTech = reinterpret_cast<RE::FrameGenerationTech*>(dku::Hook::IDToAbs(1488775));
 	}
 };
