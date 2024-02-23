@@ -27,7 +27,7 @@ namespace Settings
 
     std::string Slider::GetSliderText() const
     {
-		return std::format("{}{}", value.get_data(), suffix);
+		return std::format("{:.0f}{}", value.get_data(), suffix);
     }
 
     float Slider::GetValueFromSlider(float a_percentage) const

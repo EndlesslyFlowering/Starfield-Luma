@@ -694,6 +694,7 @@ namespace Hooks
 
 			// Skip _SettingsDataModelSliderChanged and queue the update callback ourselves. Why, you ask? Bethesda had the
 			// brilliant idea to hardcode slider option text values.
+			const std::string sliderText = a_setting.GetSliderText();
 			struct
 			{
 				int            v1;         // 0
@@ -704,7 +705,7 @@ namespace Hooks
 			} const callbackData = {
 				.v1 = a_eventData.m_SettingID,
 				.v2 = a_eventData.m_Value.Float,
-				.v3 = a_setting.GetSliderText().c_str(),
+				.v3 = sliderText.c_str(),
 			};
 
 			const auto modelData = *reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(a_eventData.m_Model) + 0x8);
@@ -754,17 +755,10 @@ namespace Hooks
 		return false;
     }
 
-    void Hooks::Hook_SettingsDataModelSliderChanged1(RE::SettingsDataModel::UpdateEventData& a_eventData)
+    void Hooks::Hook_SettingsDataModelSliderChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		if (!OnSettingsDataModelSliderChanged(a_eventData)) {
-			_SettingsDataModelSliderChanged1(a_eventData);
-		}
-    }
-
-    void Hooks::Hook_SettingsDataModelSliderChanged2(RE::SettingsDataModel::UpdateEventData& a_eventData)
-    {
-		if (!OnSettingsDataModelSliderChanged(a_eventData)) {
-			_SettingsDataModelSliderChanged2(a_eventData);
+			_SettingsDataModelSliderChanged(a_arg1, a_eventData);
 		}
     }
 
