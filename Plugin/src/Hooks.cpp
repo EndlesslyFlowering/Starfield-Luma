@@ -813,6 +813,58 @@ namespace Hooks
 		}
     }
 
+    int32_t Hooks::Hook_ffxFsr3ContextCreate(void* a_context, RE::FfxFsr3ContextDescription* a_contextDescription)
+	{
+		// format is hardcoded to FFX_SURFACE_FORMAT_R8G8B8A8_UNORM in vanilla
+
+		RE::BS_DXGI_FORMAT newFormat = Settings::Main::GetSingleton()->GetDisplayModeFormat();
+		switch (newFormat) {
+		case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM:
+			a_contextDescription->backBufferFormat = RE::FFX_SURFACE_FORMAT_R10G10B10A2_UNORM;  
+		    break;
+		case RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT:
+			a_contextDescription->backBufferFormat = RE::FFX_SURFACE_FORMAT_R16G16B16A16_FLOAT;
+		    break;
+		}
+
+	    return _ffxFsr3ContextCreate(a_context, a_contextDescription);
+	}
+
+    void Hooks::Hook_CreateShaderResourceView(ID3D12Device* a_this, ID3D12Resource* a_resource, D3D12_SHADER_RESOURCE_VIEW_DESC* a_desc, D3D12_CPU_DESCRIPTOR_HANDLE a_destDescriptor)
+	{
+		// for whatever reason the format is typeless and needs to be fixed up
+
+		if (a_desc->Format == DXGI_FORMAT_R16G16B16A16_TYPELESS) {
+			a_desc->Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+		}
+
+	    a_this->CreateShaderResourceView(a_resource, a_desc, a_destDescriptor);
+	}
+
+	static uint64_t g_savedUnk;
+
+    void Hooks::Hook_UnkFunc3(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint8_t a7)
+	{
+		const auto settings = Settings::Main::GetSingleton();
+		if (settings->bNeedsToRefreshFSR3) {
+			g_savedUnk = a1;
+			a1 = UINT64_MAX;  // force fail check
+		}
+
+		_UnkFunc3(a1, a2, a3, a4, a5, a6, a7);
+	}
+
+    void Hooks::Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6)
+	{
+		const auto settings = Settings::Main::GetSingleton();
+		if (settings->bNeedsToRefreshFSR3) {
+			a1 = g_savedUnk;
+			settings->bNeedsToRefreshFSR3 = false;
+		}
+
+		_UnkFunc3_Internal(a1, a2, a3, a4, a5, a6);
+	}
+
     void Install()
 	{
 #ifndef NDEBUG

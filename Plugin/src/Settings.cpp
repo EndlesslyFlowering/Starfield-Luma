@@ -223,6 +223,10 @@ namespace Settings
 
     void Main::OnDisplayModeChanged()
 	{
+		if (*Offsets::uiFrameGenerationTech == RE::FrameGenerationTech::kFSR3) {
+			bNeedsToRefreshFSR3 = true;
+		}
+
 		RefreshHDRDisplaySupportState();
 		RefreshHDRDisplayEnableState();
 

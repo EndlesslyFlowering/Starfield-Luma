@@ -70,6 +70,12 @@ namespace Hooks
 
 			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x201), HookedScaleformCompositeSetRenderTarget);  // 0x174 pre 1.8, 0x17E pre fsr3
 			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x320), HookedScaleformCompositeDraw);  // 0x249 pre 1.8, 0x297 pre frs3
+
+			// fsr3 fixes
+			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3BE), Hook_ffxFsr3ContextCreate);
+			dku::Hook::write_call<6>(dku::Hook::IDToAbs(1391482, 0x3CE), Hook_CreateShaderResourceView);
+			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x578), Hook_UnkFunc3);
+			_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391760, 0x87), Hook_UnkFunc3_Internal);
 		}
 
 	private:
@@ -121,6 +127,17 @@ namespace Hooks
 
 		static void Hook_PostEndOfFrame(void* a1);
 		static inline std::add_pointer_t<decltype(Hook_PostEndOfFrame)> _PostEndOfFrame;
+
+		static int32_t Hook_ffxFsr3ContextCreate(void* a_context, RE::FfxFsr3ContextDescription* a_contextDescription);
+		static inline std::add_pointer_t<decltype(Hook_ffxFsr3ContextCreate)> _ffxFsr3ContextCreate;
+
+		static void Hook_CreateShaderResourceView(ID3D12Device* a_this, ID3D12Resource* a_resource, D3D12_SHADER_RESOURCE_VIEW_DESC* a_desc, D3D12_CPU_DESCRIPTOR_HANDLE a_destDescriptor);
+
+		static void Hook_UnkFunc3(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint8_t a7);
+		static inline std::add_pointer_t<decltype(Hook_UnkFunc3)> _UnkFunc3;
+
+		static void Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6);
+		static inline std::add_pointer_t<decltype(Hook_UnkFunc3_Internal)> _UnkFunc3_Internal;
 	};
 
 	void Install();

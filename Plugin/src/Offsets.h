@@ -1,29 +1,6 @@
 #pragma once
-#include "RE/BSFixedString.h"
-#include "RE/Buffers.h"
-#include "RE/MessageBoxData.h"
-
+#include "RE/Types.h"
 #include "sfse/GameUI.h"
-
-namespace RE
-{
-	enum class UpscalingTechnique : uint32_t
-	{
-	    kNone = 1,
-		kCAS = 2,
-		kDLSS = 4,
-		kFSR2 = 8,
-		kFSR3 = 16,
-		kXESS = 32
-	};
-
-    enum class FrameGenerationTech : uint32_t
-    {
-        kNone,
-		kDLSSG,
-		kFSR3
-    };
-}
 
 class Offsets
 {
@@ -72,7 +49,7 @@ public:
 
 		ToggleVsync = reinterpret_cast<tToggleVsync>(dku::Hook::IDToAbs(184653));
 		unkToggleVsyncArg1Ptr = reinterpret_cast<uintptr_t*>(dku::Hook::IDToAbs(878340));
-		bEnableVsync = reinterpret_cast<bool*>(dku::Hook::IDToAbs(1171838));  // 875798 pre 1.8
+		bEnableVsync = reinterpret_cast<bool*>(dku::Hook::IDToAbs(1488777));  // 875798 pre 1.8, 1171838 pre fsr3
 
 		MessageMenuManagerPtr = reinterpret_cast<void**>(dku::Hook::IDToAbs(878772));
 		ShowMessageBox = reinterpret_cast<tShowMessageBox>(dku::Hook::IDToAbs(167094));

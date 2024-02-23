@@ -200,9 +200,7 @@ namespace Settings
 		    "Display Mode",
 		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB."
 					"\n"
-					"\nHDR scRGB offers the highest quality but is not compatible with technologies like DLSS Frame Generation."
-					"\n"
-					"\nIn case Frame Generation is on, scRGB will internally fall back to HDR10 regardless of this setting.",
+					"\nIn case Frame Generation is on, the format will internally fall back to the required one regardless of this setting.",
 		    "DisplayMode", "Main",
 		    0,
 		    { "SDR", "HDR10", "HDR scRGB" }
@@ -487,6 +485,8 @@ namespace Settings
 
 		std::atomic_bool bRequestedSDRScreenshot = false;
 		std::atomic_bool bRequestedHDRScreenshot = false;
+
+        std::atomic_bool bNeedsToRefreshFSR3 = false;
 
     private:
 		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");
