@@ -17,7 +17,7 @@ jobs:
 
     - name: Update submodules
       run: |
-        git submodule update
+        git submodule update --init --recursive
 
     - name: Build shaders
       run: |
