@@ -1,5 +1,6 @@
 #include "Settings.h"
 
+#include "Hooks.h"
 #include "Utils.h"
 
 #define ICON_FK_UNDO reinterpret_cast<const char*>(u8"\uf0e2")
@@ -84,8 +85,9 @@ namespace Settings
 		}
 
 		// check if Nukem's dlssg to fsr3 is present
-		if (isModuleLoaded(moduleNameDLSSGTOFSR3)) {
+		if (!bIsDLSSGTOFSR3Present && isModuleLoaded(moduleNameDLSSGTOFSR3)) {
 		    bIsDLSSGTOFSR3Present = true;
+		    Hooks::Patches::PatchStreamline();
 		}
 
 		// check hdr support

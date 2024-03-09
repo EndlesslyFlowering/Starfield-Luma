@@ -25,6 +25,21 @@ namespace Hooks
 			Utils::LogBuffers();
 		}
 
+		static void PatchStreamline()
+		{
+			auto address = reinterpret_cast<uintptr_t>(GetModuleHandleW(L"sl.dlss_g.dll"));
+
+			DWORD d = 0;
+			VirtualProtect(reinterpret_cast<void*>(address + 0x1897F), 1, PAGE_EXECUTE_READWRITE, &d);
+			memset(reinterpret_cast<void*>(address + 0x1897F), 0xEB, 1);
+			VirtualProtect(reinterpret_cast<void*>(address + 0x1897F), 1, d, &d);
+
+			VirtualProtect(reinterpret_cast<void*>(address + 0x19D46), 2, PAGE_EXECUTE_READWRITE, &d);
+			memset(reinterpret_cast<void*>(address + 0x19D46), 0x90, 1);
+			memset(reinterpret_cast<void*>(address + 0x19D47), 0xE9, 1);
+			VirtualProtect(reinterpret_cast<void*>(address + 0x19D46), 2, d, &d);
+		}
+
 	private:
 		static RE::BufferDefinition* GetBufferFromString(std::string_view a_bufferName);
 	};
