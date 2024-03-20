@@ -50,7 +50,7 @@ namespace Hooks
 		static void Hook()
 		{
 			// set color space and save swapchain object pointer
-			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x383), Hook_UnkFunc);  // 0x3EA pre 1.8, 0x42C pre fsr3
+			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x387), Hook_UnkFunc);  // 0x3EA pre 1.8, 0x42C pre fsr3
 
 			// just after loading ini settings; deal with initial framegen setting value
 			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(149040, 0x543), Hook_UnkFunc2);
@@ -62,13 +62,13 @@ namespace Hooks
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
-			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x676), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8, 0x63A in 1.8, 0x66C pre fsr3
+			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x75C), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8, 0x63A in 1.8, 0x66C pre fsr3
 
 			// Hide vanilla brightness, contrast and hdr brightness
 			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xADB), nop5, 5);  // 0xA94 in 1.8, 0xAC6 pre fsr3
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xC26), nop5, 5);  // 0xBEB in 1.8, 0xC1D pre fsr3
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xDA0), nop5, 5);  // 0xD6E in 1.8, 0xDA0 pre fsr3 (unchanged)
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBBE), nop5, 5);  // 0xA94 in 1.8, 0xAC6 pre fsr3
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD09), nop5, 5);  // 0xBEB in 1.8, 0xC1D pre fsr3
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xE89), nop5, 5);  // 0xD6E in 1.8, 0xDA0 pre fsr3 (unchanged)
 
 			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
 			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
@@ -88,7 +88,7 @@ namespace Hooks
 			// fsr3 fixes
 			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3BE), Hook_ffxFsr3ContextCreate);
 			dku::Hook::write_call<6>(dku::Hook::IDToAbs(1391482, 0x3CE), Hook_CreateShaderResourceView);
-			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x578), Hook_UnkFunc3);
+			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x576), Hook_UnkFunc3);
 			_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391760, 0x87), Hook_UnkFunc3_Internal);
 		}
 
