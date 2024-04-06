@@ -254,25 +254,28 @@ namespace Hooks
 		D3D12_GPU_DESCRIPTOR_HANDLE GpuHandleBase;
 	};
 
-	struct Dx12Resource // Setup at 00000001432E692F
+	struct Dx12Resource
 	{
-		char _pad0[0x78];												// 0
-		int  m_DescriptorArrayCount;									// 78 Greater than 0 (msb bit) indicates array
+		char _pad0[0x48];                // 0
+		int  m_CpuDescriptorArrayCount;  // 48 Greater than 0 (msb bit) indicates an array
 		union
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE  m_CpuDescriptor;				// 80 Possibly mip levels? No idea w.r.t. its purpose
-			D3D12_CPU_DESCRIPTOR_HANDLE* m_CpuDescriptorArray;			// 80
+			D3D12_CPU_DESCRIPTOR_HANDLE  m_CpuDescriptor;       // 50 Possibly mip levels? No idea w.r.t. its purpose
+			D3D12_CPU_DESCRIPTOR_HANDLE* m_CpuDescriptorArray;  // 50
 		};
-		D3D12_CPU_DESCRIPTOR_HANDLE m_CBVCpuDescriptor;                 // 88 Each handle is unioned with an array like above?
-		D3D12_CPU_DESCRIPTOR_HANDLE m_SRVCpuDescriptor;                 // 90
-		D3D12_CPU_DESCRIPTOR_HANDLE m_UAVCpuDescriptor;					// 98
-		D3D12_CPU_DESCRIPTOR_HANDLE m_UnknownSecondaryUAVCpuDescriptor;	// A0 Probably raytracing related
-		ID3D12Resource*             m_Resource;							// A8
-		uint32_t                    m_TransitionState;					// B0 Flags converted to D3D12_RESOURCE_STATES enum
+		char _pad1[0x8];                    // 58
+		int  m_UAVCpuDescriptorArrayCount;  // 60
+		union
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE  m_UAVCpuDescriptor;       // 68
+			D3D12_CPU_DESCRIPTOR_HANDLE* m_UAVCpuDescriptorArray;  // 68
+		};
+		char            _pad2[0x8];  // 70
+		ID3D12Resource* m_Resource;  // 78
 	};
-	static_assert(offsetof(Dx12Resource, m_DescriptorArrayCount) == 0x78);
-	static_assert(offsetof(Dx12Resource, m_CBVCpuDescriptor) == 0x88);
-	static_assert(offsetof(Dx12Resource, m_Resource) == 0xA8);
+	static_assert(offsetof(Dx12Resource, m_CpuDescriptorArrayCount) == 0x48);
+	static_assert(offsetof(Dx12Resource, m_UAVCpuDescriptor) == 0x68);
+	static_assert(offsetof(Dx12Resource, m_Resource) == 0x78);
 
 	thread_local Dx12Resource *ScaleformCompositeRenderTarget;
 
@@ -360,7 +363,7 @@ namespace Hooks
     void Hooks::UploadRootConstants(void* a1, void* a2)
     {
 		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8);
-		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x78);
+		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x60);
 
 		auto uploadRootConstants = [&](const Settings::ShaderConstants& a_shaderConstants, uint32_t a_rootParameterIndex, bool a_bCompute) {
 			auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
