@@ -20,6 +20,7 @@ AutoHDRVideos = true
 [Main]
 ColorGradingStrength = 100.0
 DisplayMode = 0
+EnforceUserDisplayMode = false
 FilmGrainFPSLimit = 0.0
 FilmGrainType = 1
 GammaCorrectionStrength = 100.0

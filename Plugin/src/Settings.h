@@ -21,6 +21,7 @@ namespace Settings
 		kSTART = 600,
 
 		kDisplayMode,
+		kEnforceUserDisplayMode,
 		kForceSDROnHDR,
 		kHDR_PeakBrightness,
 		kHDR_GamePaperWhite,
@@ -206,6 +207,13 @@ namespace Settings
 		    "DisplayMode", "Main",
 		    0,
 		    { "SDR", "HDR10", "HDR scRGB" }
+		};
+		Checkbox EnforceUserDisplayMode{
+			SettingID::kEnforceUserDisplayMode,
+			"Enforce User Display Mode",
+			"Forces the user selected \"Display Mode\", ignoring the automatic fallback for Frame Generation compatibility (avoid using this unless you know what you are doing).",
+			"EnforceUserDisplayMode", "Main",
+			false
 		};
 		Checkbox ForceSDROnHDR{
 			SettingID::kForceSDROnHDR,

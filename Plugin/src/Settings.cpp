@@ -101,15 +101,20 @@ namespace Settings
 			*DisplayMode.value = 0;
 			// No need to save, the user might have moved the game to an SDR display temporarily
 		}
+		*DisplayMode.value = std::clamp(DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
 
-		// autodetect peak brightness (only works reliably if HDR is enabled)
+		// autodetect peak brightness (only works reliably if HDR is enabled).
+		// Note that this value is cached on swapchain creation by DX, so it becomes outdated if the game window was moved to another screen,
+		// or if the user toggle HDR or changed their HDR calibration. This means the detection can only work on startup for now,
+		// unless we wrote code to create a new swapchain/factory and get fresh data from DX.
 		if (bIsHDREnabled) {
 			float detectedMaxLuminance;
 			if (Utils::GetHDRMaxLuminance(swapChainObject->swapChainInterface, detectedMaxLuminance)) {
+				detectedMaxLuminance = std::max(detectedMaxLuminance, 80.f); // HDR10 min would be 400 nits, but we let it go as low as 80 anyway
 				PeakBrightness.defaultValue = detectedMaxLuminance;
 				if (PeakBrightnessAutoDetected.get_data() == false) {
 					*PeakBrightnessAutoDetected = true;
-					*PeakBrightness.value = std::max(detectedMaxLuminance, 80.f);
+					*PeakBrightness.value = detectedMaxLuminance;
 					Save();
 				}
 			}
@@ -141,6 +146,7 @@ namespace Settings
 
     bool Main::IsDisplayModeSetToHDR() const
     {
+		// Note: this should acknowledge how the display mode is changed by "GetActualDisplayMode()"
 		return DisplayMode.value.get_data() > 0;
     }
 	
@@ -162,15 +168,16 @@ namespace Settings
 
     int32_t Main::GetActualDisplayMode(bool bAcknowledgeScreenshots, std::optional<RE::FrameGenerationTech> a_frameGenerationTech) const
 	{
+		// This mode is for development only and only supports scRGB to it bypasses the display mode branches by frame generation tech
 		if (IsSDRForcedOnHDR(bAcknowledgeScreenshots)) {
 		    return -1;
 		}
 
-		const auto value = DisplayMode.value.get_data();
+		const auto value = std::clamp(DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
 
 		RE::FrameGenerationTech frameGenerationTech = a_frameGenerationTech.has_value() ? a_frameGenerationTech.value() : *Offsets::uiFrameGenerationTech;
 
-		if (frameGenerationTech > RE::FrameGenerationTech::kNone) {
+		if (frameGenerationTech > RE::FrameGenerationTech::kNone && !EnforceUserDisplayMode.value.get_data()) {
 			// force scRGB with fsr3 or dlssg if dlssg_to_fsr3 is present
 			if (value == 1 && frameGenerationTech == RE::FrameGenerationTech::kFSR3 || (frameGenerationTech == RE::FrameGenerationTech::kDLSSG && bIsDLSSGTOFSR3Present)) {
 			    return 2;
@@ -225,6 +232,7 @@ namespace Settings
 
     void Main::OnDisplayModeChanged()
 	{
+		// When we change the display mode we need to refresh some internal FSR 3 stuff (there's usually no need as that stuff is already refreshed when toggling FSR 3 on and off)
 		if (*Offsets::uiFrameGenerationTech == RE::FrameGenerationTech::kFSR3) {
 			bNeedsToRefreshFSR3 = true;
 		}
@@ -308,6 +316,7 @@ namespace Settings
 		std::call_once(ConfigInit, [&]() {
 			// HDR
 			config->Bind(DisplayMode.value, DisplayMode.defaultValue);
+			config->Bind(EnforceUserDisplayMode.value, EnforceUserDisplayMode.defaultValue);
 			config->Bind(ForceSDROnHDR.value, ForceSDROnHDR.defaultValue);
 			config->Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config->Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
@@ -500,6 +509,9 @@ namespace Settings
 			}
 #if DEVELOPMENT
 			if (DrawReshadeCheckbox(ForceSDROnHDR)) {
+				OnDisplayModeChanged();
+			}
+			if (DrawReshadeCheckbox(EnforceUserDisplayMode)) {
 				OnDisplayModeChanged();
 			}
 #endif
