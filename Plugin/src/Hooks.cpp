@@ -36,6 +36,10 @@ namespace Hooks
 			extendGamut->m_Enabled.SetValue(a_bGameRenderingHDREnable);
 		}
 
+		if (const auto autoHDRVideos = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_AutoHDRVideos))) {
+			autoHDRVideos->m_Enabled.SetValue(a_bGameRenderingHDREnable);
+		}
+
 		if (const auto secondaryBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kSecondaryBrightness))) {
 			secondaryBrightnessSetting->m_Enabled.SetValue(!a_bGameRenderingHDREnable);
 		}
@@ -128,6 +132,7 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
+		CreateSliderSetting(a_settingList, settings->AutoHDRVideos, settings->IsGameRenderingSetToHDR());
 
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 
@@ -558,6 +563,9 @@ namespace Hooks
 					settings->OnDisplayModeChanged();
 				}
 			}
+			break;
+		case static_cast<int>(Settings::SettingID::kHDR_AutoHDRVideos):
+			HandleSetting(settings->AutoHDRVideos);
 			break;
 		case static_cast<int>(Settings::SettingID::kVanillaMenuLUTs):
 			HandleSetting(settings->VanillaMenuLUTs);

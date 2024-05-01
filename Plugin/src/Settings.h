@@ -26,6 +26,7 @@ namespace Settings
 		kHDR_GamePaperWhite,
 		kHDR_UIPaperWhite,
 		kHDR_ExtendGamut,
+		kHDR_AutoHDRVideos,
 
 		kSecondaryBrightness,
 
@@ -164,6 +165,7 @@ namespace Settings
 		float    GamePaperWhite;
 		float    UIPaperWhite;
 		float    ExtendGamut;
+		uint32_t bAutoHDRVideos;
 
 		float    SDRSecondaryBrightness;
 
@@ -262,6 +264,14 @@ namespace Settings
 			0.f,
 			100.f,
 			"%"
+		};
+		Checkbox AutoHDRVideos{
+			SettingID::kHDR_AutoHDRVideos,
+			"AutoHDR Videos",
+			"Applies an \"AutoHDR\" filter to pre-rendered videos."
+				"\nThis should provide a more consistent experience, avoiding videos looking flat compared to the rest of the game.",
+			"AutoHDRVideos", "HDR",
+			true
 		};
 
 		Slider SecondaryBrightness{

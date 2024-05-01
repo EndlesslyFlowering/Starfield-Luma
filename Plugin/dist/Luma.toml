@@ -15,6 +15,7 @@ PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
 StrictLUTApplication = false
 UIPaperWhite = 200
+AutoHDRVideos = true
 
 [Main]
 ColorGradingStrength = 100.0

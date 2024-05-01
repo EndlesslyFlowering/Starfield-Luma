@@ -14,8 +14,7 @@ struct PSInputs
 	float2 TEXCOORD : TEXCOORD0;
 };
 
-//TODO: expose to user? At least the on/off bool, and maybe the shoulder pow and max nits, but it's probably better to simply pick a default that looks nice on most movies.
-static const bool BinkVideosAutoHDR = true;
+//TODO: maybe expose the shoulder pow and max nits to user? it's probably better to simply pick a default that looks nice on most movies.
 static const float BinkVideosAutoHDRMaxOutputNits = 750.f;
 // The higher it is, the "later" highlights start
 static const float BinkVideosAutoHDRShoulderPow = 2.75f; // A somewhat conservative value
@@ -76,7 +75,7 @@ float4 PS(PSInputs inputs) : SV_Target
 		if (HdrDllPluginConstants.DisplayMode > 0)
 		{
 			const float paperWhite = HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB;
-			if (BinkVideosAutoHDR)
+			if (HdrDllPluginConstants.AutoHDRVideos)
 			{
 				color = PumboAutoHDR(color, HdrDllPluginConstants.HDRPeakBrightnessNits, paperWhite);
 			}

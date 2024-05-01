@@ -250,6 +250,7 @@ namespace Settings
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
 		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data()) * 0.01f;                      // 0-100 to 0-1
+		a_outShaderConstants.bAutoHDRVideos = static_cast<uint32_t>(AutoHDRVideos.value.get_data());
 		// There is no reason this wouldn't work in HDR, but for now it's disabled
 		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : (static_cast<float>(SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 
@@ -312,6 +313,7 @@ namespace Settings
 			config->Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
 			config->Bind(UIPaperWhite.value, UIPaperWhite.defaultValue);
 			config->Bind(ExtendGamut.value, ExtendGamut.defaultValue);
+			config->Bind(AutoHDRVideos.value, AutoHDRVideos.defaultValue);
 
 			// SDR
 			config->Bind(SecondaryBrightness.value, SecondaryBrightness.defaultValue);
@@ -508,6 +510,7 @@ namespace Settings
 			DrawReshadeValueStepper(GamePaperWhite);
 			DrawReshadeValueStepper(UIPaperWhite);
 			DrawReshadeSlider(ExtendGamut);
+			DrawReshadeValueStepper(AutoHDRVideos);
 		}
 		else
 		{

@@ -62,6 +62,7 @@ struct StructHdrDllPluginConstants
 	float HDRGamePaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRUIPaperWhiteNits; // 203 is the reference value (ReferenceWhiteNits_BT2408)
 	float HDRExtendGamut; // 0-1. 0 is neutral
+	uint AutoHDRVideos;
 
 	float SDRSecondaryBrightness; // 0-2. Only meant for SDR. 1 is neutral
 
