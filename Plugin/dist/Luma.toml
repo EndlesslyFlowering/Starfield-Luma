@@ -1,11 +1,3 @@
-[Dev]
-DevSetting01 = 0.0
-DevSetting02 = 0.0
-DevSetting03 = 0.0
-DevSetting04 = 0.0
-DevSetting05 = 0.0
-ForceSDROnHDR = false
-
 [HDR]
 ExtendGamut = 33.3
 GamePaperWhite = 200
@@ -51,3 +43,11 @@ Highlights = 50.0
 Saturation = 50.0
 Shadows = 50.0
 ToneMapperType = 0
+
+[Dev]
+DevSetting01 = 0.0
+DevSetting02 = 0.0
+DevSetting03 = 0.0
+DevSetting04 = 0.0
+DevSetting05 = 0.0
+ForceSDROnHDR = false
