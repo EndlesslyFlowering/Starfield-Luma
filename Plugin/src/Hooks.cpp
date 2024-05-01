@@ -126,7 +126,10 @@ namespace Hooks
 
 		CreateSeparator(a_settingList, Settings::SettingID::kSTART);
 
-		// We don't expose "DevSetting*" or "ForceSDROnHDR" to the game settings, they'd just confuse users
+		// We don't expose "DevSetting*" or "EnforceUserDisplayMode" or "ForceSDROnHDR" or "kHDRScreenshots*" to the game settings, they'd just confuse users.
+		// Here we write down the number of settings we didn't add to the UI, to make sure "Settings::SettingID::kEND" has the right value.
+		constexpr int unusedSettings = 4;
+
 		CreateStepperSetting(a_settingList, settings->DisplayMode, settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
@@ -153,7 +156,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->FilmGrainFPSLimit, settings->IsFilmGrainTypeImproved());
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
 
-		CreateSeparator(a_settingList, Settings::SettingID::kEND);
+		CreateSeparator(a_settingList, Settings::SettingID::kEND - unusedSettings);
     }
 
 	struct ScreenshotData
