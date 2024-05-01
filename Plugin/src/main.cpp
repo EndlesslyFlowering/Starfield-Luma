@@ -60,9 +60,7 @@ void LoadPlugin(bool a_bIsSFSE)
 DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
 {
 #ifndef NDEBUG
-	while (!IsDebuggerPresent()) {
-		Sleep(100);
-	}
+	MessageBoxA(NULL, "Loaded. You can now attach the debugger or continue execution.", Plugin::NAME.data(), NULL);
 #endif
 
 	if (bIsLoaded) {
