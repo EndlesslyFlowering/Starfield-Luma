@@ -44,7 +44,6 @@ float rand(float2 uv) {
 	return frac(sin(dot(uv,float2(12.9898,78.233)))*43758.5453123);
 }
 
-
 // Returns a random number between 0 and 1 based on seed
 float bethesdaRandom(float seed) {
 	return frac(sin(seed) * 493013.f);
@@ -100,7 +99,6 @@ void frag_main()
 			: inputColor;
 
 		const float filmGrainInvSize = 1.f / (FILM_GRAIN_TEXTURE_SIZE - 1u);
-		const float filmGrainHalfSize = 521.f; //TODO: rename in case we keep this as 521
 		// Applying modulus against 1023 will give value between 0 and 1023
 		// Same two values for all texels this frame
 		float randomFromRange1 = float(int(uint(filmGrainColorAndIntensity.x) & (FILM_GRAIN_TEXTURE_SIZE - 1u)));
@@ -108,11 +106,13 @@ void frag_main()
 
 		// Divide by 1023 to get a number between 0 and 1
 		float randomNormalized1 = randomFromRange1 * filmGrainInvSize;
-		float randomNormalized2 = randomFromRange1 * filmGrainInvSize;
+		float randomNormalized2 = randomFromRange2 * filmGrainInvSize;
 
 		// Offset by x/y position
 		float uniqueX = randomNormalized1 + TEXCOORD.x;
-		float uniqueY = (randomNormalized2 + TEXCOORD.y) * filmGrainHalfSize;
+		// Note: it's not clear if the "521" was purposely picked or if it was meant to be 512 (half of "FILM_GRAIN_TEXTURE_SIZE"),
+		// either way, it shoudln't make a big difference.
+		float uniqueY = (randomNormalized2 + TEXCOORD.y) * 521.f;
 
 		// Unique each frame and texel. (Is it though?)
 		float seed = (uniqueX + uniqueY);
@@ -121,7 +121,7 @@ void frag_main()
 		float randomNumber = bethesdaRandom(seed);
 
 		float colorLuma = Luminance(gammaColor);
-		float inverseLuma = saturate(1.f - colorLuma); // inverseLuma
+		float inverseLuma = saturate(1.f - colorLuma);
 
 		float luminanceShift = (randomNumber * 2.f) - 1.f;
 
