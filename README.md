@@ -13,6 +13,8 @@ To set up a development environment for this mod (skip to step 7 if you don't ca
 8) set the `DEVELOPMENT` defines to `1` in `Plugin\src\Settings.h` and `shaders\shared.hlsl` to have full access to the mod development settings
 9) To allow shaders hot reload (live edits) while running, open `SFShaderInjector.ini` (it goes alongside the Shader Injector ASI or DLL, wherever the mod was installed) and change `AllowLiveUpdates` to `1`
 10) You can now modify (or add) any hlsl shader in the `shaders` folder and run `compile_all_shaders.ps1` to build them and copy them to the game folder
+11) Run `Plugin\dist\deploy-release.ps1` to package a new full release
 
 If you want to modify the Shader Injector source code, you can find it [here](https://github.com/Nukem9/sf-shader-injector). That isn't necessary for the development of this mod.
+If you want to bump up the project version, it's in `Plugin\CMakeList.txt`.
 Note that `SFPath` can also point to a virtual folder from a mod manager.
