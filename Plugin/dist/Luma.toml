@@ -22,6 +22,7 @@ SecondaryBrightness = 50.0
 VanillaMenuLUTs = true
 
 [RenderTargets]
+# Do NOT change these unless you know what you are doing
 RenderTargetsToUpgrade = [
     'ImageSpaceBuffer',
     'ScaleformCompositeBuffer',
@@ -35,6 +36,12 @@ RenderTargetsToUpgrade = [
     'EnvBRDF',
     'ImageSpaceBufferR10G10B10A2'
 ]
+ExtraRenderTargetsToUpgrade = [
+    'NativeResolutionColorBuffer01',
+    'ColorBuffer01'
+]
+# Only confirmed to work on Nvidia GPUs (does NOT work on AMD GPUs)
+UpgradeExtraRenderTargets = false
 
 [ToneMapper]
 Bloom = 50.0

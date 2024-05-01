@@ -364,9 +364,12 @@ namespace Settings
 				"TAA_idTech7HistoryColorTarget",
 				"EnvBRDF",
 				"ImageSpaceBufferR10G10B10A2"
-				//"NativeResolutionColorBuffer01",  // issues on AMD
-				//"ColorBuffer01",  // issues on AMD
 			);
+			config->Bind(ExtraRenderTargetsToUpgrade,
+				"NativeResolutionColorBuffer01",  // issues on AMD
+				"ColorBuffer01"  // issues on AMD
+			);
+			config->Bind(UpgradeExtraRenderTargets, false);
 			config->Bind(PeakBrightnessAutoDetected, false);
 		});
 

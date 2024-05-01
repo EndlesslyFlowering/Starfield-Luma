@@ -21,6 +21,13 @@ namespace Hooks
 					Utils::SetBufferFormat(buffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
 				}
 			}
+			if (settings->UpgradeExtraRenderTargets.get_data()) {
+				for (const auto& renderTargetName : settings->ExtraRenderTargetsToUpgrade.get_collection()) {
+					if (const auto buffer = GetBufferFromString(renderTargetName)) {
+						Utils::SetBufferFormat(buffer, RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT);
+					}
+				}
+			}
 
 			Utils::LogBuffers();
 		}

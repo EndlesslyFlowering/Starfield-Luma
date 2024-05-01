@@ -35,9 +35,9 @@ How to use:
 Drop the content of the mod into the game root folder, or install it with a mod manager in the game root folder.
 The game needs to be started through the SFSE loader on Steam and ASI loader on Microsoft Store (Game Pass).
 Please remove the old "NativeHDR" or "NativeAutoHDR" mods before starting Luma.
+Before updating the mod, make sure to delete all its previous files.
 You can access Luma's settings directly from the game graphics setting menu. If you have ReShade installed, our settings will also be visible there through a widget.
 There a .toml config file in the mod's dll/asi folders, delete it to reset settings.
-Before updating the mod, make sure to delete all its previous files.
 To uninstall, clear all the files (they are unique to the mod).
 
 Dependencies:
@@ -55,6 +55,7 @@ You do NOT need any other HDR related mod, like AutoHDR ReShades, SpecialK, or "
 Refrain from using any ReShade shaders unless you are certain they support HDR.
 If you find the playable character flashlight too intense, you can use this mod https://www.nexusmods.com/starfield/mods/4888.
 If you want to make some game VFX more "HDR" like, you can use this mod https://www.nexusmods.com/starfield/mods/340.
+If you use a Nvidia GPU, you can set "UpgradeExtraRenderTargets" to true in the Luma.toml config file, to enjoy even more color buffer quality upgrades (less color banding).
 
 Issues and limitations:
 -scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)

@@ -466,8 +466,10 @@ namespace Settings
 		Slider DevSetting04{ SettingID::kDevSetting04, "DevSetting04", "Development setting", "DevSetting04", "Dev", 50.f, 0.f, 100.f };
 		Slider DevSetting05{ SettingID::kDevSetting05, "DevSetting05", "Development setting", "DevSetting05", "Dev", 50.f, 0.f, 100.f };
 		String RenderTargetsToUpgrade{ "RenderTargetsToUpgrade", "RenderTargets" };
+		String ExtraRenderTargetsToUpgrade{ "ExtraRenderTargetsToUpgrade", "RenderTargets" }; // Enabling these fixes banding, as they are the main color buffers
+		Boolean UpgradeExtraRenderTargets{ "UpgradeExtraRenderTargets", "RenderTargets" };
 
-		Boolean PeakBrightnessAutoDetected { "PeakBrightnessAutoDetected", "HDR" };
+		Boolean PeakBrightnessAutoDetected{ "PeakBrightnessAutoDetected", "HDR" };
 
 		bool InitCompatibility(RE::BGSSwapChainObject* a_swapChainObject);
 		void RefreshHDRDisplaySupportState();
