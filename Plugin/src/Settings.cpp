@@ -354,7 +354,7 @@ namespace Settings
 			config->Bind(DevSetting05.value, DevSetting05.defaultValue);
 			config->Bind(RenderTargetsToUpgrade,
 				"ImageSpaceBuffer",
-				"ScaleformCompositeBuffer",
+				"ScaleformCompositeBuffer", // Not upgrading this could cause issues with FSR FG as the swapchain would be in a different format than the UI buffer (untested)
 				"SF_ColorBuffer",
 				"HDRImagespaceBuffer",
 				"ImageSpaceHalfResBuffer",
