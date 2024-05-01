@@ -240,7 +240,7 @@ namespace Settings
 		a_outShaderConstants.DisplayMode = GetActualDisplayMode(true);
 		// TODO: expose HDR screenshot normalization as a user (advanced/config only) setting
 		if (bRequestedHDRScreenshot) {
-			// Unlock HDR range to HDR10 max when taking screenshots, to they appear consistently independently of the user peak brightness.
+			// Unlock HDR range to HDR10 max when taking screenshots, so they appear consistently independently of the user peak brightness.
 			// For now we don't force the paper white to 203 (reference/suggested value) because that'd be a bit confusing for users.
 			a_outShaderConstants.PeakBrightness = 10000.f;
 		}
@@ -249,37 +249,37 @@ namespace Settings
 		}
 		a_outShaderConstants.GamePaperWhite = static_cast<float>(GamePaperWhite.value.get_data());
 		a_outShaderConstants.UIPaperWhite = static_cast<float>(UIPaperWhite.value.get_data());
-		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data() * 0.01f);                      // 0-100 to 0-1
+		a_outShaderConstants.ExtendGamut = static_cast<float>(ExtendGamut.value.get_data()) * 0.01f;                      // 0-100 to 0-1
 		// There is no reason this wouldn't work in HDR, but for now it's disabled
-		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : static_cast<float>((SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
+		a_outShaderConstants.SDRSecondaryBrightness = IsGameRenderingSetToHDR(true) ? 1.f : (static_cast<float>(SecondaryBrightness.value.get_data()) * 0.02f); // 0-100 to 0-2
 
 		a_outShaderConstants.ToneMapperType = static_cast<uint32_t>(ToneMapperType.value.get_data());
 		a_outShaderConstants.Saturation = Utils::linearNormalization(static_cast<float>(Saturation.value.get_data()), 0.f, 100.f, 0.5f, 1.5f); // 0-100 to 0.5 - 1.5
 		a_outShaderConstants.Contrast = Utils::linearNormalization(static_cast<float>(Contrast.value.get_data()), 0.f, 100.f, 0.5f, 1.5f);     // 0-100 to 0.5 - 1.5
 		a_outShaderConstants.Highlights = IsCustomToneMapper()
-			? static_cast<float>(Highlights.value.get_data() * 0.01f) // 0-100 to 0-1
+			? static_cast<float>(Highlights.value.get_data()) * 0.01f // 0-100 to 0-1
 			: 0.5f;
 		a_outShaderConstants.Shadows = IsCustomToneMapper() 
-			? static_cast<float>(Shadows.value.get_data() * 0.01f)    // 0-100 to 0-1
+			? static_cast<float>(Shadows.value.get_data()) * 0.01f    // 0-100 to 0-1
 			: 0.5f;
 		a_outShaderConstants.Bloom = static_cast<float>(Bloom.value.get_data() * 0.01f);                                    // 0-100 to 0-1
 
-		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data() * 0.01f);    // 0-100 to 0-1
-		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.ColorGradingStrength = static_cast<float>(ColorGradingStrength.value.get_data()) * 0.01f;    // 0-100 to 0-1
+		a_outShaderConstants.LUTCorrectionStrength = static_cast<float>(LUTCorrectionStrength.value.get_data()) * 0.01f;  // 0-100 to 0-1
 		a_outShaderConstants.StrictLUTApplication = static_cast<uint32_t>(StrictLUTApplication.value.get_data());
 
-		a_outShaderConstants.GammaCorrectionStrength = static_cast<float>(GammaCorrectionStrength.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.GammaCorrectionStrength = static_cast<float>(GammaCorrectionStrength.value.get_data()) * 0.01f;  // 0-100 to 0-1
 		a_outShaderConstants.FilmGrainType = static_cast<uint32_t>(FilmGrainType.value.get_data());
 		a_outShaderConstants.FilmGrainFPSLimit = static_cast<float>(FilmGrainFPSLimit.value.get_data());
 		a_outShaderConstants.PostSharpen = static_cast<uint32_t>(PostSharpen.value.get_data());
 
 		a_outShaderConstants.bIsAtEndOfFrame = static_cast<uint32_t>(bIsAtEndOfFrame.load());
 		a_outShaderConstants.RuntimeMS = *Offsets::g_durationOfApplicationRunTimeMS;
-		a_outShaderConstants.DevSetting01 = static_cast<float>(DevSetting01.value.get_data() * 0.01f);  // 0-100 to 0-1
-		a_outShaderConstants.DevSetting02 = static_cast<float>(DevSetting02.value.get_data() * 0.01f);  // 0-100 to 0-1
-		a_outShaderConstants.DevSetting03 = static_cast<float>(DevSetting03.value.get_data() * 0.01f);  // 0-100 to 0-1
-		a_outShaderConstants.DevSetting04 = static_cast<float>(DevSetting04.value.get_data() * 0.01f);  // 0-100 to 0-1
-		a_outShaderConstants.DevSetting05 = static_cast<float>(DevSetting05.value.get_data() * 0.01f);  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting01 = static_cast<float>(DevSetting01.value.get_data()) * 0.01f;  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting02 = static_cast<float>(DevSetting02.value.get_data()) * 0.01f;  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting03 = static_cast<float>(DevSetting03.value.get_data()) * 0.01f;  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting04 = static_cast<float>(DevSetting04.value.get_data()) * 0.01f;  // 0-100 to 0-1
+		a_outShaderConstants.DevSetting05 = static_cast<float>(DevSetting05.value.get_data()) * 0.01f;  // 0-100 to 0-1
     }
 
     void Main::InitConfig(bool a_bIsSFSE)

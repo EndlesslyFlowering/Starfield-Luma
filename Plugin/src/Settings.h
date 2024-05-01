@@ -352,7 +352,7 @@ namespace Settings
 		Slider ColorGradingStrength{
 			SettingID::kColorGradingStrength,
 			"Color Grading Strength",
-			"Sets the strength of the game's color grading used to apply the game's look and feel.",
+			"Sets the intensity of the game's color grading LUTs used to apply the game's look and feel.",
 			"ColorGradingStrength", "Main",
 			100.f,
 			0.f,
@@ -361,7 +361,7 @@ namespace Settings
 		};
 		Slider LUTCorrectionStrength{
 			SettingID::kLUTCorrectionStrength,
-			"Color Grading Range",
+			"Color Grading Range", /*Referenced in Luma ReadMe*/
 			"Expands the color grading LUTs to be full-range."
 				"\nIncreasing will remove both the low-contrast fog present in shadows and the brightness limits in highlights caused by clamped LUTs.",
 			"LUTCorrectionStrength", "Main",
@@ -373,14 +373,14 @@ namespace Settings
 		Checkbox VanillaMenuLUTs{
 			SettingID::kVanillaMenuLUTs,
 			"Vanilla Menu Color Grading",
-			"When enabled, menus use the vanilla color grading and will be unaffected by the \"Color Grading Strength\" and \"Color Grading Range\" settings.",
+			"When enabled, menus use the vanilla color grading LUTs and will be unaffected by the \"Color Grading Strength\" and \"Color Grading Range\" settings.",
 			"VanillaMenuLUTs", "Main",
 			true
 		};
 		Checkbox StrictLUTApplication{
 			SettingID::kStrictLUTApplication,
 			"Strict Color Grading",
-			"Applies color grading a way that is more similar to the vanilla SDR look. Leave off for a more HDR look.",
+			"Applies color grading LUTs in a way that is more similar to the vanilla SDR look. Leave off for a more HDR look.",
 			"StrictLUTApplication", "HDR",
 			false
 		};

@@ -1923,7 +1923,7 @@ bool ApplyDebugLUT(inout CompositeParams params)
 		if (HdrDllPluginConstants.DisplayMode <= 0) // SDR
 		{
 #if SDR_USE_GAMMA_2_2 && !GAMMA_CORRECTION_IN_LUTS
-			// Note: this should use PostGradingGammaCorrect() though the function checks for some unrelated params (e.g. "GAMMA_CORRECT_SDR_RANGE_ONLY" isn't acknowledged here)
+			// Note: this should use PostGradingGammaCorrect() though the function checks for some unrelated params (e.g. "GAMMA_CORRECT_SDR_RANGE_ONLY" or "ApplyGammaBelowZeroDefault" aren't acknowledged here)
 			outputColor = lerp(outputColor, gamma_to_linear_mirrored(gamma_linear_to_sRGB_mirrored(outputColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
 #endif // SDR_USE_GAMMA_2_2 && !GAMMA_CORRECTION_IN_LUTS
 			ApplySDROutputTransforms(outputColor);

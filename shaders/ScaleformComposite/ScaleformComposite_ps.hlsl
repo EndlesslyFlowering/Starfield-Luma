@@ -49,7 +49,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 {
 	float4 UIColor = UITexture.Sample(UISampler, psInputs.uv.xy);
 
-	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG,
+	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG or FSR FG,
 	// as it has a copy of the UI buffer that it uses to determine how much to reconstruct pixels.
 
 	// We do a saturate because the original UI texture was a INT/UNORM so it couldn't have had values beyond 0-1. And this also avoids negatives powers in the code below.
