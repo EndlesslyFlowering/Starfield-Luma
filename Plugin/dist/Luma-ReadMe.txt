@@ -8,14 +8,14 @@ It is a spiritual successor to the CONTROL HDR mod https://www.nexusmods.com/con
 It includes an improved version of the "Normalized LUTs" mod https://www.nexusmods.com/starfield/mods/2407 (ShortFuse).
 It was built by using the HDR analysis ReShade shaders https://github.com/EndlesslyFlowering/ReShade_HDR_shaders (Lilium).
 Join our discord here: https://discord.gg/DNGfMZgH3f.
-We plan on going open source soon and we hope for many of you to contribute.
+The project is open source so anybody is free to contribute.
 
 List of features:
 -Native HDR (HDR10 and scRGB)
 -Increased buffers accuracy in SDR and HDR, reducing banding all around (SDR is now 10bit instead of 8bit)
 -Normalized LUTs, the grey/flat look is mostly gone, but the color tint is still there
 -New filmic tone mapper based on OpenDRT
--Fixed bink fullscreen videos playing back with the wrong colors (BT.601 instead of BT.709) and made them use AutoHDR
+-Fixed bink pre-rendered fullscreen videos playing back with the wrong colors (BT.601 instead of BT.709) and made them use AutoHDR
 -Improved the sharpening passes
 -Improved film grain to be more realistic and nice to look at (e.g. rebalancing the grain size and strength on dark/bright colors)
 -Fixed the game using very wrong gamma formulas
@@ -37,6 +37,7 @@ The game needs to be started through the SFSE loader on Steam and ASI loader on 
 Please remove the old "NativeHDR" or "NativeAutoHDR" mods before starting Luma.
 You can access Luma's settings directly from the game graphics setting menu. If you have ReShade installed, our settings will also be visible there through a widget.
 There a .toml config file in the mod's dll/asi folders, delete it to reset settings.
+Before updating the mod, make sure to delete all its previous files.
 To uninstall, clear all the files (they are unique to the mod).
 
 Dependencies:
@@ -46,9 +47,10 @@ Dependencies:
 
 Compatibility:
 This mod should work with any other mod.
-You can also use customized LUTs mods. If the customized LUT is in limited range, the "LUTs Correction" slider can be used to scale it.
+You can also use customized LUTs mods. If the customized LUT is in limited range, the "Color Grading Range" slider can be used to scale it.
 Our suggestion is to use the LUT correction that is built in Luma, as it extract extracts HDR detail out of SDR LUTs while normalizing them, something that cannot be achieved by replacing assets.
 Additionally Luma should be compatible with any story content and new location, whether official added by Bethesda as DLCs, or unofficial mods.
+Any ini/config changes to (e.g.) make the space "skybox" darker, or stars brighter etc are compatible but not suggested.
 You do NOT need any other HDR related mod, like AutoHDR ReShades, SpecialK, or "HUD for HDR" (which dimmed the UI for AutoHDR).
 Refrain from using any ReShade shaders unless you are certain they support HDR.
 If you find the playable character flashlight too intense, you can use this mod https://www.nexusmods.com/starfield/mods/4888.
@@ -56,6 +58,8 @@ If you want to make some game VFX more "HDR" like, you can use this mod https://
 
 Issues and limitations:
 -scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)
+-HDR10 doesn't work with FSR Frame Generation
+-FSR Frame Generation blends UI slightly differently due to us not being able to replace its UI blending shader
 
 Comparison with other "HDR" methods:
 -Starfield "official" HDR: Starfield does not officially support HDR, both the Xbox Series and Windows 11 versions rely on the OS AutoHDR, meaning that the game still outputs 8bit SDR, and its visual quality is still bottlenecked by that (no proper highlights, no BT.2020 colors, banding).
