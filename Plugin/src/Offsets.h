@@ -71,5 +71,10 @@ public:
 		fGammaUI = reinterpret_cast<float*>(dku::Hook::IDToAbs(1171816));
 		uiUpscalingTechnique = reinterpret_cast<RE::UpscalingTechnique*>(dku::Hook::IDToAbs(875684));
 		uiFrameGenerationTech = reinterpret_cast<RE::FrameGenerationTech*>(dku::Hook::IDToAbs(1488775));
+
+		// Immediately refresh the "Display Mode" when we come to know the frame generation tech being used
+		if (*uiFrameGenerationTech != RE::FrameGenerationTech::kNone && Settings::Main::GetSingleton()->DisplayMode.value.get_data() != Settings::Main::GetSingleton()->GetActualDisplayMode()) {
+			Settings::Main::GetSingleton()->RefreshSwapchainFormat();
+		}
 	}
 };
