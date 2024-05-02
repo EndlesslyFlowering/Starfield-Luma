@@ -4,7 +4,7 @@ Source code for the Starfield Luma mod.
 
 To set up a development environment for this mod (skip to step 7 if you don't care about developing the code plugin and only want to modify shaders):
 1) Have Visual Studio (only VS 2022 was tested) installed, with components to build C++ code for Windows
-2) Follow the requirements specified here: [SF Plugin Template requirements](https://github.com/gottyduke/SF_PluginTemplate#-requirements). You need to install vcpkg and CMake, either as VS installer components or as a custom install, and set up the specified environment paths
+2) Follow the requirements specified here: [SF Plugin Template requirements](https://github.com/gottyduke/SF_PluginTemplate#-requirements). You need to install vcpkg and CMake, either as VS installer components or as a custom install (a custom install is preferred, as vcpkg that comes with VS seems to have troubles with Luma), and set up the specified environment paths
 3) Install the official mod and anything that comes along with it (e.g. SFSE, Shader Injector): [Starfield Luma](https://www.nexusmods.com/starfield/mods/4821)
 4) Run `make-sln-msvc.bat`
 5) Open `build\Luma.sln` with VS and run the `ALL_BUILD` CMake in `Release` configuration, this will automatically build the plugin binary and copy it and its shaders in your game mods directory (and reset the mod settings)
