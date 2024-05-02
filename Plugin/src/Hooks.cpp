@@ -135,7 +135,7 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
-		CreateSliderSetting(a_settingList, settings->AutoHDRVideos, settings->IsGameRenderingSetToHDR());
+		CreateCheckboxSetting(a_settingList, settings->AutoHDRVideos, settings->IsGameRenderingSetToHDR());
 
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 
@@ -156,7 +156,7 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->FilmGrainFPSLimit, settings->IsFilmGrainTypeImproved());
 		CreateCheckboxSetting(a_settingList, settings->PostSharpen, true);
 
-		CreateSeparator(a_settingList, Settings::SettingID::kEND - unusedSettings);
+		CreateSeparator(a_settingList, Settings::SettingID((int)Settings::SettingID::kEND - unusedSettings));
     }
 
 	struct ScreenshotData

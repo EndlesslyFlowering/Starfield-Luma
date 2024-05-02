@@ -101,7 +101,7 @@ namespace Settings
 			*DisplayMode.value = 0;
 			// No need to save, the user might have moved the game to an SDR display temporarily
 		}
-		*DisplayMode.value = std::clamp(DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
+		*DisplayMode.value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
 
 		// autodetect peak brightness (only works reliably if HDR is enabled).
 		// Note that this value is cached on swapchain creation by DX, so it becomes outdated if the game window was moved to another screen,
@@ -173,7 +173,7 @@ namespace Settings
 		    return -1;
 		}
 
-		const auto value = std::clamp(DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
+		const auto value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
 
 		RE::FrameGenerationTech frameGenerationTech = a_frameGenerationTech.has_value() ? a_frameGenerationTech.value() : *Offsets::uiFrameGenerationTech;
 
@@ -525,7 +525,7 @@ namespace Settings
 			DrawReshadeValueStepper(GamePaperWhite);
 			DrawReshadeValueStepper(UIPaperWhite);
 			DrawReshadeSlider(ExtendGamut);
-			DrawReshadeValueStepper(AutoHDRVideos);
+			DrawReshadeCheckbox(AutoHDRVideos);
 		}
 		else
 		{
