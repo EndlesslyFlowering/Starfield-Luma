@@ -47,7 +47,7 @@ Dependencies:
 
 Compatibility:
 This mod should work with any other mod.
-You can also use customized LUTs mods. If the customized LUT is in limited range, the "Color Grading Range" slider can be used to scale it.
+You can also use customized LUTs mods. If the customized LUT is in limited range, the "Color Grading Range Expansion" slider can be used to scale it.
 Our suggestion is to use the LUT correction that is built in Luma, as it extract extracts HDR detail out of SDR LUTs while normalizing them, something that cannot be achieved by replacing assets.
 Additionally Luma should be compatible with any story content and new location, whether official added by Bethesda as DLCs, or unofficial mods.
 Any ini/config changes to (e.g.) make the space "skybox" darker, or stars brighter etc are compatible but not suggested.

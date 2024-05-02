@@ -369,7 +369,7 @@ namespace Settings
 
 		Slider ColorGradingStrength{
 			SettingID::kColorGradingStrength,
-			"Color Grading Strength",
+			"Color Grading Intensity", /*Referenced in other settings here*/
 			"Sets the intensity of the game's color grading LUTs used to apply the game's look and feel.",
 			"ColorGradingStrength", "Main",
 			100.f,
@@ -379,7 +379,7 @@ namespace Settings
 		};
 		Slider LUTCorrectionStrength{
 			SettingID::kLUTCorrectionStrength,
-			"Color Grading Range", /*Referenced in Luma ReadMe*/
+			"Color Grading Range Expansion", /*Referenced in other settings here, in Luma ReadMe and on the Nexus mod page*/
 			"Expands the color grading LUTs to be full-range."
 				"\nIncreasing will remove both the low-contrast fog present in shadows and the brightness limits in highlights caused by clamped LUTs.",
 			"LUTCorrectionStrength", "Main",
@@ -391,7 +391,7 @@ namespace Settings
 		Checkbox VanillaMenuLUTs{
 			SettingID::kVanillaMenuLUTs,
 			"Vanilla Menu Color Grading",
-			"When enabled, menus use the vanilla color grading LUTs and will be unaffected by the \"Color Grading Strength\" and \"Color Grading Range\" settings.",
+			"When enabled, menus use the vanilla color grading LUTs and will be unaffected by the \"Color Grading Intensity\" and \"Color Grading Range Expansion\" settings.",
 			"VanillaMenuLUTs", "Main",
 			true
 		};

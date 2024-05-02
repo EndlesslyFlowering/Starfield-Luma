@@ -134,8 +134,6 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
-		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
-		CreateCheckboxSetting(a_settingList, settings->AutoHDRVideos, settings->IsGameRenderingSetToHDR());
 
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 
@@ -144,12 +142,14 @@ namespace Hooks
 		CreateSliderSetting(a_settingList, settings->Contrast, true); // Requires "CLAMP_INPUT_OUTPUT_TYPE" 1 in shaders (gamut mapping) if we are rendering to SDR
 		CreateSliderSetting(a_settingList, settings->Highlights, settings->IsCustomToneMapper());
 		CreateSliderSetting(a_settingList, settings->Shadows, settings->IsCustomToneMapper());
+		CreateSliderSetting(a_settingList, settings->ExtendGamut, settings->IsGameRenderingSetToHDR());
 		CreateSliderSetting(a_settingList, settings->Bloom, true);
 
 		CreateSliderSetting(a_settingList, settings->ColorGradingStrength, true);
 		CreateSliderSetting(a_settingList, settings->LUTCorrectionStrength, true);
 		CreateCheckboxSetting(a_settingList, settings->VanillaMenuLUTs, true);
 		CreateCheckboxSetting(a_settingList, settings->StrictLUTApplication, settings->IsGameRenderingSetToHDR());
+		CreateCheckboxSetting(a_settingList, settings->AutoHDRVideos, settings->IsGameRenderingSetToHDR());
 
 		CreateSliderSetting(a_settingList, settings->GammaCorrectionStrength, true);
 		CreateStepperSetting(a_settingList, settings->FilmGrainType, true);

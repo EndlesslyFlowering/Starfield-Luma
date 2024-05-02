@@ -524,8 +524,6 @@ namespace Settings
 			DrawReshadeValueStepper(PeakBrightness);
 			DrawReshadeValueStepper(GamePaperWhite);
 			DrawReshadeValueStepper(UIPaperWhite);
-			DrawReshadeSlider(ExtendGamut);
-			DrawReshadeCheckbox(AutoHDRVideos);
 		}
 		else
 		{
@@ -539,10 +537,12 @@ namespace Settings
 		DrawReshadeEnumStepper(ToneMapperType);
 		DrawReshadeSlider(Saturation);
 		DrawReshadeSlider(Contrast);
-		if (isCustomToneMapper)
-		{
+		if (isCustomToneMapper) {
 			DrawReshadeSlider(Highlights);
 			DrawReshadeSlider(Shadows);
+		}
+		if (isGameRenderingSetToHDR) {
+			DrawReshadeSlider(ExtendGamut);
 		}
 		DrawReshadeSlider(Bloom);
 
@@ -551,6 +551,7 @@ namespace Settings
 		DrawReshadeCheckbox(VanillaMenuLUTs);
 		if (isGameRenderingSetToHDR) {
 			DrawReshadeCheckbox(StrictLUTApplication);
+			DrawReshadeCheckbox(AutoHDRVideos);
 		}
 
 		DrawReshadeSlider(GammaCorrectionStrength);
