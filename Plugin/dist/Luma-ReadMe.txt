@@ -60,7 +60,7 @@ If you use a Nvidia GPU, you can set "UpgradeExtraRenderTargets" to true in the 
 Issues and limitations:
 -scRGB HDR doesn't work with DLSS Frame Generation (ping Nvidia about that)
 -HDR10 doesn't work with FSR Frame Generation
--FSR Frame Generation blends UI slightly differently due to us not being able to replace its UI blending shader
+-FSR Frame Generation UI has a gamma mismatch and blends in slightly differently due to us not being able to replace its UI blending shader
 
 Comparison with other "HDR" methods:
 -Starfield "official" HDR: Starfield does not officially support HDR, both the Xbox Series and Windows 11 versions rely on the OS AutoHDR, meaning that the game still outputs 8bit SDR, and its visual quality is still bottlenecked by that (no proper highlights, no BT.2020 colors, banding).
