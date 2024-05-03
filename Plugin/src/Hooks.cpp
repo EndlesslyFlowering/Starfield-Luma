@@ -474,6 +474,7 @@ namespace Hooks
 		}
     }
 
+	// Called more than once, every time some settings are changed by the user
     void Hooks::Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject)
     {
 		const auto settings = Settings::Main::GetSingleton();
@@ -486,6 +487,7 @@ namespace Hooks
 		return _UnkFunc(a1, a_bgsSwapchainObject);
     }
 
+	// Seemengly always called before the swapchain is created
     void Hooks::Hook_UnkFunc2(uint64_t a1, uint64_t a2)
 	{
 		_UnkFunc2(a1, a2);
@@ -579,7 +581,7 @@ namespace Hooks
 		case static_cast<int>(Settings::SettingID::kPostSharpen):
 			HandleSetting(settings->PostSharpen);
 		    break;
-		case 24:  // Frame Generation
+		case static_cast<int>(Settings::SettingID::kFrameGeneration):
 			const auto prevFramegenValue = *Offsets::uiFrameGenerationTech;
 			const auto isFramegenOn = a_eventData.m_Value.Bool;
 			RE::FrameGenerationTech newFramegenValue;
@@ -659,7 +661,7 @@ namespace Hooks
 				filmGrainFPSLimit->m_Enabled.SetValue(settings->IsFilmGrainTypeImproved());
 			}
 			break;
-		case 22:  // Upscaling Technique
+		case static_cast<int>(Settings::SettingID::kUpscalingTechnique):
 			auto getUpscalingTechnique = [](int a_settingValue) {
 				switch (a_settingValue) {
 				case 0:  // off

@@ -53,11 +53,6 @@ void LoadPlugin(bool a_bIsSFSE)
 	
 	Offsets::Initialize();
 	Hooks::Install();
-
-	// Immediately refresh the "Display Mode" when we come to know the frame generation tech being used
-	if (*Offsets::uiFrameGenerationTech != RE::FrameGenerationTech::kNone && Settings::Main::GetSingleton()->DisplayMode.value.get_data() != Settings::Main::GetSingleton()->GetActualDisplayMode()) {
-		Settings::Main::GetSingleton()->RefreshSwapchainFormat();
-	}
 	
 	bIsLoaded = true;
 }

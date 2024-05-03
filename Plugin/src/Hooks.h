@@ -13,6 +13,7 @@ namespace Hooks
 		{
 			const auto settings = Settings::Main::GetSingleton();
 
+			// Note: at this point neither "Offsets::uiFrameGenerationTech" "bIsDLSSGTOFSR3Present" have loaded in yet (nor there's a swapchain yet), so we are possibly setting a "wrong" display format
 			auto newFormat = settings->GetDisplayModeFormat();
 			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
 

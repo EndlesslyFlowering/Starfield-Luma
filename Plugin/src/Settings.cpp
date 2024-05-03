@@ -84,6 +84,10 @@ namespace Settings
 			return false;
 		}
 
+		*DisplayMode.value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2);  // Clamp to valid range
+
+		const auto previousActualDisplayMode = GetActualDisplayMode();
+
 		// check if Nukem's dlssg to fsr3 is present
 		if (!bIsDLSSGTOFSR3Present && isModuleLoaded(moduleNameDLSSGTOFSR3)) {
 		    bIsDLSSGTOFSR3Present = true;
@@ -93,19 +97,42 @@ namespace Settings
 		// check hdr support
 		RefreshHDRDisplaySupportState();
 
-		// enable hdr if off and display mode suggests it should be on
+		// enable hdr if off and display mode suggests it should be on (and more)
 		RefreshHDRDisplayEnableState();
 
+		// "bIsDLSSGTOFSR3Present" and "RefreshHDRDisplayEnableState()" might have changed the "actual" display mode
+		if (previousActualDisplayMode != GetActualDisplayMode()) {
+			const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
+			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
+
+			swapChainObject->format = newFormat;
+		}
+
+		return true;
+	}
+
+    void Main::RefreshHDRDisplaySupportState()
+    {
+		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
+		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
+	}
+
+	// This function does a little more than its name might hint at
+    void Main::RefreshHDRDisplayEnableState()
+    {
+		if (bIsHDRSupported && !bIsHDREnabled && IsGameRenderingSetToHDR()) {
+		    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
+		}
+		
 		// change display mode setting if it's hdr and hdr is not supported
 		if (!bIsHDRSupported && IsGameRenderingSetToHDR()) {
 			*DisplayMode.value = 0;
 			// No need to save, the user might have moved the game to an SDR display temporarily
 		}
-		*DisplayMode.value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
-
+		
 		// autodetect peak brightness (only works reliably if HDR is enabled).
 		// Note that this value is cached on swapchain creation by DX, so it becomes outdated if the game window was moved to another screen,
-		// or if the user toggle HDR or changed their HDR calibration. This means the detection can only work on startup for now,
+		// or if the user toggle HDR or changed their HDR calibration. This means the detection can only really work on startup for now,
 		// unless we wrote code to create a new swapchain/factory and get fresh data from DX.
 		if (bIsHDREnabled) {
 			float detectedMaxLuminance;
@@ -119,23 +146,6 @@ namespace Settings
 				}
 			}
 		}
-
-		return true;
-	}
-
-    void Main::RefreshHDRDisplaySupportState()
-    {
-		bIsHDRSupported = Utils::IsHDRSupported(swapChainObject->hwnd);
-		bIsHDREnabled = Utils::IsHDREnabled(swapChainObject->hwnd);
-	}
-	
-    void Main::RefreshHDRDisplayEnableState()
-    {
-		if (bIsHDRSupported && !bIsHDREnabled && IsGameRenderingSetToHDR()) {
-		    bIsHDREnabled = Utils::SetHDREnabled(swapChainObject->hwnd);
-		}
-		// TODO: it would be nice to also force the "DisplayMode" to 0 here, and re-detect the peak brightness if "PeakBrightnessAutoDetected" was false,
-		// but it seems like it would run into thread safety problems
 	}
 
     bool Main::IsSDRForcedOnHDR(bool bAcknowledgeScreenshots) const
@@ -178,8 +188,8 @@ namespace Settings
 		RE::FrameGenerationTech frameGenerationTech = a_frameGenerationTech.has_value() ? a_frameGenerationTech.value() : *Offsets::uiFrameGenerationTech;
 
 		if (frameGenerationTech > RE::FrameGenerationTech::kNone && !EnforceUserDisplayMode.value.get_data()) {
-			// force scRGB with fsr3 or dlssg if dlssg_to_fsr3 is present
-			if (value == 1 && frameGenerationTech == RE::FrameGenerationTech::kFSR3 || (frameGenerationTech == RE::FrameGenerationTech::kDLSSG && bIsDLSSGTOFSR3Present)) {
+			// force scRGB HDR with fsr3 or dlssg if dlssg_to_fsr3 is present
+			if (value == 1 && (frameGenerationTech == RE::FrameGenerationTech::kFSR3 || (frameGenerationTech == RE::FrameGenerationTech::kDLSSG && bIsDLSSGTOFSR3Present))) {
 			    return 2;
 			}
 

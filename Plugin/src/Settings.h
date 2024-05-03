@@ -18,6 +18,11 @@ namespace Settings
 
     enum class SettingID : unsigned int
     {
+		// Bethesda's settings (subject to change):
+		kUpscalingTechnique = 24,
+		kFrameGeneration = 26,
+
+		// Make sure our settings IDs are all after Bethesda's ones
 		kSTART = 600,
 
 		kDisplayMode,
