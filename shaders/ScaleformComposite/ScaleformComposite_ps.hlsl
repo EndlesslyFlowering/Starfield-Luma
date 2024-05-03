@@ -25,9 +25,9 @@
 
 struct PushConstantWrapper_ScaleformCompositeLayout
 {
-	float UIIntensity; // 1.0f always
-	float UIBrightness; // display settings menu > Brightness
-	float UIContrast; // display settings menu > Contrast
+	float UIIntensity; // 1.0f always (it's not the "HUD Opacity" setting, that's pre-applied in the buffer)
+	float UIBrightness; // Seemengly unused (it's not the same brightness as the one for the tonemapper)
+	float UIContrast; // Seemengly unused (it's not the same contrast as the one for the tonemapper)
 };
 
 ConstantBuffer<PushConstantWrapper_ScaleformCompositeLayout> ScaleformCompositeLayout : register(b0);
@@ -47,6 +47,7 @@ struct PSInputs
 [RootSignature(ShaderRootSignature)]
 float4 PS(PSInputs psInputs) : SV_Target
 {
+	// The UI is always stored in gamma space, even if we might be using FP textures for it
 	float4 UIColor = UITexture.Sample(UISampler, psInputs.uv.xy);
 
 	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG or FSR FG,

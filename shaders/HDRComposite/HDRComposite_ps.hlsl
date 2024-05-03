@@ -821,13 +821,14 @@ float3 RestorePostProcess(float3 ColorToPostProcess, float3 SourceColor, float3 
 	const float3 postProcessColorOffset = PostProcessedColor - SourceColor;
 	const float3 postProcessedRatioColor = ColorToPostProcess * postProcessColorRatio;
 	const float3 postProcessedOffsetColor = ColorToPostProcess + postProcessColorOffset;
-// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
-// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
-// Note: in case "INVERT_TONEMAP_TYPE" was 0, we might want to test the "postProcessedOffsetColor" blend in range more carefully.
-// For the "INVERT_TONEMAP_TYPE" >0 case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
 #if 1
-	float3 newPostProcessedColor = lerp(postProcessedOffsetColor, postProcessedRatioColor, max(saturate(ColorToPostProcess / MaxShadowsColor), saturate(SourceColor / MaxShadowsColor)));
-#else // Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE" > 1 (tonemap by luminance)
+	// Near black, we prefer using the "offset" (sum) pp restoration method, as otherwise any raised black would not work,
+	// for example if any zero was shifted to a more raised color, "postProcessColorRatio" would not be able to replicate that shift due to a division by zero.
+	// Note: in case "INVERT_TONEMAP_TYPE" was 0, we might want to test the "postProcessedOffsetColor" blend in range more carefully.
+	// For the "INVERT_TONEMAP_TYPE" >0 case, this seems to work great, with the "MaxShadowsColor" setting that is there, anything more will raise colors.
+	float3 newPostProcessedColor = lerp(postProcessedOffsetColor, postProcessedRatioColor, max(saturate(abs(ColorToPostProcess / MaxShadowsColor)), saturate(abs(SourceColor / MaxShadowsColor))));
+#else
+	// Doing the branching this way might not be so good, as near black colors could still end up with crazy value due to divisions between tiny values. Might not work with "HDR_TONEMAP_TYPE" > 1 (tonemap by luminance)
 	float3 newPostProcessedColor = select(PostProcessedColor == 0.f, postProcessedOffsetColor, postProcessedRatioColor);
 #endif
 

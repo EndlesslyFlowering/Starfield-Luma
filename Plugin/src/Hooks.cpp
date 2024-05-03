@@ -128,6 +128,7 @@ namespace Hooks
 
 		// We don't expose "DevSetting*" or "EnforceUserDisplayMode" or "ForceSDROnHDR" or "kHDRScreenshots*" to the game settings, they'd just confuse users.
 		// Here we write down the number of settings we didn't add to the UI, to make sure "Settings::SettingID::kEND" has the right value.
+		// Note: this is pretty unnecessary, as the separator works anyway.
 		constexpr int unusedSettings = 4;
 
 		CreateStepperSetting(a_settingList, settings->DisplayMode, settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
