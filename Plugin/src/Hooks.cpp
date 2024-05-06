@@ -597,7 +597,7 @@ namespace Hooks
 				newFramegenValue = RE::FrameGenerationTech::kNone;
 			}
 			if (prevFramegenValue != newFramegenValue) {
-					settings->RefreshSwapchainFormat(newFramegenValue);
+				settings->RefreshSwapchainFormat(newFramegenValue);
 			}
 			break;
 		}

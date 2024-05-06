@@ -392,6 +392,7 @@ namespace Settings
 
     void Main::Save() noexcept
     {
+		std::lock_guard<std::mutex> lg(configMutex);
 		config->Generate();
 		config->Write();
     }

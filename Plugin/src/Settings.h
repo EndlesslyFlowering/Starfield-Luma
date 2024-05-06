@@ -8,6 +8,7 @@
 #include "DKUtil/Config.hpp"
 
 #include <d3d12.h>
+#include <mutex>
 
 // TODO: set to false in release builds (use the build configuation to automatically define it)
 #define DEVELOPMENT 0
@@ -518,6 +519,7 @@ namespace Settings
 		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");
 		TomlConfig asiConfig = COMPILE_PROXY("Luma.toml");
 		TomlConfig* config = nullptr;
+		std::mutex configMutex;
 
 		std::atomic_bool bIsAtEndOfFrame = false;
 		std::atomic_bool bIsHDRSupported = false;
