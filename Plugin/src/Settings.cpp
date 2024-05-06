@@ -518,8 +518,7 @@ namespace Settings
 		const bool isGameRenderingSetToHDR = IsGameRenderingSetToHDR();
 		const bool isCustomToneMapper = IsCustomToneMapper();
 		if (IsHDRSupported()) {
-			// TODO: fix, these can often crash, Maybe we could find a way to push this change to the game main or rendering thread (they probably have a func for it),
-			// or simply delay the application in our code until we get another call from the thread where this can be called (e.g. settings changed callbacks).
+			// TODO: fix, these can often crash when changed during gameplay if FG is enabled (it doesn't seem to be a threading issue).
 			if (DrawReshadeEnumStepper(DisplayMode)) {
 				OnDisplayModeChanged();
 			}
