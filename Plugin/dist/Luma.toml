@@ -1,12 +1,12 @@
 [HDR]
-GamePaperWhite = 200
 ExtendGamut = 33.333
+GamePaperWhite = 203
 HDRScreenshots = true
 HDRScreenshotsLossless = false
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
 StrictLUTApplication = false
-UIPaperWhite = 200
+UIPaperWhite = 203
 AutoHDRVideos = true
 
 [Main]
