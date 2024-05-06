@@ -49,17 +49,17 @@ namespace Hooks
 		}
     }
 
-		void Hooks::CheckCustomToneMapperSettings(RE::SettingsDataModel* a_model, bool a_bIsCustomToneMapper)
+	void Hooks::CheckCustomToneMapperSettings(RE::SettingsDataModel* a_model, bool a_bIsCustomToneMapper)
+	{
+		if (const auto toneMapperHighlights = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperHighlights)))
 		{
-			if (const auto toneMapperHighlights = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperHighlights)))
-			{
-				toneMapperHighlights->m_Enabled.SetValue(a_bIsCustomToneMapper);
-			}
-			if (const auto toneMapperShadows = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperShadows)))
-			{
-				toneMapperShadows->m_Enabled.SetValue(a_bIsCustomToneMapper);
-			}
+			toneMapperHighlights->m_Enabled.SetValue(a_bIsCustomToneMapper);
 		}
+		if (const auto toneMapperShadows = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kToneMapperShadows)))
+		{
+			toneMapperShadows->m_Enabled.SetValue(a_bIsCustomToneMapper);
+		}
+	}
 
     void Hooks::CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled)
     {
@@ -583,6 +583,7 @@ namespace Hooks
 			HandleSetting(settings->PostSharpen);
 		    break;
 		case static_cast<int>(Settings::SettingID::kFrameGeneration):
+			// The settings values haven't changed yet, so compare them for a change
 			const auto prevFramegenValue = *Offsets::uiFrameGenerationTech;
 			const auto isFramegenOn = a_eventData.m_Value.Bool;
 			RE::FrameGenerationTech newFramegenValue;
@@ -596,9 +597,7 @@ namespace Hooks
 				newFramegenValue = RE::FrameGenerationTech::kNone;
 			}
 			if (prevFramegenValue != newFramegenValue) {
-				if (prevFramegenValue != newFramegenValue) {
 					settings->RefreshSwapchainFormat(newFramegenValue);
-				}
 			}
 			break;
 		}
@@ -677,6 +676,7 @@ namespace Hooks
 					return RE::UpscalingTechnique::kXESS;
 				}
 			};
+			// The settings values haven't changed yet, so compare them for a change
 			const auto prevUpscalingTechnique = *Offsets::uiUpscalingTechnique;
 			const auto newUpscalingTechnique = getUpscalingTechnique(a_eventData.m_Value.Int);
 			if (prevUpscalingTechnique != newUpscalingTechnique && *Offsets::uiFrameGenerationTech != RE::FrameGenerationTech::kNone) {

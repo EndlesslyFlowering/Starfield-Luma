@@ -231,7 +231,7 @@ namespace Settings
 			SettingID::kHDR_PeakBrightness,
 			"Peak Brightness",
 			"Sets the peak brightness in HDR modes."
-				"\nThe value should match your display's peak brightness."
+				"\nThe value should match your display's peak brightness (HGiG)."
 				"\n"
 				"\nThis does not affect the game's average brightness.",
 			"PeakBrightness", "HDR",
@@ -243,8 +243,10 @@ namespace Settings
 		ValueStepper GamePaperWhite{
 			SettingID::kHDR_GamePaperWhite,
 			"Game Paper White",
-			"Sets the in-game brightness of white in HDR modes."
-				"\nThis setting represents the brightness of white paper (100\% diffuse white) in-game."
+			"Sets the in-game brightness of white paper (100\% diffuse white) in HDR modes."
+				"\nThis influences the average brightness of the image without affecting the peak brightness."
+				"\nFor a proper experience, adjust this to your liking, avoiding going too close to the peak brightness,"
+				" as higher values will actually reduce contrast (and thus dynamic range)."
 				"\n"
 				"\nThe default value is 200.",
 			"GamePaperWhite", "HDR",
@@ -256,8 +258,7 @@ namespace Settings
 		ValueStepper UIPaperWhite{
 			SettingID::kHDR_UIPaperWhite,
 			"UI Paper White",
-			"Sets the user-interface brightness in HDR modes."
-				"\nThis setting represents the brightness of UI elements."
+			"Sets the user interface (UI) brightness in HDR modes."
 				"\n"
 				"\nThe default value is 200",
 			"UIPaperWhite", "HDR",
@@ -281,8 +282,8 @@ namespace Settings
 		Checkbox AutoHDRVideos{
 			SettingID::kHDR_AutoHDRVideos,
 			"AutoHDR Videos",
-			"Applies an \"AutoHDR\" filter to pre-rendered videos."
-				"\nThis should provide a more consistent experience, avoiding videos looking flat compared to the rest of the game.",
+			"Applies a conservative \"AutoHDR\" filter to pre-rendered videos."
+				"\nThis should provide a more consistent HDR experience, avoiding videos looking flat compared to the rest of the game.",
 			"AutoHDRVideos", "HDR",
 			true
 		};

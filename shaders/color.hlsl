@@ -4,7 +4,8 @@
 
 // This is technically more correct as true, though it's not guaranteed to look better.
 // Note: this might start to look bad if any of the negative colors goes beyond 1 (which usually shouldn't happen with ~SDR colors)
-// Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with, at least if this is true (and maybe also if it's false?)
+// Note: can generate scRGB colors with negative luminance if there's negative scRGB values to begin with, at least if this is true (and maybe also if it's false?);
+// either way we can snap them to black in that case, even if it doesn't always look as good as clipping them to AP0, it's "mathematically" correct
 // Note: bring back "GAMMA_CORRECT_SDR_RANGE_ONLY" if this always stays false, as it was more optimized (it did clamps just once for the whole gamma correction pass)
 static const bool ApplyGammaBelowZeroDefault = true;
 

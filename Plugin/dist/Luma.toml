@@ -1,6 +1,6 @@
 [HDR]
-ExtendGamut = 33.3
 GamePaperWhite = 200
+ExtendGamut = 33.333
 HDRScreenshots = true
 HDRScreenshotsLossless = false
 PeakBrightness = 1000

@@ -231,12 +231,14 @@ namespace Settings
 
     void Main::RefreshSwapchainFormat(std::optional<RE::FrameGenerationTech> a_frameGenerationTech)
 	{
+		// This should be "safe" being called from all threads
 		const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat(a_frameGenerationTech);
 		Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
 
+		// This should be "safe" being called from all threads
 		swapChainObject->format = newFormat;
 
-		// toggle vsync to force a swapchain recreation
+		// toggle vsync to force a swapchain recreation (it will seemengly happen in one of the renderer threads, even if this is called by the main/game thread)
 		Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
 	}
 
@@ -364,7 +366,7 @@ namespace Settings
 			config->Bind(DevSetting05.value, DevSetting05.defaultValue);
 			config->Bind(RenderTargetsToUpgrade,
 				"ImageSpaceBuffer",
-				"ScaleformCompositeBuffer", // Not upgrading this could cause issues with FSR FG as the swapchain would be in a different format than the UI buffer (untested)
+				"ScaleformCompositeBuffer", // Not upgrading this could cause issues with FSR FG as the swapchain would be in a different format than the UI buffer (untested), and maybe it would break AutoHDR bink videos.
 				"SF_ColorBuffer",
 				"HDRImagespaceBuffer",
 				"ImageSpaceHalfResBuffer",
