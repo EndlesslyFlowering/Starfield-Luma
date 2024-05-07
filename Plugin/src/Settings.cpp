@@ -519,7 +519,13 @@ namespace Settings
 		const bool isCustomToneMapper = IsCustomToneMapper();
 		if (IsHDRSupported()) {
 			// TODO: fix, these can often crash when changed during gameplay if FG is enabled (it doesn't seem to be a threading issue).
-			if (DrawReshadeEnumStepper(DisplayMode)) {
+			// FSR FG crashes all the times while DLSS FG crashes sometimes.
+			// For now we work around it by not exposing it.
+			bool canChangeDisplayMode = true;
+#if !DEVELOPMENT
+			canChangeDisplayMode = *Offsets::uiFrameGenerationTech == RE::FrameGenerationTech::kNone;
+#endif
+			if (canChangeDisplayMode && DrawReshadeEnumStepper(DisplayMode)) {
 				OnDisplayModeChanged();
 			}
 #if DEVELOPMENT
