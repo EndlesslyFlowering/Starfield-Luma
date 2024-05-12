@@ -1013,10 +1013,10 @@ float2 LineIntercept(float MP, float2 FromXYCoords, float2 ToXYCoords, float2 Wh
 	return float2(x, y);
 }
 
-//not 100% hue conservering but better than just max(color, 0.f)
-//this ignores negative luminance in favor of preserving the color the pixel might once had
-//this also doesn't cause sudden black pixels.
-//Supports either BT.2020 or BT.709 (sRGB/scRGB) (input and output need to be in the same color space). Hardcoded for D65 white point.
+// Not 100% hue conservering but better than just max(color, 0.f),
+// this ignores negative luminance in favor of preserving the color the pixel might once have had (???),
+// this also doesn't cause sudden black pixels in gradients.
+// Supports either BT.2020 or BT.709 (sRGB/scRGB) (input and output need to be in the same color space). Hardcoded for D65 white point.
 float3 SimpleGamutClip(float3 Color, bool BT2020, bool ClampToSDRRange = false)
 {
 	const bool3 isNegative = Color < 0.f;
@@ -1026,6 +1026,7 @@ float3 SimpleGamutClip(float3 Color, bool BT2020, bool ClampToSDRRange = false)
 	if (allArePositive)
 	{
 	}
+	// Clip to black as the hue of an all negative color is invalid
 	else if (allAreNegative)
 	{
 		return 0.f;
