@@ -278,7 +278,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 removedGamma = 1.f - analysis.whiteGamma;
 
 	float3 midGray = LUT.Load(ThreeToTwoDimensionCoordinates(LUT_MAX_UINT / 2.f)).rgb;
-	float midGrayAvg = (midGray.r + midGray.g + midGray.b) / 3.f;
+	float midGrayAvg = average(midGray);
 
 	float shadowLength = 1.f - midGrayAvg;
 	float shadowStop = max(neutralGamma.r, max(neutralGamma.g, neutralGamma.b));

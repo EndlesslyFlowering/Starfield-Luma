@@ -15,7 +15,7 @@ T linearNormalization(T input, T min, T max, T newMin, T newMax)
 
 float average(float3 color)
 {
-	return color.x * (1.f / 3.f) + color.y * (1.f / 3.f) + color.z * (1.f / 3.f);
+	return (color.x + color.y + color.z) / 3.f;
 }
 
 // Returns 1 if "dividend" is 0
