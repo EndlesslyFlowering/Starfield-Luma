@@ -32,7 +32,10 @@
 // 3) REMOVED: OKLab mapping (OKLab in, OKLab out): this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black,
 //    the problem with this is that near black blending is very different compared to sRGB gamma or linear, crushing blacks without further adjustments.
 //    "MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK" has since then fixed the near black tint problem in a different way.
-#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 0)
+//    It's unknown if this would have worked correctly with "ENABLE_LUT_TETRAHEDRAL_INTERPOLATION".
+// 4) Linear mapping (corrected) (corrected sRGB in, Linear out): a mix between "0" and "1". LUTs are stored in linear space, but we use a more accurate way of mapping them which emulates the advantages of sRGB gamma mapping while keeping the advantages of storing values in linear space.
+//    This seems to work fine with "ENABLE_LUT_TETRAHEDRAL_INTERPOLATION" too, even if it increases the "offset" from a neutral LUT.
+#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 4)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 #define LUT_MAX_UINT (uint)(LUT_SIZE - 1u)

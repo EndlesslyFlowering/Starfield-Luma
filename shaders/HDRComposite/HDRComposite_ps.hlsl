@@ -1102,20 +1102,33 @@ float3 TetrahedralInterpolation(
 // Samples the grading LUT at the specified coordinates. Supports coordinates outside of the 0-1 range through LUT extrapolation.
 // In: LUT coordinates in sRGB (not clamped)
 // Out: linear space
-float3 SampleGradingLUT(float3 LUTCoordinates, bool NearestNeighbor = false, int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE, bool specifyOriginalColor = false, float3 originalColor = 0.f)
+float3 SampleGradingLUT(float3 LUTCoordinates, const bool NearestNeighbor = false, const int LUTExtrapolationColorSpace = DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE, const bool specifyOriginalColor = false, const float3 originalColor = 0.f)
 {
 	const float3 unclampedNeutralLUTColor = specifyOriginalColor ? originalColor : gamma_sRGB_to_linear_mirrored(LUTCoordinates);
 	const float3 unclampedLUTCoordinates = LUTCoordinates;
 #if LUT_EXTRAPOLATION_TYPE == 4
 	const float maxChannel = max(1.f, max(unclampedNeutralLUTColor.r, max(unclampedNeutralLUTColor.g, unclampedNeutralLUTColor.b)));
 	LUTCoordinates = saturate(gamma_linear_to_sRGB(unclampedNeutralLUTColor / maxChannel));
-#else // LUT_EXTRAPOLATION_TYPE
+#else // LUT_EXTRAPOLATION_TYPE != 4
 	LUTCoordinates = saturate(LUTCoordinates);
 #if LUT_EXTRAPOLATION_TYPE >= 1
 	const bool LUTCoordinatesClamped = length(unclampedLUTCoordinates - LUTCoordinates) > FLT_MIN; // Some threshold is needed here
 	const float3 neutralLUTColor = specifyOriginalColor ? saturate(originalColor) : gamma_sRGB_to_linear_mirrored(LUTCoordinates);
-#endif // LUT_EXTRAPOLATION_TYPE
-#endif // LUT_EXTRAPOLATION_TYPE
+#endif // LUT_EXTRAPOLATION_TYPE >= 1
+#endif // LUT_EXTRAPOLATION_TYPE != 4
+
+#if LUT_MAPPING_TYPE == 4
+	// Note: we do this even for values beyond the 0-1 range (and apply gamma there) as we have LUT extrapolation to help with that later.
+	float3 previousLUTCoordinatesGammaSpace = floor(LUTCoordinates * LUT_MAX_UINT) / LUT_MAX_UINT;
+	float3 nextLUTCoordinatesGammaSpace = ceil(LUTCoordinates * LUT_MAX_UINT) / LUT_MAX_UINT;
+	float3 previousLUTCoordinatesLinearSpace = gamma_sRGB_to_linear_mirrored(previousLUTCoordinatesGammaSpace);
+	float3 nextLUTCoordinatesLinearSpace = gamma_sRGB_to_linear_mirrored(nextLUTCoordinatesGammaSpace);
+	// Every step size is different as it depends on where we are within the sRGB gamma to linear conversion.
+	const float3 stepSize = nextLUTCoordinatesLinearSpace - previousLUTCoordinatesLinearSpace;
+	// If "stepSize" is zero (due to the LUT pixel coords being exactly an integer), whether alpha is zero or one won't matter as "previousLUTCoordinatesGammaSpace" and "nextLUTCoordinatesGammaSpace" will be identical.
+	const float3 blendAlpha = safeDivision(unclampedNeutralLUTColor - previousLUTCoordinatesLinearSpace, stepSize);
+	LUTCoordinates = lerp(previousLUTCoordinatesGammaSpace, nextLUTCoordinatesGammaSpace, blendAlpha);
+#endif
 
 	const float3 LUTCoordinatesScale = (LUT_SIZE - 1.f) / LUT_SIZE; // Also "1-(1/LUT_SIZE)"
 	const float3 LUTCoordinatesOffset = 1.f / (2.f * LUT_SIZE); // Also "(1/LUT_SIZE)/2"
