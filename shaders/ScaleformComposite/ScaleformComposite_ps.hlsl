@@ -66,13 +66,13 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// It's possible that skipping this clipping would allow some "HDR" UI to come through, due to usage of pre-multiplied alpha.
 	UIColor = saturate(UIColor);
 
-	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
-	float3 UIColorGammaSpace = UIColor.rgb;
-	UIColor.rgb = GAMMA_TO_LINEAR(UIColor.rgb);
-
-	// This multiplication is probably used by Bethesda to dim the UI when applying an AutoHDR pass at the very end (they don't have real HDR)
+	// This multiplication is probably used by Bethesda to dim the UI when applying an AutoHDR pass at the very end (they don't have real HDR).
+	// We do it in gamma space to maintain the expected intensity change.
 	UIColor.rgb *= ScaleformCompositeLayout.UIIntensity;
-	UIColorGammaSpace *= ScaleformCompositeLayout.UIIntensity;
+
+	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
+	const float3 UIColorGammaSpace = UIColor.rgb;
+	UIColor.rgb = GAMMA_TO_LINEAR(UIColor.rgb);
 
 	const bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
 	bool isLinear = true;
@@ -114,6 +114,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 #endif
 // Find the matching alpha (theoretically less correct but it looks better)
 #if OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 3
+		// Note: for now we let it possibly go < 0, as theoretically it's more accurate (I don't know if it can even happen, but probably not as it ends up adding alpha, not removing it)
 		UIColor.a = -((average(averageGammaBlendColor - UIColor.rgb) / MidGrayBackgroundColorLinearSpace) - 1.f);
 // Find the matching rgb color (theoretically more correct but it seems to cause issues with alpha blending, probably because rgb values go below 0)
 #else // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 4
