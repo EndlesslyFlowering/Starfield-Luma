@@ -38,7 +38,7 @@
 	#define CORRECT_GAMMA(x) x
 	#define POST_CORRECT_GAMMA(x)
 
-#else
+#else // SDR_USE_GAMMA_2_2
 
 	// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens).
 	// 
@@ -439,7 +439,8 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 [numthreads(LUT_SIZE_UINT, LUT_SIZE_UINT, 1)]
 void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 {
-	// These pixel coordinates inherit (or, represent) whatever input gamma the LUT has
+	// These pixel coordinates inherit (or, represent) whatever input gamma the LUT has.
+	// If we wanted to change the LUT input encoding from sRGB gamma to (e.g.) PQ any other transfer function, we could do it here (with bilinear sampling on LUTs).
 	const uint3 inUVW = ThreeToTwoDimensionCoordinates(SV_DispatchThreadID);
 	const uint3 outUVW = SV_DispatchThreadID;
 
@@ -492,8 +493,8 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	mixedLUT = oklab_to_linear_srgb(mixedLUT);
 #endif // LUT_BLENDING_TYPE
 
-#if CLAMP_INPUT_OUTPUT_TYPE == 1 || CLAMP_INPUT_OUTPUT_TYPE == 2 && LUT_MAPPING_TYPE >= 1
-	// Clamp to AP1 since OKLab colors may turn black when not clamped
+#if CLAMP_INPUT_OUTPUT_TYPE >= 3 && LUT_BLENDING_TYPE == 1
+	// Clamp to AP1 since OKLab mixed colors (from above) may turn black later on in tonemapping, probably because of invalid luminance or too low negative values
 	mixedLUT = mul(BT709_2_AP1D65, mixedLUT);
 	mixedLUT = max(mixedLUT, 0.f);
 	mixedLUT = mul(AP1D65_2_BT709, mixedLUT);
