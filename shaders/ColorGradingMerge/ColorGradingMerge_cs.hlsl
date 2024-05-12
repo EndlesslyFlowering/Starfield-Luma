@@ -311,20 +311,18 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float highlightsStop = min(neutralGamma.r, min(neutralGamma.g, neutralGamma.b));
 	float3 liftHighlights = removedGamma * ((max(highlightsStart, highlightsStop) - highlightsStart) / highlightsStart);
 
-	// Use max(0) because some texels have some channels dip below 0 (eg: single-channel colors)
-	float3 detintedInGamma = max(0, originalGamma - removeFog) + liftHighlights;
+	// Note: some texels have some channels dip below 0 (eg: single-channel colors)
+	const float3 detintedGamma = (originalGamma - removeFog) + liftHighlights;
+	const float3 detintedLinear = LINEARIZE_SAFE(detintedGamma);
 
-	float3 detintedInGammaLinear = LINEARIZE(detintedInGamma);
-
+// Mixing sRGB gamma with OKLab and LUT sample causes crushing, use linear instead
 #if LUT_MAPPING_TYPE == 0
-	// Mixing sRGB Gamma with OKLab and LUT sample causes crushing
-	// Use linear instead
-	float detintedInGammaY = max(0, Luminance(detintedInGammaLinear));
+	float detintedY = max(0.f, Luminance(detintedLinear));
 	float originalY = Luminance(originalLinear);
-	float3 retintedLinear = originalLinear * (originalY > 0 ? detintedInGammaY / originalY : 0);
+	float3 retintedLinear = originalLinear * (originalY > 0.f ? detintedY / originalY : 0.f);
 	float3 retintedLab = linear_srgb_to_oklab(retintedLinear);
 #else
-	float3 retintedLab = linear_srgb_to_oklab(detintedInGammaLinear);
+	float3 retintedLab = linear_srgb_to_oklab(detintedLinear);
 	retintedLab[1] = originalLab[1];
 	retintedLab[2] = originalLab[2];
 #endif // LUT_MAPPING_TYPE
