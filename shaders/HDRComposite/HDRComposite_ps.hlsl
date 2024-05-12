@@ -932,14 +932,14 @@ float3 PostGradingGammaCorrect(float3 TonemappedPostProcessedGradedColor)
 	bool gammaCorrected = false;
 // Do this even if "ENABLE_LUT" is false, for consistency
 #if SDR_USE_GAMMA_2_2 && (!ENABLE_LUT || !GAMMA_CORRECTION_IN_LUTS)
-	// This error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
+	// The gamma error was always built in the image if we assume Bethesda calibrated the game on gamma 2.2 displays.
 	// Possibly, if there's no color grading LUT, there shouldn't be any gamma adjustment, as the error might have been exclusively baked into LUTs,
 	// while a neutral LUT (or no LUT) image would have never been calibrated, so we couldn't say for sure there was a gamma mismatch in it, but for the sake of simplicity,
 	// we don't care about that, and there's a setting exposed for users anyway (it does indeed seem like the world is too dark with gamma correction on if there's no color grading).
 	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, gamma_to_linear_custom(gamma_linear_to_sRGB_custom(TonemappedPostProcessedGradedColor), 2.2f), HdrDllPluginConstants.GammaCorrection);
 	gammaCorrected = true;
-#elif SDR_USE_GAMMA_2_2 && !ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS
-	// If gamma correction is in LUTs but LUTs are disabled, do it here.
+#elif SDR_USE_GAMMA_2_2 && ENABLE_LUT && GAMMA_CORRECTION_IN_LUTS
+	// If gamma correction is in LUTs but LUTs don't apply to a 100% due to user settings, do the remaining gamma correction here.
 	// This is questionable as maybe we shouldn't correct gamma if we didn't apply any LUT? Though if we didn't, there would be a gamma difference between applying a neutral LUT and skipping the LUT completely, which is unexpected.
 	// Users can always disable gamma correction alongside color grading if they wished so.
 	TonemappedPostProcessedGradedColor = lerp(TonemappedPostProcessedGradedColor, gamma_to_linear_custom(gamma_linear_to_sRGB_custom(TonemappedPostProcessedGradedColor)), HdrDllPluginConstants.GammaCorrection * (1.f - HdrDllPluginConstants.ColorGradingStrength));

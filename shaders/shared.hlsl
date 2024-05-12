@@ -21,7 +21,7 @@
 
 // If true, SDR will be kept in linear space until the final out.
 // This is desired for output quality as we store colors on float buffers, which are based kept in linear space,
-// it also simplifies the code and optmizes performance, but at the moment is changes the look of the Scaleform UI blend in.
+// it also simplifies the code and optmizes performance, and the Scaleform UI still blends in in gamma space (with a custom function).
 #define SDR_LINEAR_INTERMEDIARY (FORCE_VANILLA_LOOK ? 0 : 1)
 
 // 0 None, 1 Scale with Black Linear 2 Remove Black SRGB Values
@@ -29,14 +29,14 @@
 #define MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK (LUT_IMPROVEMENT_TYPE == 1)
 
 // Determines what kind of color space/gamut/gamma the merged/mixed LUT is in.
-// 0) sRGB gamma mapping (Vanilla): the most mathematically correct way of mapping LUTs.
-// 1) Linear mapping: Makes LUTs sampling work in linear space. This possibly shifts colors a bit, and is less mathematically correct, though it's faster and avoids using SDR gamma on LUTs colors that might be in the HDR range (which would be fine anyway).
+// 0) sRGB gamma mapping (sRGB in, sRGB out) (Vanilla): the simplest and most mathematically correct way of mapping LUTs. Neutral LUTs should have a near zero quality loss and be mapped perfectly.
+// 1) Linear mapping (sRGB in, Linear out): Makes LUTs sampling work in linear space. This possibly shifts colors a bit, and is less mathematically correct, though it's faster and avoids using SDR gamma on LUTs colors that might be in the HDR range (which would be fine anyway).
 //    Other than performance, this helps a bit with accuracy, as LUTs are stored in linear FP16 textures in SF, thus storing values in gamma space isn't the smartest choice.
-// 2) Linear mapping + OKLAB blending: Blend multiple LUTs (by their respective percentage) in OKLab colorspace before returning as Linear SRGB. Identical to index 1 when there's only one LUT applied.
-// 3) REMOVED: OKLAB mapping: this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black,
+// 2) Linear mapping + OKLab blending (Linear in, OKLab out): Blend multiple LUTs (by their respective percentage) in OKLab colorspace before returning as Linear SRGB. Identical to index 1 when there's only one LUT applied.
+// 3) REMOVED: OKLab mapping (OKLab in, OKLab out): this has a lot of advantages, like allowing the blackest LUT texel (coords 0 0 0) to also have a hue, so it can contribute to tinting the image even near black,
 //    the problem with this is that near black blending is very different compared to sRGB gamma or linear, crushing blacks without further adjustments.
-//    "MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK" has since then fixed the near black ting problem in a different way.
-#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
+//    "MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK" has since then fixed the near black tint problem in a different way.
+#define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 0)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
 #define LUT_MAX_UINT (uint)(LUT_SIZE - 1u)

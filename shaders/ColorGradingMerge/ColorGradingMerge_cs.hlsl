@@ -139,7 +139,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	// is #cc0000 than a dark blue tint #cc0005 would result in #000005
 	// Special handling is needed for colors that are darker than the fog color
 	// which is common around blue whic has low perceptual luminance (7%)
-  //
+	//
 	// If something was barely perceivable in the original game because it
 	// diluted by the fog color, it would be consistent for it to be still barely
 	// perceivable due to darkness (delta from black)
@@ -201,7 +201,6 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 #endif // LUT_DEBUG_VALUES
 		detintedLinear = 0.f;
 	}
-
 
 	// Detint less near black, to avoid LUTs all going to grey/black
 	const float detintedChroma = lerp(originalLCh[1], linear_srgb_to_oklch(detintedLinear)[1], blackDistance);
@@ -295,7 +294,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 retintedLab = linear_srgb_to_oklab(detintedInGammaLinear);
 	retintedLab[1] = originalLab[1];
 	retintedLab[2] = originalLab[2];
-#endif
+#endif // LUT_MAPPING_TYPE
 
 	float3 retintedLCh = oklab_to_oklch(retintedLab);
 
@@ -303,13 +302,12 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	const float targetChroma = retintedLCh[1] * saturation;
 	const float targetHue = retintedLCh[2];
 
-#endif
+#endif // LUT_IMPROVEMENT_TYPE == 2
 
-	targetL = max(0, targetL);
+	targetL = max(0.f, targetL);
 
 	const float3 targetLCh = float3(targetL, targetChroma, targetHue);
 	float3 outputLCh = targetLCh;
-
 	
 #if 0
 	// Try to remove the S filmic tonemapper curve that is baked in inside some LUTs.
@@ -324,7 +322,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 		const float LUTFilmicTonemapCorrection = HdrDllPluginConstants.DevSetting04;
 #else
 		static const float LUTFilmicTonemapCorrection = 1.f;
-#endif
+#endif // DEVELOPMENT
 		const float colorAverageRatio = safeDivision(average(neutralLinear), average(targetLinear));
 		// (optional) Pivot adjustments around the center.
 		// Not using length() as average seems more appropriate here (especially with negative coordinates being possible).
@@ -387,7 +385,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 #if LUT_MAPPING_TYPE == 2
 	// Note: we partially ignore "SDRRange" clamping here (you can't simply clamp Oklab to SDR sRGB without gamut mapping)
 	return float3(SDRRange ? min(outputLab.x, 1.f) : outputLab.x, outputLab.yz);
-#else
+#else // LUT_MAPPING_TYPE
 	float3 outputLinear = oklab_to_linear_srgb(outputLab);
 	if (SDRRange) {
 		// Optional step to keep colors in the SDR range.
@@ -400,7 +398,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	}
 #endif
 	return outputLinear;
-#endif
+#endif // LUT_MAPPING_TYPE
 }
 
 // Dispatch size is 1 1 16 (x and y have one thread and one thread group, while z has 16 thread groups with a thread each)
@@ -459,14 +457,14 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 #if LUT_MAPPING_TYPE == 2
 	mixedLUT = oklab_to_linear_srgb(mixedLUT);
 	//TODO: make this case convert to sRGB as LUT mapping is more correct in sRGB
-#endif // LUT_MAPPINT_TYPE
+#endif // LUT_MAPPING_TYPE
 
 #if CLAMP_INPUT_OUTPUT_TYPE == 1 || CLAMP_INPUT_OUTPUT_TYPE == 2 && LUT_MAPPING_TYPE >= 1
 	// Clamp to AP1 since OKLab colors may turn black when not clamped
 	mixedLUT = mul(BT709_2_AP1D65, mixedLUT);
 	mixedLUT = max(mixedLUT, 0.f);
 	mixedLUT = mul(AP1D65_2_BT709, mixedLUT);
-#endif
+#endif // CLAMP_INPUT_OUTPUT_TYPE
 
 	// If necessary (!GAMMA_CORRECTION_IN_LUTS), shift from gamma 2.2 to sRGB interpretation, so the LUT input and output colors
 	// are in the same gamma space, which should be more mathematically correct, and we can then instead do the gamma correction later.
@@ -476,7 +474,7 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 // Convert to sRGB gamma after blending between LUTs, so the blends are done in linear space, which gives more consistent and correct results
 #if LUT_MAPPING_TYPE == 0
 	mixedLUT = gamma_linear_to_sRGB_mirrored(mixedLUT);
-#endif // LUT_MAPPINT_TYPE
+#endif // LUT_MAPPING_TYPE
 
 	OutMixedLUT[outUVW] = float4(mixedLUT, 1.f);
 }
