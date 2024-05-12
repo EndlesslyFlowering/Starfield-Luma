@@ -5,6 +5,13 @@
 #define USE_REPLACED_COMPOSITION (FORCE_VANILLA_LOOK ? 1 : 1)
 #define OPTIMIZE_REPLACED_COMPOSITION_BLENDS (FORCE_VANILLA_LOOK ? 0 : 0)
 #define CLIP_HDR_BACKGROUND 0
+// 0) Raw linear blend instead of sRGB gamma blend (looks very different from Vanilla).
+// 1) Apply pow on blend alpha (luminance based). Looks better than linear blends, though results vary on the background brightness.
+// 2) DEPRECATED: Apply pow on blend alpha (percentage based).
+// 3) Pre-blend against mid gray (alpha based): attempts to pre-blend with a mid gray background to better predict the color shift from sRGB gamma blends.
+//    This generally looks best and closest to sRGB gamma blends, though results vary on the background brightness.
+// 4) DEPRECATED: Pre-blend against mid gray (rgb based).
+#define OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE 3
 // Hack: change the alpha value at which the UI blends in in HDR, to increase readability. Range is 0 to 1, with 1 having no effect.
 // We found the best value empirically and it seems to match gamma 2.2.
 // Note that this make the look more towards SDR sRGB gamma blends when the background is white and the UI is dark,
@@ -60,10 +67,12 @@ float4 PS(PSInputs psInputs) : SV_Target
 	UIColor = saturate(UIColor);
 
 	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
+	float3 UIColorGammaSpace = UIColor.rgb;
 	UIColor.rgb = GAMMA_TO_LINEAR(UIColor.rgb);
 
 	// This multiplication is probably used by Bethesda to dim the UI when applying an AutoHDR pass at the very end (they don't have real HDR)
 	UIColor.rgb *= ScaleformCompositeLayout.UIIntensity;
+	UIColorGammaSpace *= ScaleformCompositeLayout.UIIntensity;
 
 	const bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
 	bool isLinear = true;
@@ -77,23 +86,41 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 #if !USE_REPLACED_COMPOSITION || OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 
+#if OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 1 || OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 2
+
 		// Scale alpha to emulate sRGB gamma blending (we blend in linear space in HDR),
 		// this won't ever be perfect but it's close enough for most cases.
-#if DEVELOPMENT && 0 // Quick testing
-		float HDRUIBlendPow = 1.f - HdrDllPluginConstants.DevSetting02;
-#else
 		float HDRUIBlendPow = HDR_UI_BLEND_POW;
-#endif // DEVELOPMENT
-#if 1
+#if OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 2
+		HDRUIBlendPow = lerp(1.f, HDRUIBlendPow, HDR_UI_BLEND_POW_ALPHA);
+#else // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 1
 		// Base the alpha pow application percentage on the color luminance.
 		// Generally speaking dark colors (with a low alpha) are meant as darkneing (transparent) backgrounds,
 		// while brighter/whiter colors are meant to replace the background color directly (opaque),
 		// so we could take that into account to avoid cases where the alpha pow would make stuff look worse.
-		HDRUIBlendPow = lerp(HDRUIBlendPow, 1.f, saturate(Luminance(UIColor.xyz)));
-#else
-		HDRUIBlendPow = lerp(1.f, HDRUIBlendPow, HDR_UI_BLEND_POW_ALPHA);
-#endif
+		HDRUIBlendPow = lerp(HDRUIBlendPow, 1.f, saturate(LINEAR_TO_GAMMA(Luminance(UIColor.xyz))));
+#endif // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 1
 		UIColor.a = pow(UIColor.a, HDRUIBlendPow);
+		
+#else // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 3 || OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 4
+
+		// Blend in in gamma space with the average color of the background (guessed to be 0.5, even if it's likely a lot lower than that, and finding the actual average pixel brightness of the game could yield better results),
+		// then, with the pre-multiplied alpha inverse formula, find the new UI color with the average gamma space "offset" baked into it.
+		static const float MidGrayBackgroundColorGammaSpace = 0.5f;
+		static const float MidGrayBackgroundColorLinearSpace = GAMMA_TO_LINEAR(MidGrayBackgroundColorGammaSpace);
+		const float3 averageGammaBlendColor = GAMMA_TO_LINEAR(UIColorGammaSpace + (MidGrayBackgroundColorGammaSpace * (1.f - UIColor.a)));
+#if 0 // Unused
+		const float3 averageLinearBlendColor = UIColor.rgb + (MidGrayBackgroundColorLinearSpace * (1.f - UIColor.a));
+#endif
+// Find the matching alpha (theoretically less correct but it looks better)
+#if OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 3
+		UIColor.a = -((average(averageGammaBlendColor - UIColor.rgb) / MidGrayBackgroundColorLinearSpace) - 1.f);
+// Find the matching rgb color (theoretically more correct but it seems to cause issues with alpha blending, probably because rgb values go below 0)
+#else // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 4
+		UIColor.rgb = averageGammaBlendColor - (MidGrayBackgroundColorLinearSpace * (1.f - UIColor.a));
+#endif // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 4
+
+#endif // OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 3 || OPTIMIZED_REPLACED_COMPOSITION_BLENDS_TYPE == 4
 
 #endif // !USE_REPLACED_COMPOSITION || OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 	}
@@ -165,7 +192,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 #endif // !OPTIMIZE_REPLACED_COMPOSITION_BLENDS
 	{
 		// Pre-multiplied alpha formula
-		outputColor = UIColor.rgb + (backgroundColor * (1.f - UIColor.a));
+		outputColor = (UIColor.rgb * LinearUIPaperWhite) + (backgroundColor * (1.f - UIColor.a));
 	}
 
 	FinalColorTexture[psInputs.pos.xy].rgb = outputColor;
