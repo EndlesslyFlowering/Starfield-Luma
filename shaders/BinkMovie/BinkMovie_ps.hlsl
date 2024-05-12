@@ -66,6 +66,8 @@ float4 PS(PSInputs inputs) : SV_Target
 	if (HdrDllPluginConstants.DisplayMode > 0)
 #endif // SDR_LINEAR_INTERMEDIARY
 	{
+		// Note: we ignore "HdrDllPluginConstants.GammaCorrection" here, as we fully rely on "SDR_USE_GAMMA_2_2"
+		// Note: "ApplyGammaBelowZeroDefault" doesn't matter here as the UI should only have positive scRGB values (negative values would have been accidental)
 #if SDR_USE_GAMMA_2_2
 		color = pow(color, 2.2f);
 #else

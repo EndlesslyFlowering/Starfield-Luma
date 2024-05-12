@@ -15,6 +15,8 @@
 // and without or alpha pow modifications, it becomes much more noticeable).
 #define HDR_UI_BLEND_POW_ALPHA 0.5f
 
+// Note: we ignore "HdrDllPluginConstants.GammaCorrection" here, as we fully rely on "SDR_USE_GAMMA_2_2"
+// Note: "ApplyGammaBelowZeroDefault" doesn't really matter here as the UI should only have positive scRGB values
 #if SDR_USE_GAMMA_2_2 // NOTE: these gamma formulas should use their mirrored versions in the CLAMP_INPUT_OUTPUT_TYPE < 3 case
 	#define GAMMA_TO_LINEAR(x) gamma_to_linear_mirrored(x, 2.2f)
 	#define LINEAR_TO_GAMMA(x) linear_to_gamma_mirrored(x, 2.2f)
@@ -54,6 +56,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// as it has a copy of the UI buffer that it uses to determine how much to reconstruct pixels.
 
 	// We do a saturate because the original UI texture was a INT/UNORM so it couldn't have had values beyond 0-1. And this also avoids negatives powers in the code below.
+	// It's possible that skipping this clipping would allow some "HDR" UI to come through, due to usage of pre-multiplied alpha.
 	UIColor = saturate(UIColor);
 
 	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
@@ -171,7 +174,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// of whether a "discard" statement is used.
 	discard;
 	return 0.f;
-#else
+#else // USE_REPLACED_COMPOSITION
 	return UIColor;
 #endif // USE_REPLACED_COMPOSITION
 }
