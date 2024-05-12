@@ -62,6 +62,9 @@
 #define HDR_POST_PROCESS_TYPE 5
 #define DRAW_LUT 0
 #define DRAW_TONEMAPPER 0
+// Draws the offset between the expected neutral LUT value and the actual final value we had.
+// Requires "AdditionalNeutralLUTPercentage" and "HdrDllPluginConstants.ColorGradingStrength" set to 1 to work properly.
+#define DEBUG_NEUTRAL_LUT_SAMPLING 1
 
 // Enables our Luma custom HDR tonemapper
 #define HDR_TONE_MAPPER_ENABLED 1
@@ -1301,7 +1304,7 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 
 	float3 LUTColor = SampleGradingLUT(LUTCoordinates, false, LUTExtrapolationColorSpace, true, color);
 
-#if MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK
+#if MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK && !DEBUG_NEUTRAL_LUT_SAMPLING
 	// If we have LUT correction ongoing, and the input/output LUT colors are dark/black and they fall within the closest LUT step around zero,
 	// double the saturation to maintain color tint more effectively around black (0 0 0 black doesn't have a hue, and LUTs are corrected so their black point is always full black).
 	// We can't do this in the LUT merge/mix shader as it would mess around with the LUT texture sampling.
@@ -1376,7 +1379,7 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 		LUTColor = closenessToZero * luminanceDeviationFromNeutralLUT * chromaDeviationFromNeutralLUT;
 #endif
 	}
-#endif // MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK
+#endif // MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK && !DEBUG_NEUTRAL_LUT_SAMPLING
 
 	// "ColorGradingStrength" is similar to "AdditionalNeutralLUTPercentage" from the LUT mixing shader, though this is more precise as it skips the precision loss induced by a neutral LUT
 	const float LUTMaskAlpha = (1.f - LUTMaskTexture.Sample(Sampler0, uv).x) * HdrDllPluginConstants.ColorGradingStrength;
@@ -1481,20 +1484,20 @@ float3 DrawLUTGradients(float2 PixelPosition, uint PixelScale, inout bool DrawnL
 #endif // DRAW_LUT
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
 
-#if DRAW_TONEMAPPER
 static const uint DrawToneMapperSize = 512;
 static const uint ToneMapperPadding = 8;
 static const uint ToneMapperBins = DrawToneMapperSize - (2 * ToneMapperPadding);
 struct DrawToneMapperParams
 {
-	bool drawToneMapper;
+	uint drawToneMapperType; // 0 None, 1 Body, 2 Frame
 	uint toneMapperY;
 	float valueX;
 };
 
+#if DRAW_TONEMAPPER
 DrawToneMapperParams DrawToneMapperStart(inout CompositeParams params)
 {
-	DrawToneMapperParams dtmParams = { false, -1u, 0 };
+	DrawToneMapperParams dtmParams = { 0, -1u, 0 };
 	float width;
 	float height;
 	InputColorTexture.GetDimensions(width, height);
@@ -1504,15 +1507,13 @@ DrawToneMapperParams DrawToneMapperStart(inout CompositeParams params)
 	);
 	if (offset.x >= 0 && offset.y >= 0)
 	{
-		params.outputColor = float3(0.15f, 0.15f, 0.15f);
-		if (
-			offset.x >= ToneMapperPadding
+		if (offset.x >= ToneMapperPadding
 			&& offset.y >= ToneMapperPadding
 			&& offset.x < (DrawToneMapperSize - ToneMapperPadding)
 			&& offset.y < (DrawToneMapperSize - ToneMapperPadding)
 		)
 		{
-			dtmParams.drawToneMapper = true;
+			dtmParams.drawToneMapperType = 1;
 			uint toneMapperX = offset.x - ToneMapperPadding;
 			dtmParams.toneMapperY = offset.y - ToneMapperPadding;
 
@@ -1522,34 +1523,39 @@ DrawToneMapperParams DrawToneMapperStart(inout CompositeParams params)
 			const float xRange = xMax - xMin;
 			dtmParams.valueX = (float(toneMapperX) / float(ToneMapperBins)) * (xRange) + xMin;
 			dtmParams.valueX = pow(10.f, dtmParams.valueX);
-			params.outputColor = float3(dtmParams.valueX,dtmParams.valueX,dtmParams.valueX);
+			// This color will be tonemapped (and post processed) normally as if it came from the scene
+			params.outputColor = float3(dtmParams.valueX, dtmParams.valueX, dtmParams.valueX);
+		}
+		else
+		{
+			dtmParams.drawToneMapperType = 2;
 		}
 	}
 	return dtmParams;
 }
 
-void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams dtmParams)
+bool DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams dtmParams)
 {
-	if (dtmParams.drawToneMapper)
+	if (dtmParams.drawToneMapperType == 1)
 	{
 		// From 0.01 to Peak nits (in log)
 		const float yMin = log10(0.01);
 		const float yMax = log10(PQMaxNits);
 		const float yRange = yMax - yMin;
 		float valueY = (float(dtmParams.toneMapperY) / float(ToneMapperBins)) * (yRange) + yMin;
-		float peakNits = HdrDllPluginConstants.DisplayMode >=0
-			? HdrDllPluginConstants.HDRPeakBrightnessNits
-			: WhiteNits_sRGB;
+		const float peakNits = HdrDllPluginConstants.DisplayMode >= 0 ? HdrDllPluginConstants.HDRPeakBrightnessNits : WhiteNits_sRGB;
+		const float maxOutputLuminance = peakNits / WhiteNits_sRGB;
 		valueY = pow(10.f, valueY);
 		valueY /= WhiteNits_sRGB;
+		// Note: we purposely not normalize out the paper white from the color, we want to acknowledge it
 		float outputY = Luminance(params.outputColor);
 		if (outputY > valueY )
 		{
 			if (outputY < MidGray)
 			{
-				params.outputColor = float3(0.3f,0,0.3f);
+				params.outputColor = float3(0.3f, 0, 0.3f);
 			}
-			else if (outputY > peakNits / WhiteNits_sRGB)
+			else if (outputY > maxOutputLuminance)
 			{
 				params.outputColor = float3(0, 0.3f, 0.3f);
 			}
@@ -1562,18 +1568,26 @@ void DrawToneMapperEnd(inout CompositeParams params, inout DrawToneMapperParams 
 		{
 			if (dtmParams.valueX < MidGray)
 			{
-				params.outputColor = float3(0,0.3f,0);
+				params.outputColor = float3(0, 0.3f, 0);
 			}
-			else if (valueY >= peakNits / WhiteNits_sRGB)
+			else if (valueY >= maxOutputLuminance)
 			{
-				params.outputColor = float3(0,0,0.3f);
+				params.outputColor = float3(0, 0, 0.3f);
 			}
 			else
 			{
 				params.outputColor = 0.05f;
 			}
 		}
+		return true;
 	}
+	else if (dtmParams.drawToneMapperType == 2)
+	{
+		static const float TonemapperFrameColor = 0.15f;
+		params.outputColor = TonemapperFrameColor;
+		return true;
+	}
+	return false;
 }
 #endif // DRAW_TONEMAPPER
 
@@ -1612,11 +1626,11 @@ void ApplyColorGrading(inout float3 Color, out float3 NonGammaCorrectedColor, fl
 void ApplyColorGrading(inout CompositeParams params)
 {
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
-	ApplyColorGrading(params.outputColor, params.postLUTColor, params.psInput.TEXCOORD);
+	const float2 UV = params.psInput.TEXCOORD;
 #else
-	const float2 unusedUV = 0.f;
-	ApplyColorGrading(params.outputColor, params.postLUTColor, unusedUV);
+	const float2 UV = 0.f; // Unused
 #endif // APPLY_MERGED_COLOR_GRADING_LUT
+	ApplyColorGrading(params.outputColor, params.postLUTColor, UV);
 }
 
 #if HDR_TONE_MAPPER_ENABLED
@@ -2021,6 +2035,27 @@ void ApplySDRBrightness(inout float3 Color)
 #endif // ENABLE_TONEMAP
 }
 
+void DrawDebug(inout CompositeParams params, inout DrawToneMapperParams dtmParams)
+{
+#if DRAW_TONEMAPPER
+	if (DrawToneMapperEnd(params, dtmParams))
+		return;
+#endif // DRAW_TONEMAPPER
+
+#if DEBUG_NEUTRAL_LUT_SAMPLING
+#if defined(APPLY_MERGED_COLOR_GRADING_LUT)
+	const float2 UV = params.psInput.TEXCOORD;
+#else
+	const float2 UV = 0.f; // Unused
+#endif // APPLY_MERGED_COLOR_GRADING_LUT
+	float3 InOutLUTColor = params.preLUTColor;
+	float3 InOutLUTColorNonGammaCorrected = InOutLUTColor;
+	ApplyColorGrading(InOutLUTColor, InOutLUTColorNonGammaCorrected, UV);
+	params.outputColor = abs(InOutLUTColorNonGammaCorrected - params.preLUTColor) * 100.f; // Print out the LUT in/out difference (which represents the sampling accuracy error for a neutral LUT)
+	params.outputColor *= (HdrDllPluginConstants.DisplayMode > 0) ? (HdrDllPluginConstants.HDRGamePaperWhiteNits / WhiteNits_sRGB) : 1.f;
+#endif // DEBUG_NEUTRAL_LUT_SAMPLING
+}
+
 [RootSignature(ShaderRootSignature)]
 PSOutput PS(PSInput psInput) // Main Entrypoint
 {
@@ -2052,6 +2087,8 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 
 #if DRAW_TONEMAPPER
 	DrawToneMapperParams dtmParams = DrawToneMapperStart(params);
+#else
+	DrawToneMapperParams dtmParams = { 0, -1u, 0 };
 #endif
 
 	const float tmParamsInputColorLuminance = Luminance(params.outputColor);
@@ -2120,9 +2157,9 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 #else
 		params.outputColor *= HdrDllPluginConstants.HDRGamePaperWhiteNits / ReferenceWhiteNits_BT2408; // Don't use "HDRGamePaperWhiteNits" directly as it'd be too bright on an untonemapped image
 #endif
-#if DRAW_TONEMAPPER
-		DrawToneMapperEnd(params, dtmParams);
-#endif
+
+		DrawDebug(params, dtmParams);
+
 		ApplyHDROutputTransforms(params.outputColor);
 	}
 	else // SDR
@@ -2141,9 +2178,9 @@ PSOutput PS(PSInput psInput) // Main Entrypoint
 				ApplyUserSettingContrast(params.outputColor);
 			}
 		}
-#if DRAW_TONEMAPPER
-		DrawToneMapperEnd(params, dtmParams);
-#endif
+
+		DrawDebug(params, dtmParams);
+
 		ApplySDROutputTransforms(params.outputColor);
 	}
 
