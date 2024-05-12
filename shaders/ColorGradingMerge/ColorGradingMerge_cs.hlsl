@@ -3,13 +3,21 @@
 #include "../math.hlsl"
 #include "RootSignature.hlsl"
 
+// 0 None, 1 Scale with Black Linear, 2 Remove Black sRGB Values
+#define LUT_IMPROVEMENT_TYPE (FORCE_VANILLA_LOOK ? 0 : 2)
+// Determines how multiple LUTs blend between themseleves (e.g. the game can have up to 4 loaded, and each has a different intensity).
+// This only really makes a difference if more than one LUT is used at the same time.
+// 0) linear space (scRGB) blending: Doing blends in linear space is better than the vanilla gamma space blends, as they cause hue shift.
+// 1) OKLbab blending: OKLab blending is more perceptually accurate.
+#define LUT_BLENDING_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
 #define FORCE_SDR_LUTS 0
+
 #define LUT_DEBUG_VALUES false
-#if LUT_MAPPING_TYPE == 2
+#if LUT_BLENDING_TYPE == 1
 #define DEBUG_COLOR linear_srgb_to_oklab(float3(1.f, 0.f, 1.f)) /*Magenta*/
 #else
 #define DEBUG_COLOR float3(1.f, 0.f, 1.f) /*Magenta*/
-#endif // LUT_MAPPING_TYPE
+#endif // LUT_BLENDING_TYPE
 
 // These settings goes to influence the LUTs correction process, by determining how LUTs are linearized and how to correct the gamma mismatch baked into the game's look.
 // There's many ways these LUTs could have been generated (designed, made):
@@ -117,11 +125,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 
 	if (analysis.whiteY < analysis.blackY) // If LUT is inversed (eg: photo negative) don't do anything
 	{
-#if LUT_MAPPING_TYPE == 2
+#if LUT_BLENDING_TYPE == 1
 		return originalLab;
 #else
 		return originalLinear;
-#endif // LUT_MAPPING_TYPE
+#endif // LUT_BLENDING_TYPE
 	}
 
 	// LUT(0,0,0) is the black color, which is also the shadow fog color.
@@ -152,9 +160,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	const float saturation = SDRRange ? 1.f : HdrDllPluginConstants.ToneMapperSaturation;
 
 #if LUT_IMPROVEMENT_TYPE == 0
+
 	float targetL = originalLCh[0];
 	const float targetChroma = originalLCh[1] * saturation;
 	const float targetHue = originalLCh[2];
+
 #elif LUT_IMPROVEMENT_TYPE == 1
 
 	// Note: Black scaling implements curve in the newly created shadow region
@@ -272,7 +282,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 
 	float shadowLength = 1.f - midGrayAvg;
 	float shadowStop = max(neutralGamma.r, max(neutralGamma.g, neutralGamma.b));
-	float3 removeFog = addedGamma * max(0, shadowLength - shadowStop) / shadowLength;
+	float3 removeFog = addedGamma * max(0.f, shadowLength - shadowStop) / shadowLength;
 
 	float highlightsStart = midGrayAvg;
 	float highlightsStop = min(neutralGamma.r, min(neutralGamma.g, neutralGamma.b));
@@ -382,10 +392,10 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	// Blending in Oklab should even better than doing it in linear
 	outputLab = lerp(originalLab, outputLab, HdrDllPluginConstants.LUTCorrectionStrength);
 
-#if LUT_MAPPING_TYPE == 2
+#if LUT_BLENDING_TYPE == 1
 	// Note: we partially ignore "SDRRange" clamping here (you can't simply clamp Oklab to SDR sRGB without gamut mapping)
 	return float3(SDRRange ? min(outputLab.x, 1.f) : outputLab.x, outputLab.yz);
-#else // LUT_MAPPING_TYPE
+#else // LUT_BLENDING_TYPE
 	float3 outputLinear = oklab_to_linear_srgb(outputLab);
 	if (SDRRange) {
 		// Optional step to keep colors in the SDR range.
@@ -398,7 +408,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	}
 #endif
 	return outputLinear;
-#endif // LUT_MAPPING_TYPE
+#endif // LUT_BLENDING_TYPE
 }
 
 // Dispatch size is 1 1 16 (x and y have one thread and one thread group, while z has 16 thread groups with a thread each)
@@ -406,6 +416,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 [numthreads(LUT_SIZE_UINT, LUT_SIZE_UINT, 1)]
 void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 {
+	// These pixel coordinates inherit (or, represent) whatever input gamma the LUT has
 	const uint3 inUVW = ThreeToTwoDimensionCoordinates(SV_DispatchThreadID);
 	const uint3 outUVW = SV_DispatchThreadID;
 
@@ -430,18 +441,18 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	float3 LUT2Color = PatchLUTColor(LUT2, inUVW, neutralGamma, neutralLinear, SDRRange);
 	float3 LUT3Color = PatchLUTColor(LUT3, inUVW, neutralGamma, neutralLinear, SDRRange);
 	float3 LUT4Color = PatchLUTColor(LUT4, inUVW, neutralGamma, neutralLinear, SDRRange);
-#elif LUT_MAPPING_TYPE == 2
+#elif LUT_BLENDING_TYPE == 1
 	LUT1Color = linear_srgb_to_oklab(LUT1Color);
 	LUT2Color = linear_srgb_to_oklab(LUT2Color);
 	LUT3Color = linear_srgb_to_oklab(LUT3Color);
 	LUT4Color = linear_srgb_to_oklab(LUT4Color);
 #endif // LUT_IMPROVEMENT_TYPE
 
-#if LUT_MAPPING_TYPE == 2
+#if LUT_BLENDING_TYPE == 1
 	neutralLinear = linear_srgb_to_oklab(neutralLinear);
-#endif // LUT_MAPPING_TYPE
+#endif // LUT_BLENDING_TYPE
 
-	// Blend in linear space or Oklab space depending on "LUT_MAPPING_TYPE"
+	// Blend in linear space or Oklab space depending on "LUT_BLENDING_TYPE" (and maybe on "LUT_MAPPING_TYPE")
 	float adjustedNeutralLUTPercentage = lerp(PcwColorGradingMerge.neutralLUTPercentage, 1.f, AdditionalNeutralLUTPercentage);
 	float adjustedLUT1Percentage = lerp(PcwColorGradingMerge.LUT1Percentage, 0.f, AdditionalNeutralLUTPercentage);
 	float adjustedLUT2Percentage = lerp(PcwColorGradingMerge.LUT2Percentage, 0.f, AdditionalNeutralLUTPercentage);
@@ -454,10 +465,9 @@ void CS(uint3 SV_DispatchThreadID : SV_DispatchThreadID)
 	                + (adjustedLUT3Percentage * LUT3Color)
 	                + (adjustedLUT4Percentage * LUT4Color);
 
-#if LUT_MAPPING_TYPE == 2
+#if LUT_BLENDING_TYPE == 1
 	mixedLUT = oklab_to_linear_srgb(mixedLUT);
-	//TODO: make this case convert to sRGB as LUT mapping is more correct in sRGB
-#endif // LUT_MAPPING_TYPE
+#endif // LUT_BLENDING_TYPE
 
 #if CLAMP_INPUT_OUTPUT_TYPE == 1 || CLAMP_INPUT_OUTPUT_TYPE == 2 && LUT_MAPPING_TYPE >= 1
 	// Clamp to AP1 since OKLab colors may turn black when not clamped
