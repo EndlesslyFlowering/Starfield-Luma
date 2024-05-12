@@ -67,7 +67,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 	UIColor = saturate(UIColor);
 
 	// This multiplication is probably used by Bethesda to dim the UI when applying an AutoHDR pass at the very end (they don't have real HDR).
-	// We do it in gamma space to maintain the expected intensity change.
+	// We do it in gamma space to maintain the expected intensity change (it doesn't cause hue shift, as one might think).
 	UIColor.rgb *= ScaleformCompositeLayout.UIIntensity;
 
 	// Theoretically all UI would be in sRGB though it seems like it was designed on gamma 2.2 screens, and even if it wasn't, that's how it looks in the game
