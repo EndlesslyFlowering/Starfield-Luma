@@ -300,7 +300,9 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 addedGamma = analysis.blackGamma;
 	float3 removedGamma = 1.f - analysis.whiteGamma;
 
-	float3 midGray = LUT.Load(ThreeToTwoDimensionCoordinates(LUT_MAX_UINT / 2.f)).rgb;
+	// We don't have a bilinear sampler guaranteed to be accessible here, so we need to load two texels for best results (four would even be better, as a proper bilinear).
+	// Note: this is only useful if "LUT_MAX_UINT" is an odd number.
+	float3 midGray = lerp(LUT.Load(ThreeToTwoDimensionCoordinates(round((LUT_MAX_UINT / 2.f) - 0.5f))).rgb, LUT.Load(ThreeToTwoDimensionCoordinates(round((LUT_MAX_UINT / 2.f) + 0.5f))).rgb, 0.5f); // TODO: add to "LUTAnalysis"
 	float midGrayAvg = average(midGray);
 
 	float shadowLength = 1.f - midGrayAvg;
