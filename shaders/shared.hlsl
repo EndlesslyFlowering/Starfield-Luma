@@ -41,8 +41,10 @@
 // Requires "SDR_USE_GAMMA_2_2".
 // Cannot be set to false with "LUT_MAPPING_TYPE" == 3 (removed), as the point of doing LUTs mapping in OKLAB is for the blackest point to have no luminosity but still have a hue
 // to help out with tinting the dakest 1/16 part of the image, thus if we convert back from OKLAB to Rec.709 to OKLAB, we'd lose the hue on black, due to having no luminance.
-// NOTE: to avoid hue shift from gamma correction, we could do gamma correction by luminance instead of by channel, though the hue shift is kind of "correct".
 #define GAMMA_CORRECTION_IN_LUTS 0
+// To avoid hue shift from gamma correction, we can do gamma correction by luminance instead of by channel, though the hue shift is kind of "correct" and expected, as displays linearize gamma by channel, not by luminance,
+// so this is just an experiment. It can look good and better in certain scenes (especially around blue), and possibly helps preventing some crushed blacks, but we have no proper technical reason to enable this.
+#define GAMMA_CORRECTION_BY_LUMINANCE 0
 
 // Brings the range roughly from 80 nits to 203 nits (~2.5)
 #define HDR_REFERENCE_PAPER_WHITE_MUTLIPLIER (ReferenceWhiteNits_BT2408 / WhiteNits_sRGB)

@@ -30,12 +30,16 @@
 // and we base our LUT correction/normalization process on that.
 // Some of these options make LUTs too bright, and some other crush detail around shadow.
 #if !SDR_USE_GAMMA_2_2 // sRGB->linear->LUT normalization
+
 	// This assumes the game used the sRGB gamma formula and was meant to be viewed on sRGB gamma displays.
 	// No need to run "gamma_sRGB_to_linear_mirrored()" as there's no HDR source colors in LUTs.
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
+	#define LINEARIZE_SAFE(x) gamma_sRGB_to_linear_custom(x)
 	#define CORRECT_GAMMA(x) x
 	#define POST_CORRECT_GAMMA(x)
+
 #else
+
 	// Follow the user setting (slower but it can probably help accross the whole range of LUTs and screens).
 	// 
 	// Note: if "GAMMA_CORRECTION_IN_LUTS" is false and "ApplyGammaBelowZeroDefault" is false and the gamma correction setting is changed, the output colors seem to wobble a bit (not a real problem probably).
@@ -49,20 +53,39 @@
 	// To work around the issue, we could simply force LUTs to be intepreted with gamma 2.2 (and outputted in sRGB) at 100% if gamma correction was > 0,
 	// or better, not undo intermediary gamma correction in "CORRECT_GAMMA()" if the LUT was corrected, though that's near impossible to determine.
 	// Another alternative would be to apply gamma by average or luminance instead than by channel.
-	#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), pow(x, 2.2f), HdrDllPluginConstants.GammaCorrection)
-	//#define LINEARIZE(x) pow(x, 2.2f) /*Version without "HdrDllPluginConstants.GammaCorrection"*/
+	#if !GAMMA_CORRECTION_BY_LUMINANCE
+	#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), gamma_to_linear(x), HdrDllPluginConstants.GammaCorrection)
+	#define LINEARIZE_SAFE(x) lerp(gamma_sRGB_to_linear_custom(x), gamma_to_linear_custom(x), HdrDllPluginConstants.GammaCorrection)
+	#elif !GAMMA_CORRECTION_BY_LUMINANCE && 0 /*Version without "HdrDllPluginConstants.GammaCorrection" (as if it was 100%)*/
+	#define LINEARIZE(x) gamma_to_linear(x)
+	#define LINEARIZE_SAFE(x) gamma_to_linear_custom(x)
+	#else /*Version with gamma correction by luminance (not by channel)*/
+	#define LINEARIZE(x) (lerp(1.f, safeDivision(Luminance(gamma_to_linear(x)), Luminance(gamma_sRGB_to_linear(x))), HdrDllPluginConstants.GammaCorrection) * gamma_sRGB_to_linear(x))
+	#define LINEARIZE_SAFE(x) (lerp(1.f, safeDivision(Luminance(gamma_to_linear_custom(x)), Luminance(gamma_sRGB_to_linear_custom(x))), HdrDllPluginConstants.GammaCorrection) * gamma_sRGB_to_linear_custom(x))
+	#endif
+
 	#if GAMMA_CORRECTION_IN_LUTS // 2.2->linear->LUT normalization
+
 		// If we correct gamma in LUTs, there's nothing more to do than linearize (interpret) them as gamma 2.2, while the input coordinates keep using sRGB gamma.
 		// This single difference will correct the gamma on output.
 		#define CORRECT_GAMMA(x) x
 		#define POST_CORRECT_GAMMA(x)
+
 	#else // 2.2->linear->LUT normalization->sRGB->linear
-		// If we don't correct gamma in LUTs, we convert them back to sRGB gamma at the end, so that it will match the input coordinates gamma, as they also use sRGB.
+
+		// If we don't correct gamma in LUTs, we convert them back from gamma 2.2 to sRGB at the end, so that it will match the input coordinates gamma, as they also use sRGB.
 		// A further correction step will be done after that to acknowledge the gamma mismatch baked into the game look.
 		// Use the custom gamma formulas to apply (and mirror) gamma on colors below 0 but not beyond 1 (based on "ApplyGammaBelowZeroDefault").
+		#if !GAMMA_CORRECTION_BY_LUMINANCE
 		#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear_custom(lerp(gamma_linear_to_sRGB_custom(x), linear_to_gamma_custom(x), HdrDllPluginConstants.GammaCorrection)))
-		//#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear_custom(linear_to_gamma_custom(x))); if (Luminance(x) < 0.f) { x = 0.f } /*Version without "HdrDllPluginConstants.GammaCorrection"*/
+		#elif !GAMMA_CORRECTION_BY_LUMINANCE && 0 /*Version without "HdrDllPluginConstants.GammaCorrection" (as if it was 100%)*/
+		#define CORRECT_GAMMA(x) (gamma_sRGB_to_linear_custom(linear_to_gamma_custom(x)))
+		#else /*Version with gamma correction by luminance (not by channel)*/
+		#define CORRECT_GAMMA(x) (lerp(1.f, safeDivision(Luminance(gamma_sRGB_to_linear_custom(linear_to_gamma_custom(x))), Luminance(x)), HdrDllPluginConstants.GammaCorrection) * x)
+		#endif
+
 		#define POST_CORRECT_GAMMA(x) if (ApplyGammaBelowZeroDefault && Luminance(x) < 0.f) { x = 0.f; }
+
 	#endif // GAMMA_CORRECTION_IN_LUTS
 #endif // SDR_USE_GAMMA_2_2
 
