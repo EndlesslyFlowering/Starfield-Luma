@@ -64,7 +64,7 @@
 #define DRAW_TONEMAPPER 0
 // Draws the offset between the expected neutral LUT value and the actual final value we had.
 // Requires "AdditionalNeutralLUTPercentage" and "HdrDllPluginConstants.ColorGradingStrength" set to 1 to work properly.
-#define DEBUG_NEUTRAL_LUT_SAMPLING 1
+#define DEBUG_NEUTRAL_LUT_SAMPLING 0
 
 // Enables our Luma custom HDR tonemapper
 #define HDR_TONE_MAPPER_ENABLED 1
