@@ -33,8 +33,9 @@
 //    the problem with this is that near black blending is very different compared to sRGB gamma or linear, crushing blacks without further adjustments.
 //    "MAINTAIN_CORRECTED_LUTS_TINT_AROUND_BLACK" has since then fixed the near black tint problem in a different way.
 //    It's unknown if this would have worked correctly with "ENABLE_LUT_TETRAHEDRAL_INTERPOLATION".
-// 4) Linear mapping (corrected) (corrected sRGB in, Linear out): a mix between "0" and "1". LUTs are stored in linear space, but we use a more accurate way of mapping them which emulates the advantages of sRGB gamma mapping while keeping the advantages of storing values in linear space.
-//    This seems to work fine with "ENABLE_LUT_TETRAHEDRAL_INTERPOLATION" too, even if it increases the "offset" from a neutral LUT.
+// 4) Corrected linear mapping (corrected sRGB in, Linear out): a mix between option "0" and "1".
+//    LUTs are stored in linear space, but we use a more accurate way of mapping them which emulates the advantages of sRGB gamma mapping while keeping the advantages of storing colors in linear space.
+//    This seems to work fine with "ENABLE_LUT_TETRAHEDRAL_INTERPOLATION" too, even if it increases the in/out sampling error from a neutral LUT.
 #define LUT_MAPPING_TYPE (FORCE_VANILLA_LOOK ? 0 : 4)
 #define LUT_SIZE 16.f
 #define LUT_SIZE_UINT (uint)LUT_SIZE
