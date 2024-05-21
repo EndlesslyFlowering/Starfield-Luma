@@ -74,7 +74,7 @@ namespace Hooks
 
 			// Hide vanilla brightness, contrast and hdr brightness
 			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBAC), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBBB), nop5, 5);
 			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD06), nop5, 5);
 			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xE8F), nop5, 5);
 
@@ -94,7 +94,7 @@ namespace Hooks
 			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x320), HookedScaleformCompositeDraw);
 
 			// fsr3 fixes
-			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3BE), Hook_ffxFsr3ContextCreate);
+			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3B2), Hook_ffxFsr3ContextCreate);
 			dku::Hook::write_call<6>(dku::Hook::IDToAbs(1391482, 0x3CE), Hook_CreateShaderResourceView);
 			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x572), Hook_UnkFunc3);
 			_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0xF7), Hook_UnkFunc3_Internal);
