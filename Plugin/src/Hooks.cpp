@@ -865,7 +865,7 @@ namespace Hooks
 		_UnkFunc3(a1, a2, a3, a4, a5, a6, a7);
 	}
 
-    void Hooks::Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6)
+    void Hooks::Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint64_t a7)
 	{
 		const auto settings = Settings::Main::GetSingleton();
 		if (settings->bNeedsToRefreshFSR3) {
@@ -873,7 +873,7 @@ namespace Hooks
 			settings->bNeedsToRefreshFSR3 = false;
 		}
 
-		_UnkFunc3_Internal(a1, a2, a3, a4, a5, a6);
+		_UnkFunc3_Internal(a1, a2, a3, a4, a5, a6, a7);
 	}
 
     void Install()

@@ -52,8 +52,13 @@ namespace RE
 
 			struct CheckBoxData
 			{
-				TUIValue<bool> m_Value;  // 0
-				char _pad20[0x8];        // 20
+				TUIValue<bool> m_Value;       // 0
+				char           _pad20[0x48];  // 20
+			};
+
+			struct PEOData
+			{
+				char _unk[0xF8];  // 0
 			};
 
 			StringUIValue m_Text;                        // 00
@@ -63,10 +68,12 @@ namespace RE
 			TUIValue<unsigned int> m_Type;               // 80
 			TUIValue<unsigned int> m_Category;           // A0
 			TUIValue<bool> m_Enabled;                    // C0
-			NestedUIValue<SliderData> m_SliderData;      // E0
-			NestedUIValue<StepperData> m_StepperData;    // 178
-			NestedUIValue<CheckBoxData> m_CheckBoxData;  // 268
-			char _pad2C0[0x8];							 // 2F0
+			TUIValue<bool> m_Unk;						 // E0
+			NestedUIValue<SliderData> m_SliderData;      // 100
+			NestedUIValue<StepperData> m_StepperData;    // 198
+			NestedUIValue<CheckBoxData> m_CheckBoxData;  // 288
+			NestedUIValue<PEOData> m_PEOData;            // 340
+			char _unk488[0x10];							 // 488
 
 			GeneralSetting()
 			{
@@ -122,15 +129,17 @@ namespace RE
 	// Sanity checks
 	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting::SliderData>) == 0x98);
 	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting::StepperData>) == 0xF0);
-	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting::CheckBoxData>) == 0x78);
+	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting::CheckBoxData>) == 0xB8);
+	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting::PEOData>) == 0x148);
 
 	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList::GeneralSetting::SliderData>) == 0x70);
 	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList::GeneralSetting::StepperData>) == 0xC8);
-	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList::GeneralSetting::CheckBoxData>) == 0x50);
+	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList::GeneralSetting::CheckBoxData>) == 0x90);
+	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList::GeneralSetting::PEOData>) == 0x120);
 
 	static_assert(sizeof(ArrayUIValue<NestedUIValue<SubSettingsList::GeneralSetting::SliderData>, 0>) == 0x78);
 
-	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting>) == 0x338);
+	static_assert(sizeof(NestedUIValue<SubSettingsList::GeneralSetting>) == 0x4E8);
 	static_assert(sizeof(ArrayNestedUIValue<SubSettingsList::GeneralSetting, 0>) == 0x78);
 
 	static_assert(sizeof(TUIDataShuttleContainerMap<SubSettingsList>) == 0xA8);
