@@ -299,7 +299,7 @@ namespace Hooks
 	void Hooks::HookedScaleformCompositeDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount)
 	{
 		auto creationRendererInstance = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x0);
-		auto device = *reinterpret_cast<ID3D12Device2**>(creationRendererInstance + 0x3A0);
+		auto device = *reinterpret_cast<ID3D12Device2**>(creationRendererInstance + 0x3A8);
 
 		auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_arg1) + 0x10);
 
