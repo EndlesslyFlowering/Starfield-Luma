@@ -58,7 +58,7 @@ namespace Hooks
 		static void Hook()
 		{
 			// set color space and save swapchain object pointer
-			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x387), Hook_UnkFunc);  // 0x3EA pre 1.8, 0x42C pre fsr3
+			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x387), Hook_UnkFunc);
 
 			// just after loading ini settings; deal with initial framegen setting value
 			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(149040, 0x543), Hook_UnkFunc2);
@@ -70,34 +70,34 @@ namespace Hooks
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
-			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x75C), Hook_CreateMonitorSetting);  // 136113, 0x62F pre 1.8, 0x63A in 1.8, 0x66C pre fsr3
+			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x759), Hook_CreateMonitorSetting);
 
 			// Hide vanilla brightness, contrast and hdr brightness
 			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBBE), nop5, 5);  // 0xA94 in 1.8, 0xAC6 pre fsr3
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD09), nop5, 5);  // 0xBEB in 1.8, 0xC1D pre fsr3
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xE89), nop5, 5);  // 0xD6E in 1.8, 0xDA0 pre fsr3 (unchanged)
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBAC), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD06), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xE8F), nop5, 5);
 
-			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x3A), Hook_SettingsDataModelCheckboxChanged);
-			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x37), Hook_SettingsDataModelStepperChanged);
-			_SettingsDataModelSliderChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136130, 0x37), Hook_SettingsDataModelSliderChanged);
+			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x43), Hook_SettingsDataModelCheckboxChanged);
+			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x40), Hook_SettingsDataModelStepperChanged);
+			_SettingsDataModelSliderChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136130, 0x40), Hook_SettingsDataModelSliderChanged);
 
-			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x8F), Hook_RecreateSwapchain);  // 0x89 pre 1.8
+			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x8F), Hook_RecreateSwapchain);
 
 			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204409, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
 			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204408, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
 
-			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F5), Hook_EndOfFrame);  // 205436, 0x3F7 pre 1.8, 0x12F0 in 1.8, 0x12FB pre fsr3
-			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B2B), Hook_PostEndOfFrame);  // 205436, 0x7CB pre 1.8, 0x1B32 in 1.8, 0x1B43 pre fsr3
+			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F5), Hook_EndOfFrame);
+			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B2B), Hook_PostEndOfFrame);
 
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x201), HookedScaleformCompositeSetRenderTarget);  // 0x174 pre 1.8, 0x17E pre fsr3
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x320), HookedScaleformCompositeDraw);  // 0x249 pre 1.8, 0x297 pre frs3
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x201), HookedScaleformCompositeSetRenderTarget);
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x320), HookedScaleformCompositeDraw);
 
 			// fsr3 fixes
 			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3BE), Hook_ffxFsr3ContextCreate);
 			dku::Hook::write_call<6>(dku::Hook::IDToAbs(1391482, 0x3CE), Hook_CreateShaderResourceView);
-			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x576), Hook_UnkFunc3);
-			_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391760, 0x87), Hook_UnkFunc3_Internal);
+			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x572), Hook_UnkFunc3);
+			_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0xF7), Hook_UnkFunc3_Internal);
 		}
 
 	private:
@@ -156,7 +156,7 @@ namespace Hooks
 		static void Hook_UnkFunc3(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint8_t a7);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc3)> _UnkFunc3;
 
-		static void Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6);
+		static void Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint64_t a7);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc3_Internal)> _UnkFunc3_Internal;
 	};
 
