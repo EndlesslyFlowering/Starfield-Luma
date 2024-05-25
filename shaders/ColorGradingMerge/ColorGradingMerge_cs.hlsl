@@ -19,7 +19,7 @@
 #define DEBUG_COLOR float3(1.f, 0.f, 1.f) /*Magenta*/
 #endif // LUT_BLENDING_TYPE
 
-// These settings goes to influence the LUTs correction process, by determining how LUTs are linearized and how to correct the gamma mismatch baked into the game's look.
+// These settings go to influence the LUTs correction process, by determining how LUTs are linearized and how to correct the gamma mismatch baked into the game's look.
 // There's many ways these LUTs could have been generated (designed, made):
 // -They were made outside of the game on sRGB screens (this assumes that in the game they didn't look as the artists intended them) (sRGB raises blacks compared to 2.2)
 // -They were made outside of the game on 2.2 screens (this assumes that in the game they didn't look as the artists intended them)
