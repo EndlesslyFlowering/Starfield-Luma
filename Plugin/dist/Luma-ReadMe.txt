@@ -44,6 +44,7 @@ Dependencies:
 -Starfield Script Extender (SFSE): https://www.nexusmods.com/starfield/mods/106
 -Address Library for SFSE: https://www.nexusmods.com/starfield/mods/3256
 -ShaderInjector by Nukem: https://www.nexusmods.com/starfield/mods/5562 (source code: https://github.com/Nukem9/sf-shader-injector)
+-Latest VC Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe
 
 Compatibility:
 This mod should work with any other mod.
