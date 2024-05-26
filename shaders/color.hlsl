@@ -8,6 +8,8 @@
 // either way we can snap them to black in that case, even if it doesn't always look as good as clipping them to AP0, it's "mathematically" correct
 // Note: bring back "GAMMA_CORRECT_SDR_RANGE_ONLY" if this always stays false, as it was more optimized (it did clamps just once for the whole gamma correction pass)
 static const bool ApplyGammaBelowZeroDefault = true;
+// This should be true for correctness, but most calls to the functions that use it need it false, so for simplicity we left it to false.
+static const bool ApplyGammaBeyondOneDefault = false;
 
 // sRGB SDR white is meant to be mapped to 80 nits (not 100, even if some game engine (UE) and consoles (PS5) interpret it as such).
 static const float WhiteNits_sRGB = 80.f;
@@ -185,7 +187,7 @@ T gamma_to_linear_mirrored(T Color, float Gamma = 2.2f)
 	return gamma_to_linear(abs(Color), Gamma) * sign(Color);
 }
 
-float3 gamma_linear_to_sRGB_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+float3 gamma_linear_to_sRGB_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = ApplyGammaBeyondOneDefault)
 {
 	const float3 SDRColor = saturate(Color);
 	const float3 BeyondZeroColor = max(Color, 0.f);
@@ -216,7 +218,7 @@ float3 gamma_linear_to_sRGB_custom(float3 Color, bool MirrorBelowZero = true, bo
 	return Color;
 }
 
-float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = ApplyGammaBeyondOneDefault)
 {
 	const float3 SDRColor = saturate(Color);
 	const float3 BeyondZeroColor = max(Color, 0.f);
@@ -247,7 +249,7 @@ float3 gamma_sRGB_to_linear_custom(float3 Color, bool MirrorBelowZero = true, bo
 	return Color;
 }
 
-float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = ApplyGammaBeyondOneDefault)
 {
 	const float3 SDRColor = saturate(Color);
 	const float3 BeyondZeroColor = max(Color, 0.f);
@@ -278,7 +280,7 @@ float3 linear_to_gamma_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZ
 	return Color;
 }
 
-float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = false)
+float3 gamma_to_linear_custom(float3 Color, float Gamma = 2.2f, bool ApplyBelowZero = ApplyGammaBelowZeroDefault, bool ApplyBeyondOne = ApplyGammaBeyondOneDefault)
 {
 	const float3 SDRColor = saturate(Color);
 	const float3 BeyondZeroColor = max(Color, 0.f);

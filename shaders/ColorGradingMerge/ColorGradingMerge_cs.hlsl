@@ -34,7 +34,7 @@
 	// This assumes the game used the sRGB gamma formula and was meant to be viewed on sRGB gamma displays.
 	// No need to run "gamma_sRGB_to_linear_mirrored()" as there's no HDR source colors in LUTs.
 	#define LINEARIZE(x) gamma_sRGB_to_linear(x)
-	#define LINEARIZE_SAFE(x) gamma_sRGB_to_linear_custom(x)
+	#define LINEARIZE_SAFE(x) gamma_sRGB_to_linear_custom(x, true, true, true)
 	#define CORRECT_GAMMA(x) x
 	#define POST_CORRECT_GAMMA(x)
 
@@ -55,13 +55,13 @@
 	// Another alternative would be to apply gamma by average or luminance instead than by channel.
 	#if !GAMMA_CORRECTION_BY_LUMINANCE
 	#define LINEARIZE(x) lerp(gamma_sRGB_to_linear(x), gamma_to_linear(x), HdrDllPluginConstants.GammaCorrection)
-	#define LINEARIZE_SAFE(x) lerp(gamma_sRGB_to_linear_custom(x), gamma_to_linear_custom(x), HdrDllPluginConstants.GammaCorrection)
+	#define LINEARIZE_SAFE(x) lerp(gamma_sRGB_to_linear_custom(x, true, true, true), gamma_to_linear_custom(x, 2.2f, true, true), HdrDllPluginConstants.GammaCorrection)
 	#elif !GAMMA_CORRECTION_BY_LUMINANCE && 0 /*Version without "HdrDllPluginConstants.GammaCorrection" (as if it was 100%)*/
 	#define LINEARIZE(x) gamma_to_linear(x)
-	#define LINEARIZE_SAFE(x) gamma_to_linear_custom(x)
+	#define LINEARIZE_SAFE(x) gamma_to_linear_custom(x, 2.2f, true, true)
 	#else /*Version with gamma correction by luminance (not by channel)*/
 	#define LINEARIZE(x) (lerp(1.f, safeDivision(Luminance(gamma_to_linear(x)), Luminance(gamma_sRGB_to_linear(x))), HdrDllPluginConstants.GammaCorrection) * gamma_sRGB_to_linear(x))
-	#define LINEARIZE_SAFE(x) (lerp(1.f, safeDivision(Luminance(gamma_to_linear_custom(x)), Luminance(gamma_sRGB_to_linear_custom(x))), HdrDllPluginConstants.GammaCorrection) * gamma_sRGB_to_linear_custom(x))
+	#define LINEARIZE_SAFE(x) (lerp(1.f, safeDivision(Luminance(gamma_to_linear_custom(x, 2.2f, true, true)), Luminance(gamma_sRGB_to_linear_custom(x, true, true, true))), HdrDllPluginConstants.GammaCorrection) * gamma_sRGB_to_linear_custom(x, true, true, true))
 	#endif
 
 	#if GAMMA_CORRECTION_IN_LUTS // 2.2->linear->LUT normalization
