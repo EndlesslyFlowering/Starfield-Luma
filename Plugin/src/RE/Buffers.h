@@ -254,6 +254,7 @@ namespace RE
 		MBOITForwardHalfResTarget,
 		ForwardHalfResTarget,
 		ForwardHalfResDepth,
+		ForwardHalfResDepthAvg,
 		ForwardHalfResOverdraw,
 		BlurHeightFieldStaging,
 		BlurHeightField,
@@ -330,7 +331,9 @@ namespace RE
 		ParticleLightingAtlas,
 		CloudsHalfResTarget,
 		CloudCardsOpacity,
-		ImageCaptureHDR_OutputImage
+		ImageCaptureHDR_OutputImage,
+
+		Buffers_MAX
 	};
 
 	struct BufferDefinition

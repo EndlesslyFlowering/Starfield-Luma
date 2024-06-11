@@ -5,7 +5,7 @@
 class Offsets
 {
 public:
-	using BufferArray = std::array<RE::BufferDefinition*, 200>;
+	using BufferArray = std::array<RE::BufferDefinition*, static_cast<size_t>(RE::Buffers::Buffers_MAX)>;
 	static inline BufferArray* bufferArray = nullptr;
 
 	using tGetDXGIFormat = DXGI_FORMAT (*)(RE::BS_DXGI_FORMAT a_bgsFormat);
@@ -56,7 +56,7 @@ public:
 		PhotoMode_ToggleUI = reinterpret_cast<tPhotoMode_ToggleUI>(dku::Hook::IDToAbs(139734));
 
 		uiPtr = reinterpret_cast<UI**>(dku::Hook::IDToAbs(878339));
-		UI_IsMenuOpen = reinterpret_cast<tUI_IsMenuOpen>(dku::Hook::IDToAbs(187049));
+		UI_IsMenuOpen = reinterpret_cast<tUI_IsMenuOpen>(dku::Hook::IDToAbs(1870208));
 
 		unkToggleMenusPtr = reinterpret_cast<void**>(dku::Hook::IDToAbs(879521));
 		ToggleMenus = reinterpret_cast<tToggleMenus>(dku::Hook::IDToAbs(187200));

@@ -61,7 +61,7 @@ namespace Hooks
 			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x387), Hook_UnkFunc);
 
 			// just after loading ini settings; deal with initial framegen setting value
-			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(149040, 0x543), Hook_UnkFunc2);
+			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(149040, 0x535), Hook_UnkFunc2);
 
 			// disable photo mode screenshots with HDR
 			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(415473);
@@ -90,8 +90,8 @@ namespace Hooks
 			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F5), Hook_EndOfFrame);
 			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B2B), Hook_PostEndOfFrame);
 
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x201), HookedScaleformCompositeSetRenderTarget);
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x320), HookedScaleformCompositeDraw);
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x21D), HookedScaleformCompositeSetRenderTarget);
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x33E), HookedScaleformCompositeDraw);
 
 			// fsr3 fixes
 			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3B2), Hook_ffxFsr3ContextCreate);
