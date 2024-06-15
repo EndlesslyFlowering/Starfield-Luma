@@ -84,8 +84,8 @@ void frag_main()
 //   .z = Film Grading Intensity (fFilmGrainAmountMax=0.03)
 
 	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
-	bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
 	bool isInOutColorLinear = isHDR;
+	const bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
 #if SDR_LINEAR_INTERMEDIARY
 	isInOutColorLinear |= HdrDllPluginConstants.DisplayMode <= 0;
 #endif // SDR_LINEAR_INTERMEDIARY
@@ -94,7 +94,7 @@ void frag_main()
 
 	if (HdrDllPluginConstants.FilmGrainType == 0)
 	{
-		float3 gammaColor = (isInOutColorLinear)
+		float3 gammaColor = isInOutColorLinear
 			? LINEAR_TO_GAMMA(inputColor)
 			: inputColor;
 
@@ -160,9 +160,9 @@ void frag_main()
 
 		float randomNumber = rand(seed);
 
-		float3 linearColor = (isHDR)
+		float3 linearColor = isHDR
 			? BT709_To_WBT2020(inputColor)
-			: (isInOutColorLinear)
+			: isInOutColorLinear
 			? inputColor
 			: GAMMA_TO_LINEAR(inputColor);
 		// Film grain is based on film density

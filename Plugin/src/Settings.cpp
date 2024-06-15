@@ -100,7 +100,8 @@ namespace Settings
 		// enable hdr if off and display mode suggests it should be on (and more)
 		RefreshHDRDisplayEnableState();
 
-		// "bIsDLSSGTOFSR3Present" and "RefreshHDRDisplayEnableState()" might have changed the "actual" display mode
+		// "bIsDLSSGTOFSR3Present" and "RefreshHDRDisplayEnableState()" might have changed the "actual" display mode.
+		// No need to refresh the swapchain ("RefreshSwapchainFormat()") here as it's not been fully created yet.
 		if (previousActualDisplayMode != GetActualDisplayMode()) {
 			const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
 			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
@@ -545,8 +546,7 @@ namespace Settings
 		}
 		else
 		{
-			if (isSDRForcedOnHDR)
-			{
+			if (isSDRForcedOnHDR) {
 				DrawReshadeValueStepper(GamePaperWhite);
 			}
 			DrawReshadeSlider(SecondaryBrightness);

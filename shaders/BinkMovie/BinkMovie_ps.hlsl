@@ -14,6 +14,14 @@ struct PSInputs
 	float2 TEXCOORD : TEXCOORD0;
 };
 
+#if SDR_USE_GAMMA_2_2
+	#define GAMMA_TO_LINEAR(x) gamma_to_linear(x)
+	#define LINEAR_TO_GAMMA(x) linear_to_gamma(x)
+#else
+	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
+	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
+#endif
+
 //TODO: maybe expose the shoulder pow and max nits to user? it's probably better to simply pick a default that looks nice on most movies.
 static const float BinkVideosAutoHDRMaxOutputNits = 750.f;
 // The higher it is, the "later" highlights start
@@ -68,11 +76,7 @@ float4 PS(PSInputs inputs) : SV_Target
 	{
 		// Note: we ignore "HdrDllPluginConstants.GammaCorrection" here, as we fully rely on "SDR_USE_GAMMA_2_2"
 		// Note: "ApplyGammaBelowZeroDefault" doesn't matter here as the UI should only have positive scRGB values (negative values would have been accidental)
-#if SDR_USE_GAMMA_2_2
-		color = pow(color, 2.2f);
-#else
-		color = gamma_sRGB_to_linear(color);
-#endif // SDR_USE_GAMMA_2_2
+		color = GAMMA_TO_LINEAR(color);
 
 		if (HdrDllPluginConstants.DisplayMode > 0)
 		{

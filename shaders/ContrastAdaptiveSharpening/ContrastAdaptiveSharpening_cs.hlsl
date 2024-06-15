@@ -59,7 +59,6 @@ struct CSInput
 	#define LINEAR_TO_GAMMA_SINGLE(x) gamma_linear_to_sRGB(x)
 #endif
 
-
 #define CLAMPX(x) clamp(x, minX, maxX)
 #define CLAMPY(y) clamp(y, minY, maxY)
 
