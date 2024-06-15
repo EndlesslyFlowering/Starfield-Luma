@@ -5,7 +5,7 @@ HDRScreenshots = true
 HDRScreenshotsLossless = false
 PeakBrightness = 1000
 PeakBrightnessAutoDetected = false
-StrictLUTApplication = false
+StrictLUTApplication = true
 UIPaperWhite = 203
 AutoHDRVideos = true
 

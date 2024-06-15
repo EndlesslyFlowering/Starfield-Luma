@@ -405,9 +405,9 @@ namespace Settings
 		Checkbox StrictLUTApplication{
 			SettingID::kStrictLUTApplication,
 			"Strict Color Grading",
-			"Applies color grading LUTs in a way that is more similar to the vanilla SDR look. Leave off for a more HDR look.",
+			"Applies color grading LUTs in a way that is more faithful to the vanilla look. Disable it for a more HDR look.",
 			"StrictLUTApplication", "HDR",
-			false
+			true
 		};
 
 		Slider GammaCorrectionStrength{
