@@ -9,8 +9,8 @@
 	#define GAMMA_TO_LINEAR(x) x
 	#define LINEAR_TO_GAMMA(x) x
 #elif SDR_USE_GAMMA_2_2 // NOTE: these gamma formulas should use their mirrored versions in the CLAMP_INPUT_OUTPUT_TYPE < 3 case
-	#define GAMMA_TO_LINEAR(x) pow(x, 2.2f)
-	#define LINEAR_TO_GAMMA(x) pow(x, 1.f / 2.2f)
+	#define GAMMA_TO_LINEAR(x) gamma_to_linear(x)
+	#define LINEAR_TO_GAMMA(x) linear_to_gamma(x)
 #else
 	#define GAMMA_TO_LINEAR(x) gamma_sRGB_to_linear(x)
 	#define LINEAR_TO_GAMMA(x) gamma_linear_to_sRGB(x)
@@ -84,8 +84,8 @@ void frag_main()
 //   .z = Film Grading Intensity (fFilmGrainAmountMax=0.03)
 
 	const float3 inputColor = TonemappedColorTexture.Sample(Sampler0, float2(TEXCOORD.x, TEXCOORD.y));
-	bool isInOutColorLinear = isHDR;
 	const bool isHDR = HdrDllPluginConstants.DisplayMode > 0;
+	bool isInOutColorLinear = isHDR;
 #if SDR_LINEAR_INTERMEDIARY
 	isInOutColorLinear |= HdrDllPluginConstants.DisplayMode <= 0;
 #endif // SDR_LINEAR_INTERMEDIARY

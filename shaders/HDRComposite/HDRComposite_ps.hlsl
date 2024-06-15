@@ -1922,7 +1922,7 @@ void ApplySDROutputTransforms(inout float3 Color)
 #if !SDR_LINEAR_INTERMEDIARY
 	// Note that gamma was never applied if LUTs were disabled, but we don't care about that as the affected shaders permutations were never used
 	#if SDR_USE_GAMMA_2_2
-		Color = pow(Color, 1.f / 2.2f);
+		Color = linear_to_gamma(Color);
 	#else
 		// Do sRGB gamma even if we'd be playing on gamma 2.2 screens, as the game was already calibrated for 2.2 gamma despite using the wrong formula
 		Color = gamma_linear_to_sRGB(Color);
