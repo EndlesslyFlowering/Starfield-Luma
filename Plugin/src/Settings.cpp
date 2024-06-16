@@ -88,10 +88,15 @@ namespace Settings
 
 		const auto previousActualDisplayMode = GetActualDisplayMode();
 
-		// check if Nukem's dlssg to fsr3 is present
-		if (!bIsDLSSGTOFSR3Present && isModuleLoaded(moduleNameDLSSGTOFSR3)) {
-		    bIsDLSSGTOFSR3Present = true;
+		// check if Nukem's dlss fg to fsr 3 fg is present
+		bIsDLSSFGToFSRFGPresent = isModuleLoaded(moduleNameDLSSGTOFSR3);
+		if (bIsDLSSFGToFSRFGPresent && !bIsDLSSFGToFSRFGPatched) {
+			bIsDLSSFGToFSRFGPatched = true;
 		    Hooks::Patches::PatchStreamline();
+		}
+		if (*DLSSFGToFSRFGMod.value != bIsDLSSFGToFSRFGPresent) {
+			*DLSSFGToFSRFGMod.value = bIsDLSSFGToFSRFGPresent;
+			Save();
 		}
 
 		// check hdr support
@@ -100,7 +105,7 @@ namespace Settings
 		// enable hdr if off and display mode suggests it should be on (and more)
 		RefreshHDRDisplayEnableState();
 
-		// "bIsDLSSGTOFSR3Present" and "RefreshHDRDisplayEnableState()" might have changed the "actual" display mode.
+		// "bIsDLSSFGToFSRFGPresent" and "RefreshHDRDisplayEnableState()" might have changed the "actual" display mode.
 		// No need to refresh the swapchain ("RefreshSwapchainFormat()") here as it's not been fully created yet.
 		if (previousActualDisplayMode != GetActualDisplayMode()) {
 			const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
@@ -167,6 +172,12 @@ namespace Settings
 		return IsDisplayModeSetToHDR() && !IsSDRForcedOnHDR(bAcknowledgeScreenshots);
     }
 
+	bool Main::IsFSR3FGEnabled() const
+	{
+		const RE::FrameGenerationTech frameGenerationTech = *Offsets::uiFrameGenerationTech;
+		return frameGenerationTech == RE::FrameGenerationTech::kFSR3;
+	}
+
 	bool Main::IsCustomToneMapper() const
 	{
 		return IsDisplayModeSetToHDR() || ToneMapperType.value.get_data() > 0;
@@ -190,12 +201,12 @@ namespace Settings
 
 		if (frameGenerationTech > RE::FrameGenerationTech::kNone && !EnforceUserDisplayMode.value.get_data()) {
 			// force scRGB HDR with fsr3 or dlssg if dlssg_to_fsr3 is present
-			if (value == 1 && (frameGenerationTech == RE::FrameGenerationTech::kFSR3 || (frameGenerationTech == RE::FrameGenerationTech::kDLSSG && bIsDLSSGTOFSR3Present))) {
+			if (value == 1 && (frameGenerationTech == RE::FrameGenerationTech::kFSR3 || (frameGenerationTech == RE::FrameGenerationTech::kDLSSG && bIsDLSSFGToFSRFGPresent))) {
 			    return 2;
 			}
 
 			// otherwise force HDR10
-			if (value == 2 && frameGenerationTech == RE::FrameGenerationTech::kDLSSG && !bIsDLSSGTOFSR3Present) {
+			if (value == 2 && frameGenerationTech == RE::FrameGenerationTech::kDLSSG && !bIsDLSSFGToFSRFGPresent) {
 			    return 1;
 			}
 		}
@@ -256,7 +267,7 @@ namespace Settings
 		RefreshSwapchainFormat();
 	}
 
-    void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants) const
+    void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants, ShaderConstantsMode a_shaderConstantsMode) const
     {
 		a_outShaderConstants.DisplayMode = GetActualDisplayMode(true);
 		// TODO: expose HDR screenshot normalization as a user (advanced/config only) setting
@@ -302,6 +313,11 @@ namespace Settings
 		a_outShaderConstants.DevSetting03 = static_cast<float>(DevSetting03.value.get_data()) * 0.01f;  // 0-100 to 0-1
 		a_outShaderConstants.DevSetting04 = static_cast<float>(DevSetting04.value.get_data()) * 0.01f;  // 0-100 to 0-1
 		a_outShaderConstants.DevSetting05 = static_cast<float>(DevSetting05.value.get_data()) * 0.01f;  // 0-100 to 0-1
+
+		if (a_shaderConstantsMode == ShaderConstantsMode::kLUT && VanillaMenuLUTs.value.get_data() && !Utils::ShouldCorrectLUTs()) {
+			a_outShaderConstants.LUTCorrectionStrength = 0.f;
+			a_outShaderConstants.ColorGradingStrength = 1.f;
+		}
     }
 
     void Main::InitConfig(bool a_bIsSFSE)
@@ -360,6 +376,7 @@ namespace Settings
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
 			config->Bind(HDRScreenshots.value, HDRScreenshots.defaultValue);
 			config->Bind(HDRScreenshotsLossless.value, HDRScreenshotsLossless.defaultValue);
+			config->Bind(DLSSFGToFSRFGMod.value, DLSSFGToFSRFGMod.defaultValue);
 			config->Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config->Bind(DevSetting02.value, DevSetting02.defaultValue);
 			config->Bind(DevSetting03.value, DevSetting03.defaultValue);
@@ -389,6 +406,11 @@ namespace Settings
 		config->Load();
 
 		INFO("Config loaded"sv)
+
+		// Default to the last value saved in the config, to avoid issues on startup if we detected the DLSS to FSR FG mod too late,
+		// which makes the display mode change in a non thread safe (?) manner that makes the game crash.
+		// This workaround avoids crashes all the times except once when adding or removing the mod.
+		bIsDLSSFGToFSRFGPresent = *DLSSFGToFSRFGMod.value;
 	}
 
     void Main::Save() noexcept
@@ -517,6 +539,7 @@ namespace Settings
 
 		const bool isSDRForcedOnHDR = IsSDRForcedOnHDR();
 		const bool isGameRenderingSetToHDR = IsGameRenderingSetToHDR();
+		const bool isFSR3FGEnabled = IsFSR3FGEnabled();
 		const bool isCustomToneMapper = IsCustomToneMapper();
 		if (IsHDRSupported()) {
 			// TODO: fix, these can often crash when changed during gameplay if FG is enabled (it doesn't seem to be a threading issue).
@@ -542,7 +565,12 @@ namespace Settings
 		if (isGameRenderingSetToHDR) {
 			DrawReshadeValueStepper(PeakBrightness);
 			DrawReshadeValueStepper(GamePaperWhite);
-			DrawReshadeValueStepper(UIPaperWhite);
+#if !FSR_3_FG_SUPPORTS_UI_PAPER_WHITE
+			if (!isFSR3FGEnabled)
+#endif
+			{
+				DrawReshadeValueStepper(UIPaperWhite);
+			}
 		}
 		else
 		{

@@ -13,6 +13,9 @@
 // TODO: set to false in release builds (use the build configuation to automatically define it)
 #define DEVELOPMENT 0
 
+// FSR 3 FG uses its own shader to blend in the UI and at the moment we don't have code to override it
+#define FSR_3_FG_SUPPORTS_UI_PAPER_WHITE 0
+
 namespace Settings
 {
     using namespace DKUtil::Alias;
@@ -55,6 +58,7 @@ namespace Settings
 		kPostSharpen,
 		kHDRScreenshots,
 		kHDRScreenshotsLossless,
+		kDLSSFGToFSRFGMod,
 
 		kEND,
 
@@ -200,6 +204,12 @@ namespace Settings
 		float    DevSetting05;
 	};
 	constexpr static uint32_t shaderConstantsCount = sizeof(ShaderConstants) / sizeof(uint32_t); // Number of dwords
+
+	enum class ShaderConstantsMode
+	{
+		kDefault,
+		kLUT,
+	};
 
     class Main : public DKUtil::model::Singleton<Main>
     {
@@ -462,9 +472,17 @@ namespace Settings
 		};
 		Checkbox HDRScreenshotsLossless{
 			SettingID::kHDRScreenshotsLossless,
-			"Lossless",
+			"HDR Screenshots Lossless",
 			"Enable to save the HDR screenshots with a lossless parameter. It vastly increases their filesize without a perceptible difference.",
 			"HDRScreenshotsLossless", "HDR",
+			false
+		};
+		Checkbox DLSSFGToFSRFGMod{
+			SettingID::kDLSSFGToFSRFGMod,
+			"DLSS FG to FSR FG Mod",
+			"Should be set to true when using the DLSS Frame Generation to FSR 3 Frame Generation mod, Luma might otherwise crash or pick the wrong display mode."
+				"\nThis setting is automatically updated by Luma and should only (optionall) be manually edited when adding or removing the mod.",
+			"DLSSFGToFSRFGMod", "Main",
 			false
 		};
 		Slider DevSetting01{ SettingID::kDevSetting01, "DevSetting01", "Development setting", "DevSetting01", "Dev", 0.f, 0.f, 100.f };
@@ -486,6 +504,7 @@ namespace Settings
 		bool IsSDRForcedOnHDR(bool bAcknowledgeScreenshots = false) const;
 		bool IsDisplayModeSetToHDR() const;
 		bool IsGameRenderingSetToHDR(bool bAcknowledgeScreenshots = false) const;
+		bool IsFSR3FGEnabled() const;
 		bool IsCustomToneMapper() const;
 		bool IsFilmGrainTypeImproved() const;
 
@@ -499,7 +518,7 @@ namespace Settings
 		void RefreshSwapchainFormat(std::optional<RE::FrameGenerationTech> a_frameGenerationTech = std::nullopt);
 		void OnDisplayModeChanged();
 
-		void GetShaderConstants(ShaderConstants& a_outShaderConstants) const;
+		void GetShaderConstants(ShaderConstants& a_outShaderConstants, ShaderConstantsMode a_shaderConstantsMode = ShaderConstantsMode::kDefault) const;
 
 		void InitConfig(bool a_bIsSFSE);
 
@@ -528,7 +547,8 @@ namespace Settings
 		RE::BGSSwapChainObject* swapChainObject = nullptr;
 
 		bool bReshadeSettingsOverlayRegistered = false;
-		bool bIsDLSSGTOFSR3Present = false;
+		bool bIsDLSSFGToFSRFGPresent = false;
+		bool bIsDLSSFGToFSRFGPatched = false;
 
 		void DrawReshadeTooltip(const char* a_desc);
 		bool DrawReshadeCheckbox(Checkbox& a_checkbox);

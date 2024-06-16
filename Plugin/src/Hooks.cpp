@@ -18,7 +18,7 @@ namespace Hooks
 		return nullptr;
 	}
 
-    void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bDisplayModeHDREnable, bool a_bGameRenderingHDREnable, bool a_bSDRForcedOnHDR)
+    void Hooks::ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bDisplayModeHDREnable, bool a_bGameRenderingHDREnable, bool a_bSDRForcedOnHDR, RE::FrameGenerationTech a_frameGenerationTech)
     {
 		if (const auto peakBrightnessSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_PeakBrightness))) {
 			peakBrightnessSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
@@ -29,7 +29,11 @@ namespace Hooks
 		}
 
 		if (const auto uiPaperWhiteSetting = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_UIPaperWhite))) {
-			uiPaperWhiteSetting->m_Enabled.SetValue(a_bGameRenderingHDREnable);
+			bool bUIPaperWhiteEnabled = a_bGameRenderingHDREnable;
+#if !FSR_3_FG_SUPPORTS_UI_PAPER_WHITE
+			bUIPaperWhiteEnabled = bUIPaperWhiteEnabled && a_frameGenerationTech != RE::FrameGenerationTech::kFSR3;
+#endif
+			uiPaperWhiteSetting->m_Enabled.SetValue(bUIPaperWhiteEnabled);
 		}
 
 		if (const auto extendGamut = a_model->FindSettingById(static_cast<int>(Settings::SettingID::kHDR_ExtendGamut))) {
@@ -134,7 +138,11 @@ namespace Hooks
 		CreateStepperSetting(a_settingList, settings->DisplayMode, settings->IsHDRSupported() && !settings->IsSDRForcedOnHDR());
 		CreateStepperSetting(a_settingList, settings->PeakBrightness, settings->IsGameRenderingSetToHDR());
 		CreateStepperSetting(a_settingList, settings->GamePaperWhite, settings->IsDisplayModeSetToHDR() || settings->IsSDRForcedOnHDR());
+#if FSR_3_FG_SUPPORTS_UI_PAPER_WHITE
 		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR());
+#else
+		CreateStepperSetting(a_settingList, settings->UIPaperWhite, settings->IsGameRenderingSetToHDR() && !settings->IsFSR3FGEnabled());
+#endif
 
 		CreateSliderSetting(a_settingList, settings->SecondaryBrightness, !settings->IsGameRenderingSetToHDR());
 
@@ -397,12 +405,7 @@ namespace Hooks
 		case 0x1E01FE1A:
 			{
 				Settings::ShaderConstants shaderConstants;
-				const auto settings = Settings::Main::GetSingleton();
-				settings->GetShaderConstants(shaderConstants);
-				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
-				    shaderConstants.LUTCorrectionStrength = 0.f;
-					shaderConstants.ColorGradingStrength = 1.f;
-				}
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants, Settings::ShaderConstantsMode::kLUT);
 				uploadRootConstants(shaderConstants, 14, false);  // HDRComposite
 				break;
 			}
@@ -428,12 +431,7 @@ namespace Hooks
 		case 0x1FE87:
 			{
 				Settings::ShaderConstants shaderConstants;
-				const auto settings = Settings::Main::GetSingleton();
-				settings->GetShaderConstants(shaderConstants);
-				if (*settings->VanillaMenuLUTs.value && !Utils::ShouldCorrectLUTs()) {
-				    shaderConstants.LUTCorrectionStrength = 0.f;
-				    shaderConstants.ColorGradingStrength = 1.f;
-				}
+				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants, Settings::ShaderConstantsMode::kLUT);
 				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge / HDRColorGradingMerge
 				break;
 			}
@@ -560,7 +558,7 @@ namespace Hooks
 					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 					// We probably don't need all these checks, but we are being extra sure
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
-						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
+						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR, *Offsets::uiFrameGenerationTech);
 						CheckCustomToneMapperSettings(a_eventData.m_Model, settings->IsCustomToneMapper());
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
@@ -598,6 +596,8 @@ namespace Hooks
 			}
 			// If FG was off, the setting would have been guaranteed to be "RE::FrameGenerationTech::kNone".
 			if (prevFramegenValue != newFramegenValue) {
+				ToggleEnableHDRSubSettings(a_eventData.m_Model, settings->IsDisplayModeSetToHDR(), settings->IsSDRForcedOnHDR(), settings->IsGameRenderingSetToHDR(), newFramegenValue);
+
 				settings->RefreshSwapchainFormat(newFramegenValue);
 			}
 			break;
@@ -633,7 +633,7 @@ namespace Hooks
 					const bool isGameRenderingHDR = settings->IsGameRenderingSetToHDR();
 					// We probably don't need all these checks, but we are being extra sure
 					if (wasDisplayModeHDR != isDisplayModeHDR || wasSDRForcedOnHDR != isSDRForcedOnHDR || wasGameRenderingHDR != isGameRenderingHDR) {
-						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR);
+						ToggleEnableHDRSubSettings(a_eventData.m_Model, isDisplayModeHDR, isGameRenderingHDR, isSDRForcedOnHDR, *Offsets::uiFrameGenerationTech);
 						CheckCustomToneMapperSettings(a_eventData.m_Model, settings->IsCustomToneMapper());
 					}
 					if (const auto displayModeSetting = a_eventData.m_Model->FindSettingById(static_cast<int>(Settings::SettingID::kDisplayMode))) {
@@ -690,6 +690,11 @@ namespace Hooks
 				} else {
 					newFramegenValue = RE::FrameGenerationTech::kNone;
 				}
+
+#if !FSR_3_FG_SUPPORTS_UI_PAPER_WHITE
+				ToggleEnableHDRSubSettings(a_eventData.m_Model, settings->IsDisplayModeSetToHDR(), settings->IsSDRForcedOnHDR(), settings->IsGameRenderingSetToHDR(), newFramegenValue);
+#endif
+
 				settings->RefreshSwapchainFormat(newFramegenValue);
 			}
 		    break;

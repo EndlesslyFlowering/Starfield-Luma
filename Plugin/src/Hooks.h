@@ -13,7 +13,7 @@ namespace Hooks
 		{
 			const auto settings = Settings::Main::GetSingleton();
 
-			// Note: at this point neither "Offsets::uiFrameGenerationTech" "bIsDLSSGTOFSR3Present" have loaded in yet (nor there's a swapchain yet), so we are possibly setting a "wrong" display format
+			// Note: at this point "Offsets::uiFrameGenerationTech" has not loaded in yet (nor there's a swapchain yet), and "bIsDLSSFGToFSRFGPresent" might have an outdated value, so we are possibly setting a "wrong" display format
 			auto newFormat = settings->GetDisplayModeFormat();
 			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
 
@@ -101,7 +101,7 @@ namespace Hooks
 		}
 
 	private:
-		static void ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bDisplayModeHDREnable, bool a_bGameRenderingHDREnable, bool a_bSDRForcedOnHDR);
+		static void ToggleEnableHDRSubSettings(RE::SettingsDataModel* a_model, bool a_bDisplayModeHDREnable, bool a_bGameRenderingHDREnable, bool a_bSDRForcedOnHDR, RE::FrameGenerationTech a_frameGenerationTech);
 		static void CheckCustomToneMapperSettings(RE::SettingsDataModel* a_model, bool a_bIsCustomToneMapper);
 		static void CreateCheckboxSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Checkbox& a_setting, bool a_bEnabled);
 		static void CreateStepperSetting(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::Stepper& a_setting, bool a_bEnabled);
