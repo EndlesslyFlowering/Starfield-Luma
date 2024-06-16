@@ -2,8 +2,10 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-#define USE_REPLACED_COMPOSITION (FORCE_VANILLA_LOOK ? 1 : 1)
+// This is defined by Luma and Shader Injector code, we can't directly change it in the shader
+#define USE_REPLACED_COMPOSITION 1
 #define OPTIMIZE_REPLACED_COMPOSITION_BLENDS (FORCE_VANILLA_LOOK ? 0 : 0)
+#define CLIP_HDR_UI 0
 #define CLIP_HDR_BACKGROUND 0
 // 0) Raw linear blend instead of sRGB gamma blend (looks very different from Vanilla).
 // 1) Apply pow on blend alpha (luminance based). Looks better than linear blends, though results vary on the background brightness.
@@ -62,9 +64,13 @@ float4 PS(PSInputs psInputs) : SV_Target
 	// NOTE: any kind of modulation we do on the UI might not be acknowledged by DLSS FG or FSR FG,
 	// as it has a copy of the UI buffer that it uses to determine how much to reconstruct pixels.
 
+#if CLIP_HDR_UI
 	// We do a saturate because the original UI texture was a INT/UNORM so it couldn't have had values beyond 0-1. And this also avoids negatives powers in the code below.
 	// It's possible that skipping this clipping would allow some "HDR" UI to come through, due to usage of pre-multiplied alpha.
 	UIColor = saturate(UIColor);
+#else
+	UIColor.a = saturate(UIColor.a);
+#endif // CLIP_HDR_UI
 
 	// This multiplication is probably used by Bethesda to dim the UI when applying an AutoHDR pass at the very end (they don't have real HDR).
 	// We do it in gamma space to maintain the expected intensity change (it doesn't cause hue shift, as one might think).
@@ -180,7 +186,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		// Apply the Reinhard tonemapper on any background color in excess, to avoid it burning it through the UI.
 		// NOTE: If this is not enough we could already apply to the entire "backgroundColor" before blending it with the UI.
-		float3 tonemappedBackgroundColor = abs(excessBackgroundColor) / (1.f + abs(excessBackgroundColor)) * sign(excessBackgroundColor);
+		float3 tonemappedBackgroundColor = excessBackgroundColor / (1.f + abs(excessBackgroundColor));
 		// In SDR, we clip any HDR color passing through the UI, as long as the UI has ANY kind of influence on the output.
 		// The reason is that the game wouldn't have ever had any colors beyond 0-1 due to having int UNORM textures, so we want to replicate the same look.
 		tonemappedBackgroundColor *= isHDR ? 1.f : 0.f;
