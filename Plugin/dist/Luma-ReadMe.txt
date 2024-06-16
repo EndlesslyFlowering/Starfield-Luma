@@ -59,9 +59,10 @@ If you want to make some game VFX more "HDR" like, you can use this mod https://
 If you use a Nvidia GPU, you can set "UpgradeExtraRenderTargets" to true in the Luma.toml config file, to enjoy even more color buffer quality upgrades (less color banding), at a slight performance cost.
 
 Issues and limitations:
--scRGB HDR doesn't work with DLSS Frame Generation (due to DLSS limitations)
--HDR10 doesn't work with FSR Frame Generation
--FSR Frame Generation UI has a gamma mismatch and blends in slightly differently due to us not being able to replace its UI blending shader
+-scRGB HDR doesn't work with DLSS Frame Generation (due to DLSS limitations) (Luma automatically falls back to HDR10)
+-HDR10 doesn't work with FSR Frame Generation (Luma automatically falls back to scRGB)
+-FSR Frame Generation UI has a gamma mismatch and blends in slightly differently due to us not being able to replace its UI blending shader (we are working on fixing it)
+-The DLSS 3 FG to FSR 3 FG mods (e.g. https://www.nexusmods.com/site/mods/738) work, but might cause a crash on the first launch after being added or removed (following launches will be fine). The UI might also flicker (we are working on fixing it)
 
 Comparison with other "HDR" methods:
 -Starfield "official" HDR: Starfield does not officially support HDR, both the Xbox Series and Windows 11 versions rely on the OS AutoHDR, meaning that the game still outputs 8bit SDR, and its visual quality is still bottlenecked by that (no proper highlights, no BT.2020 colors, banding).
