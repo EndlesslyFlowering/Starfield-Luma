@@ -171,8 +171,8 @@ float4 PS(PSInputs psInputs) : SV_Target
 
 		const float3 UIColorGammaSpace = LINEAR_TO_GAMMA(UIColor.rgb);
 		const float3 SDRBackgroundColorGammaSpace = LINEAR_TO_GAMMA(SDRBackgroundColor);
-		const float3 DarkenedSDRBackgroundColorGammaSpace = SDRBackgroundColorGammaSpace * (1.f - UIColor.a);
-		outputColor = GAMMA_TO_LINEAR(UIColorGammaSpace + DarkenedSDRBackgroundColorGammaSpace);
+		const float3 darkenedSDRBackgroundColorGammaSpace = SDRBackgroundColorGammaSpace * (1.f - UIColor.a); // Pre-multiply alpha on the background
+		outputColor = GAMMA_TO_LINEAR(UIColorGammaSpace + darkenedSDRBackgroundColorGammaSpace);
 
 		// 2) Restore the paper white multipliers:
 

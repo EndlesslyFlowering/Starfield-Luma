@@ -35,6 +35,7 @@ namespace Hooks
 
 		static void PatchStreamline()
 		{
+			// TODO: add version check
 			auto address = reinterpret_cast<uintptr_t>(GetModuleHandleW(L"sl.dlss_g.dll"));
 
 			DWORD d = 0;
