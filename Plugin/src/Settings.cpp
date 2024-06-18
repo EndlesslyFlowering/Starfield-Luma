@@ -60,7 +60,6 @@ namespace Settings
 		};
 
 		constexpr std::array moduleNamesNativeHDR = { L"NativeHDR.dll", L"NativeHDR.asi", L"NativeAutoHDR.dll", L"NativeAutoHDR.asi" };
-		constexpr std::array moduleNamesShaderInjector = { L"SFShaderInjector.dll", L"SFShaderInjector.asi" };
 		constexpr auto moduleNameDLSSGTOFSR3 = L"dlssg_to_fsr3_amd_is_better.dll";
 
 		// check for old NativeHDR being present
@@ -71,18 +70,6 @@ namespace Settings
 			}
 		}
 
-		// check for Shader Injector being present
-		bool bShaderInjectorFound = false;
-		for (auto& moduleName : moduleNamesShaderInjector) {
-			if (!bShaderInjectorFound && isModuleLoaded(moduleName)) {
-				bShaderInjectorFound = true;
-			}
-		}
-
-		if (!bShaderInjectorFound) {
-			__REPORT(true, fatal, "Starfield Shader Injector is not loaded. Luma requires it to function properly. Please download and install the plugin - https://www.nexusmods.com/starfield/mods/5562")
-			return false;
-		}
 
 		*DisplayMode.value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2);  // Clamp to valid range
 
@@ -384,7 +371,7 @@ namespace Settings
 			config->Bind(DevSetting05.value, DevSetting05.defaultValue);
 			config->Bind(RenderTargetsToUpgrade,
 				"ImageSpaceBuffer",
-				"ScaleformCompositeBuffer", // Not upgrading this could cause issues with FSR FG as the swapchain would be in a different format than the UI buffer (untested), and maybe it would break AutoHDR bink videos.
+				// "ScaleformCompositeBuffer", // Not upgrading this could cause issues with FSR FG as the swapchain would be in a different format than the UI buffer (untested), and maybe it would break AutoHDR bink videos.
 				"SF_ColorBuffer",
 				"HDRImagespaceBuffer",
 				"ImageSpaceHalfResBuffer",

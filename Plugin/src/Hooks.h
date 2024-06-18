@@ -85,14 +85,10 @@ namespace Hooks
 
 			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x8F), Hook_RecreateSwapchain);
 
-			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204409, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
-			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204408, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
 
 			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F5), Hook_EndOfFrame);
 			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B2B), Hook_PostEndOfFrame);
 
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x21D), HookedScaleformCompositeSetRenderTarget);
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x33E), HookedScaleformCompositeDraw);
 
 			// fsr3 fixes
 			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3B2), Hook_ffxFsr3ContextCreate);
@@ -110,10 +106,6 @@ namespace Hooks
 		static void CreateSeparator(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList, Settings::SettingID a_id);
 		static void CreateSettings(RE::ArrayNestedUIValue<RE::SubSettingsList::GeneralSetting, 0>* a_settingList);
 
-		static void UploadRootConstants(void* a1, void* a2);
-
-		static void HookedScaleformCompositeSetRenderTarget(void* a1, void* a2, void** a_rtArray, void* a4, void* a5, void* a6, void* a7, void* a8, void* a9);
-		static void HookedScaleformCompositeDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount);
 
 		static void Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;
@@ -138,10 +130,6 @@ namespace Hooks
 		static void Hook_SettingsDataModelSliderChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelSliderChanged)> _SettingsDataModelSliderChanged;
 
-		static bool Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2);
-		static bool Hook_ApplyRenderPassRenderState2(void* a_arg1, void* a_arg2);
-		static inline std::add_pointer_t<decltype(Hook_ApplyRenderPassRenderState1)> _ApplyRenderPassRenderState1;
-		static inline std::add_pointer_t<decltype(Hook_ApplyRenderPassRenderState2)> _ApplyRenderPassRenderState2;
 
 		static void Hook_EndOfFrame(void* a1, void* a2, const char* a3);
 		static inline std::add_pointer_t<decltype(Hook_EndOfFrame)> _EndOfFrame;
