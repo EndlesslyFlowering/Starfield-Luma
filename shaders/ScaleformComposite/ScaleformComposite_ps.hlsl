@@ -2,7 +2,7 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-// This is defined by Luma and Shader Injector code, we can't directly change it in the shader
+// This is defined by Luma and Shader Injector code, we can't directly change it in the shader (independently of "FORCE_VANILLA_LOOK")
 #define USE_REPLACED_COMPOSITION 1
 #define OPTIMIZE_REPLACED_COMPOSITION_BLENDS (FORCE_VANILLA_LOOK ? 0 : 0)
 #define CLIP_HDR_UI 0
