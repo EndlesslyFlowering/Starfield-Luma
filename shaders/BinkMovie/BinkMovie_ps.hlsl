@@ -30,16 +30,16 @@ static const float BinkVideosAutoHDRShoulderPow = 2.75f; // A somewhat conservat
 // AutoHDR pass to generate some HDR brightess out of an SDR signal (it has no effect if HDR is not engaged).
 // This is hue conserving and only really affects highlights.
 // https://github.com/Filoppi/PumboAutoHDR
-float3 PumboAutoHDR(float3 Color, float MaxOutputNits, float PaperWhite)
+float3 PumboAutoHDR(float3 SDRColor, float MaxOutputNits, float PaperWhite)
 {
-	const float SDRRatio = max(Luminance(Color), 0.f);
+	const float SDRRatio = max(Luminance(SDRColor), 0.f);
 	// Limit AutoHDR brightness, it won't look good beyond a certain level.
 	// The paper white multiplier is applied later so we account for that.
 	const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, WhiteNits_sRGB) / WhiteNits_sRGB;
 	const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
 	const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, BinkVideosAutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
 	const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
-	return Color * safeDivision(AutoHDRTotalRatio, SDRRatio);
+	return SDRColor * safeDivision(AutoHDRTotalRatio, SDRRatio);
 }
 
 [RootSignature(ShaderRootSignature)]
