@@ -81,10 +81,10 @@ goto :init
     set "dxil_spirv_params=--dead-code-eliminate --use-reflection-names --min-precision-native-16bit --storage-input-output-16bit --validate"
     set "spirv_cross_params=--hlsl --stage %stage% --relax-nan-checks --shader-model 66 --hlsl-enable-16bit-types --hlsl-preserve-structured-buffers"
 
-    "%~dp0\tools\dxil-spirv\dxil-spirv.exe" "%bin2hlslInput%" %dxil_spirv_params% --output "%bin2hlslInput%.tmp"
+    "%~dp0\dxil-spirv\dxil-spirv.exe" "%bin2hlslInput%" %dxil_spirv_params% --output "%bin2hlslInput%.tmp"
 
-    if defined bin2hlslOutput     "%~dp0\tools\spirv-cross\spirv-cross.exe" "%bin2hlslInput%.tmp" %spirv_cross_params% --output "%bin2hlslOutput%"
-    if not defined bin2hlslOutput "%~dp0\tools\spirv-cross\spirv-cross.exe" "%bin2hlslInput%.tmp" %spirv_cross_params%
+    if defined bin2hlslOutput     "%~dp0\spirv-cross\spirv-cross.exe" "%bin2hlslInput%.tmp" %spirv_cross_params% --output "%bin2hlslOutput%"
+    if not defined bin2hlslOutput "%~dp0\spirv-cross\spirv-cross.exe" "%bin2hlslInput%.tmp" %spirv_cross_params%
     del "%bin2hlslInput%.tmp"
 
 :end
