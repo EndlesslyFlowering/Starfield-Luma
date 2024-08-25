@@ -2,9 +2,9 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-cbuffer _13_15 : register(b0, space7)
+cbuffer CPerSceneConstants : register(b0, space7)
 {
-	float4 _15_m0[3265] : packoffset(c0);
+	float4 PerSceneConstants[3317] : packoffset(c0);
 };
 
 
@@ -76,7 +76,7 @@ PSOutput PS(PSInput psInput)
 				inColor = GAMMA_TO_LINEAR(inColor);
 			}
 
-			static const float2 cbConst = _15_m0[161u].zw;
+			static const float2 cbConst = PerSceneConstants[161u].zw;
 
 			float2 _70 = (cbConst * psInput.TEXCOORD.xy * sharpenParams.xy) + 0.5f;
 

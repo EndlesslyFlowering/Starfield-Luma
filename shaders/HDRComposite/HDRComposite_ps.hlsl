@@ -111,7 +111,7 @@ cbuffer CSharedFrameData : register(b0, space6)
 
 cbuffer CPerSceneConstants : register(b0, space7)
 {
-	float4 PerSceneConstants[3265] : packoffset(c0);
+	float4 PerSceneConstants[3317] : packoffset(c0);
 };
 
 cbuffer CPushConstantWrapper_HDRComposite : register(b0, space0)
@@ -973,7 +973,7 @@ float3 TetrahedralInterpolation(
 	Texture3D<float3> LUTTextureIn,
 	float3            LUTCoordinates)
 {
-	// We need to clip the input coordinates as LUT texure samples below are not clamped.
+	// We need to clip the input coordinates as LUT texture samples below are not clamped.
 	const float3 coords = saturate(LUTCoordinates) * (LUT_SIZE - 1); // Pixel coords
 
 	// baseInd is on [0,LUT_SIZE-1]
@@ -1654,7 +1654,6 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 		tmParams.inputColor *= 2.8f;
 		tmParams.inputLuminance *= 2.8f;
 	}
-
 }
 
 void ApplyOpenDRTToneMap(inout CompositeParams params, inout ToneMapperParams tmParams)

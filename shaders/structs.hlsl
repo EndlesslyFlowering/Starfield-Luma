@@ -57,47 +57,6 @@ struct CameraBlockArray
 	ResolutionBlock rb4;
 };
 
-struct SPerSceneConstants
-{
-	CameraBlockArray cba;
-//    WindData;
-//    CameraExposureData;
-//    GlobalLightData;
-//    GlobalShadowData;
-//    ReflectionProbeDescData;
-//    ReflectionProbeExposureData;
-//    SIndirectLightingData;
-//    ProbeRenderData;
-//    PlanetConstantsData;
-//    float pcs0;
-//    int   pcs1;
-//    int   pcs2;
-//    float pcs3;
-//    TiledBinning_idTech7FrameData;
-//    float pcs4;
-//    float pcs5;
-//    float pcs6;
-//    float pcs7;
-//    float pcs8;
-//    float pcs9;
-//    float pcs10;
-//    float pcs11;
-//    float pcs12;
-//    int   pcs13;
-//    int   pcs14;
-//    int   pcs15;
-//    HairConstantData;
-//    FogParams;
-//    VolumetricLightingApplyParameters;
-//    PrecomputeTransmittanceParameters;
-//    HeightfieldData;
-//    MomentBasedOITSettings;
-//    TiledLightingDebug;
-//    GPUDebugGeometrySettings;
-//    TonemappingParams;
-//    EffectsAlphaThresholdParams;
-};
-
 struct TonemappingParams
 {
 	float AcesParam0;
