@@ -25,8 +25,8 @@
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
 // 0 Disabled.
 // 1 "Proper" LUT extrapolation done in conservative ways to determine colors outside of the LUT range as accurately as possible. It might look flat compared to other methods.
-// 2 Fast LUT extrapolation that isn't hue conserving (works by rgb ratio) (generally looks good and is fairly accurate, though it generates hues that weren't there, even from "white").
-// 3 Fast and hue conserving LUT extrapolation approach. It just scales the luminance/average up (it doesn't work LUTs that invert colors/brightness as we can't detect when to flip the luminance restoration direction).
+// 2 Fast LUT extrapolation (restoration) that isn't hue conserving (works by rgb ratio) (generally looks good and is fairly accurate, though it generates hues that weren't there, even from "white").
+// 3 Fast and hue conserving LUT extrapolation approach. It just scales the luminance/average up, thus maintaining the clipping to white of SDR (it doesn't work LUTs that invert colors/brightness as we can't detect when to flip the luminance restoration direction).
 // 4 Fast gamut compression (by max channel) before sampling and decompression after. This isn't accurate but generally looks good.
 //   NOTE: this only compresses positive scRGB values, negative ones get clipped.
 #define LUT_EXTRAPOLATION_TYPE (FORCE_VANILLA_LOOK ? 0 : 1)
@@ -34,7 +34,7 @@
 // 1 Linear space. Gradients look wrong and there's a lot of invalid colors.
 // 2 sRGB gamma. Looks best here, it produces the smoothest results with the least amount of invalid colors.
 // 3 Oklab. Gradients look okish but there's a lot of invalid colors.
-// 4 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green), but looks pretty desaturated on highlights.
+// 4 Oklch - maintain hue and chroma. It's the one that produces the most correct results (e.g. night vision LUT doesn't turn to pink, which is the inverse of green) (oklch breaks on high luminances so it's best avoided), but looks pretty desaturated on highlights.
 // 5 Oklch - maintain hue. Gradients look off, not too many invalid colors.
 #define DEFAULT_LUT_EXTRAPOLATION_COLOR_SPACE 5
 // Meant for "LUT_IMPROVEMENT_TYPE" > 0
@@ -1237,6 +1237,8 @@ float3 SampleGradingLUT(float3 LUTCoordinates, const bool NearestNeighbor = fals
 				extrapolatedDerivedLUTColor.y = max(extrapolatedDerivedLUTColor.y, 0.f);
 
 				//TODOFT:
+				//-TO find the proper "extrapolationRatio" in OKLAB/OKLCH, we should linearize the "unclampedLUTCoordinates", "LUTCoordinates" and "LUTCenteredCoordinates", find their OKLAB/OKLCH color, and find their relative ratio (speed of change), we can't find the ratio in sRGB gamma space...
+				//-Maybe only recover hue at 50%? Given that otherwise we use the one clipped from "SDR" with the wrong rgb ratio (e.g. if we try to extrapolate 5 3 2, it will clip to 1 1 1, so there won't be any hue...)?
 				//-Try to determine whether highlights are compressed with an S filmic curve in the LUT, and if so, increase the extrapolation ratio amount...
 				//-Try increasing user saturation beyond mid tones.
 				//-Normalize extrapolationRatio around the target offset???
@@ -1391,8 +1393,8 @@ float3 GradingLUT(float3 color /*neutralLUTColor*/, float2 uv, int LUTExtrapolat
 #if DRAW_LUT
 float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT)
 {
-	const uint LUTMin = 0;
-	uint LUTMax = LUT_MAX_UINT;
+	const uint LUTMin = 0; // Extra offset from the top left
+	uint LUTMax = LUT_MAX_UINT; // Bottom (right) limit
 	uint LUTSizeMultiplier = 1;
 #if LUT_EXTRAPOLATION_TYPE >= 1
 	LUTSizeMultiplier = 3; // This will end up multiplying the number of shown cube slices as well
@@ -1402,7 +1404,7 @@ float3 DrawLUTTexture(float2 PixelPosition, uint PixelScale, inout bool DrawnLUT
 	// while for the middle 50% squares, only their outer half would be extrapolated.
 	LUTMax += LUT_SIZE_UINT * (LUTSizeMultiplier - 1);
 #endif
-	PixelScale = pow(PixelScale, 1.f / LUTSizeMultiplier);
+	PixelScale = round(pow(PixelScale, 1.f / LUTSizeMultiplier));
 
 	const uint2 LUTPixelPosition2D = PixelPosition / PixelScale;
 	const uint3 LUTPixelPosition3D = uint3(LUTPixelPosition2D.x % (LUT_SIZE_UINT * LUTSizeMultiplier), LUTPixelPosition2D.y, LUTPixelPosition2D.x / (LUT_SIZE_UINT * LUTSizeMultiplier));
