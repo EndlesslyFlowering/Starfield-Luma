@@ -15,7 +15,8 @@ DLLEXPORT constinit auto SFSEPlugin_Version = []() noexcept {
 	data.UsesAddressLibrary(true);
 
 	// Uses version specific structure definitions
-	data.IsLayoutDependent(true);
+	//data.IsLayoutDependent(true);
+	data.structureCompatibility = 1 << 3;  // kStructureIndependence_1_14_70_Layout = 1 << 3,
 
 	data.CompatibleVersions({ CURRENT_RELEASE_RUNTIME });
 
