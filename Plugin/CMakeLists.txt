@@ -7,6 +7,8 @@ project(
 	LANGUAGES CXX
 )
 
+add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+
 # boiler
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/common.cmake)
 
