@@ -247,8 +247,8 @@ T ACESParametric(
 	inout ACESParametricParams params
 )
 {
-	const float AcesParam0 = PerSceneConstants[3262u].x; // Constant is usually 11.2
-	const float AcesParam1 = PerSceneConstants[3262u].y; // Constant is usually 0.022
+	const float AcesParam0 = PerSceneConstants[3259u].x; // Constant is usually 11.2
+	const float AcesParam1 = PerSceneConstants[3259u].y; // Constant is usually 0.022
 
 	params.modE = AcesParam1;
 	params.modA = ((0.56f / AcesParam0) + ACES_b) + (AcesParam1 / (AcesParam0 * AcesParam0));
@@ -343,11 +343,11 @@ float3 Hable(
 
 	// Note that all these variables can vary depending on the level.
 	// The 2.2 pow is so you don't have to input very small numbers, it's not related to gamma.
-	const float toeLength        =   pow(saturate(PerSceneConstants[3262u].w), 2.2f); // Constant is usually 0.3, but can also be ~0
-	const float toeStrength      =       saturate(PerSceneConstants[3262u].z); // Constant is usually 0.5
-	const float shoulderLength   = clamp(saturate(PerSceneConstants[3263u].y), EPSILON, BTHCNST); // Constant is usually 0.8
-	const float shoulderStrength =            max(PerSceneConstants[3263u].x, 0.f); // Constant is usually 9.9
-	const float shoulderAngle    =       saturate(PerSceneConstants[3263u].z); // Constant is usually 0.3
+	const float toeLength        =   pow(saturate(PerSceneConstants[3259u].w), 2.2f); // Constant is usually 0.3, but can also be ~0
+	const float toeStrength      =       saturate(PerSceneConstants[3259u].z); // Constant is usually 0.5
+	const float shoulderLength   = clamp(saturate(PerSceneConstants[3260u].y), EPSILON, BTHCNST); // Constant is usually 0.8
+	const float shoulderStrength =            max(PerSceneConstants[3260u].x, 0.f); // Constant is usually 9.9
+	const float shoulderAngle    =       saturate(PerSceneConstants[3260u].z); // Constant is usually 0.3
 
 	// Decent range found empirically. It's very extensive.
 	static const float HableShadowModulationMax = 10.f;
@@ -1648,7 +1648,7 @@ void ApplyHDRToneMapperScaling(inout CompositeParams params, inout ToneMapperPar
 		tmParams.inputColor *= 3.5f;
 		tmParams.inputLuminance *= 3.5f;
 	}
-	else if (PerSceneConstants[3262u].w == 0 || PerSceneConstants[3262u].z == 0) // 0-Toe Hable
+	else if (PerSceneConstants[3259u].w == 0 || PerSceneConstants[3259u].z == 0) // 0-Toe Hable
 	{
 		params.outputColor *= 2.8f;
 		tmParams.inputColor *= 2.8f;
