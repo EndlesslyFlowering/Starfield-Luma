@@ -157,7 +157,7 @@ namespace Settings
     bool Main::IsSDRForcedOnHDR(bool bAcknowledgeScreenshots) const
     {
 		// The game will tonemap to SDR if this is true
-		return ForceSDROnHDR.value.get_data() || (bAcknowledgeScreenshots && !bRequestedHDRScreenshot && bRequestedSDRScreenshot);
+		return ForceSDROnHDR.value.get_data() || (bAcknowledgeScreenshots && !bRequestedHDRScreenshot && bRequestedSDRScreenshot && IsDisplayModeSetToHDR());
     }
 
     bool Main::IsDisplayModeSetToHDR() const

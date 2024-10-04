@@ -332,6 +332,7 @@ namespace Hooks
 		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(207691));
 
 		// This seems to be the best place to shove our screenshot code in. It's not worth adding new hooks.
+		// This will end up missing the photo mode frames as they are drawn in later passes.
 		bool bScreenshotMade = CheckForScreenshotRequest(device, getCommandQueue(), commandList, ScaleformCompositeRenderTarget->m_Resource);
 
 		if (Hook_ApplyRenderPassRenderState1(a_arg1, a_arg2)) {
