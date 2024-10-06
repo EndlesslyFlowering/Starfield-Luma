@@ -256,7 +256,7 @@ namespace Settings
 
     void Main::OnDisplayModeChanged()
 	{
-		// When we change the display mode we need to refresh some internal FSR 3 stuff
+		// When we change the display mode we need to refresh some internal FSR 3 stuff (this might already be refreshed when toggling FSR 3, but not when changing other display settings)
 		if (*Offsets::uiFrameGenerationTech == RE::FrameGenerationTech::kFSR3) {
 			bNeedsToRefreshFSR3 = true;
 		}

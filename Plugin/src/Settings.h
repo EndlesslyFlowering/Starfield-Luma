@@ -293,7 +293,7 @@ namespace Settings
 		Checkbox AutoHDRVideos{
 			SettingID::kHDR_AutoHDRVideos,
 			"AutoHDR Videos",
-			"Applies a conservative \"AutoHDR\" filter to pre-rendered videos."
+			"Applies a conservative \"AutoHDR\" (inverse tonemapping) filter to pre-rendered videos, extrapolating HDR from SDR."
 				"\nThis should provide a more consistent HDR experience, avoiding videos looking flat compared to the rest of the game.",
 			"AutoHDRVideos", "HDR",
 			true

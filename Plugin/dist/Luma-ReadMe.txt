@@ -63,7 +63,8 @@ Issues and limitations:
 -HDR10 doesn't work with FSR Frame Generation (Luma automatically falls back to scRGB)
 -FSR Frame Generation UI has a gamma mismatch and blends in slightly differently due to us not being able to replace its UI blending shader (we are working on fixing it)
 -The DLSS 3 FG to FSR 3 FG mods (e.g. https://www.nexusmods.com/site/mods/738) work, but might cause a crash on the first launch after being added or removed (following launches will be fine). The UI might also flicker (we are working on fixing it)
--The photo mode frames are not rendered in screenshots taken directly from the game (photo mode space button). Screenshots taken with external tools will show frames as normal.
+-The photo mode frames are not rendered in screenshots taken directly from the game (photo mode space button). Screenshots taken with external tools will show frames as normal
+-FSR 3 FG prevents screenshots taken directly from the game (e.g. photo mode space button) from working (they are skipped). Simply take screenshots with external tools as a workaround
 
 Comparison with other "HDR" methods:
 -Starfield "official" HDR: Starfield does not officially support HDR, both the Xbox Series and Windows 11 versions rely on the OS AutoHDR, meaning that the game still outputs 8bit SDR, and its visual quality is still bottlenecked by that (no proper highlights, no BT.2020 colors, banding).

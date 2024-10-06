@@ -202,7 +202,7 @@ namespace Utils
 			return false;
 		}
 
-		// make sure we do correct luts in galaxy and starship menus, even though DataMenu is in the menu stack
+		// make sure we do correct luts in galaxy and spaceship/starship menus (they both look ok, or better, with correction), even though DataMenu is in the menu stack
 		if (Offsets::UI_IsMenuOpen(ui, "GalaxyStarMapMenu")) {
 			return true;
 		}
@@ -422,6 +422,7 @@ namespace Utils
 
 		// thumbnail
 		DirectX::ScratchImage resizedImage;
+		// TODO: for ideal results, we could crop out the non 16:9 central part, so the screenshot isn't stretched
 		DirectX::Resize(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), 640, 360, DirectX::TEX_FILTER_DEFAULT, resizedImage);
 		DirectX::SaveToWICFile(resizedImage.GetImages(), resizedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatPng, thumbnailPath.c_str(), &GUID_WICPixelFormat32bppBGRA, nullptr);
 

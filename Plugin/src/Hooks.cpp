@@ -128,6 +128,10 @@ namespace Hooks
     {
 		const auto settings = Settings::Main::GetSingleton();
 
+		// TODO: these settings can end up being added twice? (it has happened but we can't reproduce it).
+		// We could check if the setting ID is already present in the list, but for now we don't have the hooks for it.
+		// It's possible it's related to some UI mods (e.g. https://www.nexusmods.com/starfield/mods/9410).
+
 		CreateSeparator(a_settingList, Settings::SettingID::kSTART);
 
 		// We don't expose "DevSetting*" or "EnforceUserDisplayMode" or "ForceSDROnHDR" or "kHDRScreenshots*" to the game settings, they'd just confuse users.
@@ -499,19 +503,26 @@ namespace Hooks
 
     bool Hooks::Hook_TakeSnapshot(uintptr_t a1)
     {
+		bool skippedScreenshot = true;
 		const auto settings = Settings::Main::GetSingleton();
-		screenshotName = Utils::GetPhotoModeScreenshotName();
-		if (settings->IsDisplayModeSetToHDR() && *settings->HDRScreenshots.value) {
-			settings->bRequestedHDRScreenshot.store(true);
+		// FSR 3 fails to call "HookedScaleformCompositeDraw()" (it probably has an alternative mirrored path we haven't implemented),
+		// so skip the screenshot for now (it would be black otherwise)
+		if (*Offsets::uiFrameGenerationTech != RE::FrameGenerationTech::kFSR3) {
+			skippedScreenshot = false;
+			screenshotName = Utils::GetPhotoModeScreenshotName();
+			if (settings->IsDisplayModeSetToHDR() && *settings->HDRScreenshots.value) {
+				settings->bRequestedHDRScreenshot.store(true);
+			}
+			settings->bRequestedSDRScreenshot.store(true);
 		}
-		settings->bRequestedSDRScreenshot.store(true);
 
 		// hack to refresh the UI visibility after the snapshot
 		Offsets::PhotoMode_ToggleUI(a1 + 0x8);
 		Offsets::PhotoMode_ToggleUI(a1 + 0x8);
 
-		return true;
-        //return _TakeSnapshot(a1);
+		return !skippedScreenshot;
+		// Disable the vanilla implementation (it would crash either in SDR or HDR, or screenshots would be garbled)
+		//return _TakeSnapshot(a1);
     }
 
     void Hooks::Hook_RecreateSwapchain(void* a1, RE::BGSSwapChainObject* a_bgsSwapChainObject, uint32_t a_width, uint32_t a_height, uint8_t a5)
