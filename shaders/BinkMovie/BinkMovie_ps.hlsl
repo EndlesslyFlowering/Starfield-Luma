@@ -58,11 +58,23 @@ float4 PS(PSInputs inputs) : SV_Target
 	// Y:  0.0-1.0
 	// Cb: 0.0-1.0
 	// Cr: 0.0-1.0
-	// the formula adjusts for that but was for BT.601 limited range while the video is definitely BT.709 full range
-	// matrix paramters have been adjusted for BT.709 full range
-	color.r = Y - 0.790487825870513916015625f + (Cr * 1.5748f);
-	color.g = Y + 0.329009473323822021484375f - (Cb * 0.18732427060604095458984375f) - (Cr * 0.46812427043914794921875f);
-	color.b = Y - 0.931438446044921875f       + (Cb * 1.8556f);
+	// the formula adjusts for that but was for BT.601 limited range while the video is definitely BT.709 full range (proven by bink meta data)
+	// so the matrix paramters have been adjusted for BT.709 full range (both the brightness and hue of all colors would have previously been wrong)
+#if 1 // Rec.709 full range
+	color.r = (Y - 0.790487825870513916015625f) + (Cr * 1.5748f);
+	color.g = (Y + 0.329009473323822021484375f) - (Cr * 0.46812427043914794921875f) - (Cb * 0.18732427060604095458984375f);
+	color.b = (Y - 0.931438446044921875f)       + (Cb * 1.8556f);
+#elif 0 // Rec.709 limited range
+    Y *= 1.16438353f;
+    color.r = (Y - 0.972945094f) + (Cr * 1.79274106f);
+    color.g = (Y + 0.301482677f) - (Cr * 0.532909333f) - (Cb * 0.213248610f);
+    color.b = (Y - 1.13340222f)  + (Cb * 2.11240172f);
+#else // Rec.601 limited range (vanilla)
+    Y *= 1.16412353515625f;
+    color.r = (Y - 0.870655059814453125f) + (Cr * 1.595794677734375f);
+    color.g = (Y + 0.529705047607421875f) - (Cr * 0.8134765625f) - (Cb * 0.391448974609375f);
+    color.b = (Y - 1.081668853759765625f) + (Cb * 2.017822265625f);
+#endif
 
 	// Clamp for safety as YCbCr<->RGB is not 100% accurate in float and can produce negative/invalid colors,
 	// this breaks the UI pass if we are using R16G16B16A16F textures,
