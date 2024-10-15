@@ -62,7 +62,9 @@ DLLEXPORT bool SFSEAPI SFSEPlugin_Load(SFSEInterface* a_sfse)
 {
 #if 0
 #ifndef NDEBUG
-	MessageBoxA(NULL, "Loaded. You can now attach the debugger or continue execution.", Plugin::NAME.data(), NULL);
+	if (!IsDebuggerPresent()) {
+		MessageBoxA(NULL, "Loaded. You can now attach the debugger or continue execution.", Plugin::NAME.data(), NULL);
+	}
 #endif
 #endif
 
