@@ -9,7 +9,7 @@ $ShaderOutputEmbedPDB = $false
 
 $main =
 {
-	#HDRComposite
+	#HDRComposite (HDR->SDR or HDR->HDR post procress + grading + display/tone mapper)
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "1FE1A"
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "C01FE1A" -Defines "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
 	Compile-Shader -Type "ps" -TechniqueName "HDRComposite" -TechniqueId "E01FE1A" -Defines "APPLY_BLOOM", "APPLY_TONEMAPPING", "APPLY_CINEMATICS"
@@ -24,12 +24,12 @@ $main =
 	#FilmGrain
 	Compile-Shader -Type "ps" -TechniqueName "FilmGrain" -TechniqueId "1FE73" -Entry "main"
 
-	#ColorGradingMerge
+	#ColorGradingMerge (LUT blender)
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE86"
-	#HDRColorGradingMerge
+	#HDRColorGradingMerge (unused)
 	Compile-Shader -Type "cs" -TechniqueName "ColorGradingMerge" -TechniqueId "1FE87" -OutputName "HDRColorGradingMerge"
 
-	#ContrastAdaptiveSharpening
+	#ContrastAdaptiveSharpening (AMD CAS)
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "1FE96"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "201FE96" -Defines "USE_PACKED_MATH" #-AdditionalParams "-enable-16bit-types", "-Wno-conversion"
 	Compile-Shader -Type "cs" -TechniqueName "ContrastAdaptiveSharpening" -TechniqueId "401FE96" -Defines "USE_UPSCALING"
@@ -38,11 +38,14 @@ $main =
 	#PostSharpen
 	Compile-Shader -Type "ps" -TechniqueName "PostSharpen" -TechniqueId "1FE9C"
 
-	#ScaleformComposite
+	#ScaleformComposite (Scaleform (UI) composition)
 	Compile-Shader -Type "ps" -TechniqueName "ScaleformComposite" -TechniqueId "1FEAC"
 
-	#BinkMovie
+	#BinkMovie (Bink)
 	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAD"
+
+	#FidelityFX3FI (FSR 3 Frame Generation)
+	Compile-Shader -Type "ps" -TechniqueName "FidelityFX3FI" -TechniqueId "7CDA689BC1662BD8" -Entry "main"
 }
 
 

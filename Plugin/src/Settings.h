@@ -271,6 +271,8 @@ namespace Settings
 			"UI Paper White",
 			"Sets the user interface (UI) brightness in HDR modes."
 				"\n"
+				"\nSome Frame Generation implementations do not support changes to this value and fall back on the default.",
+				"\n"
 				"\nThe default value is 203.",
 			"UIPaperWhite", "HDR",
 			203,
