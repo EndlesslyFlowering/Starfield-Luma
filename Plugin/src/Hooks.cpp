@@ -608,7 +608,7 @@ namespace Hooks
 			}
 			// If FG was off, the setting would have been guaranteed to be "RE::FrameGenerationTech::kNone".
 			if (prevFramegenValue != newFramegenValue) {
-				ToggleEnableHDRSubSettings(a_eventData.m_Model, settings->IsDisplayModeSetToHDR(), settings->IsSDRForcedOnHDR(), settings->IsGameRenderingSetToHDR(), newFramegenValue);
+				ToggleEnableHDRSubSettings(a_eventData.m_Model, settings->IsDisplayModeSetToHDR(), settings->IsGameRenderingSetToHDR(), settings->IsSDRForcedOnHDR(), newFramegenValue);
 
 				settings->RefreshSwapchainFormat(newFramegenValue);
 			}
@@ -692,7 +692,8 @@ namespace Hooks
 			// The settings values haven't changed yet, so compare them for a change
 			const auto prevUpscalingTechnique = *Offsets::uiUpscalingTechnique;
 			const auto newUpscalingTechnique = getUpscalingTechnique(a_eventData.m_Value.Int);
-			// If FG was not engaged, it also won't engage automatically now, thus the swapchain format would have been the one selected by the user and there's no need to refresh it
+			// If FG was not engaged, it also won't engage automatically now, thus the swapchain format would have been the one selected by the user and there's no need to refresh it,
+			// and the same applies to the UI settings states toggle.
 			if (prevUpscalingTechnique != newUpscalingTechnique && *Offsets::uiFrameGenerationTech != RE::FrameGenerationTech::kNone) {
 				RE::FrameGenerationTech newFramegenValue;
 				if (newUpscalingTechnique == RE::UpscalingTechnique::kDLSS) {
@@ -704,7 +705,7 @@ namespace Hooks
 				}
 
 #if !FSR_3_FG_SUPPORTS_UI_PAPER_WHITE
-				ToggleEnableHDRSubSettings(a_eventData.m_Model, settings->IsDisplayModeSetToHDR(), settings->IsSDRForcedOnHDR(), settings->IsGameRenderingSetToHDR(), newFramegenValue);
+				ToggleEnableHDRSubSettings(a_eventData.m_Model, settings->IsDisplayModeSetToHDR(), settings->IsGameRenderingSetToHDR(), settings->IsSDRForcedOnHDR(), newFramegenValue);
 #endif
 
 				settings->RefreshSwapchainFormat(newFramegenValue);

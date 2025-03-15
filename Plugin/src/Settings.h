@@ -13,7 +13,7 @@
 // TODO: set to false in release builds (use the build configuation to automatically define it)
 #define DEVELOPMENT 0
 
-// FSR 3 FG uses its own shader to blend in the UI and at the moment we don't have code to override it
+// FSR 3 FG uses its own shader to blend in the UI and at the moment we don't have code to override it (well, we do, but we can't inject buffers to scale the UI brightness dynamically)
 #define FSR_3_FG_SUPPORTS_UI_PAPER_WHITE 0
 
 namespace Settings
@@ -271,7 +271,7 @@ namespace Settings
 			"UI Paper White",
 			"Sets the user interface (UI) brightness in HDR modes."
 				"\n"
-				"\nSome Frame Generation implementations do not support changes to this value and fall back to the default."
+				"\nFSR 3 Frame Generation does not support changes to this value and falls back on the default."
 				"\n"
 				"\nThe default value is 203.",
 			"UIPaperWhite", "HDR",
