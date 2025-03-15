@@ -37,7 +37,7 @@ float3 PumboAutoHDR(float3 SDRColor, float MaxOutputNits, float PaperWhite)
 	// The paper white multiplier is applied later so we account for that.
 	const float AutoHDRMaxWhite = max(min(MaxOutputNits, BinkVideosAutoHDRMaxOutputNits) / PaperWhite, WhiteNits_sRGB) / WhiteNits_sRGB;
 	const float AutoHDRShoulderRatio = 1.f - max(1.f - SDRRatio, 0.f);
-	const float AutoHDRExtraRatio = pow(AutoHDRShoulderRatio, BinkVideosAutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
+	const float AutoHDRExtraRatio = pow(max(AutoHDRShoulderRatio, 0.f), BinkVideosAutoHDRShoulderPow) * (AutoHDRMaxWhite - 1.f);
 	const float AutoHDRTotalRatio = SDRRatio + AutoHDRExtraRatio;
 	return SDRColor * safeDivision(AutoHDRTotalRatio, SDRRatio);
 }
