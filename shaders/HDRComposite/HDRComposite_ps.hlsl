@@ -1170,7 +1170,11 @@ float3 SampleGradingLUT(float3 LUTCoordinates, const bool NearestNeighbor = fals
 		static const bool AccurateLUTCentering = HdrDllPluginConstants.DevSetting04 <= 0.5f; //TODOFT
 		const float LUTCenteringMultiplier = AccurateLUTCentering ? 1.f : (LUT_SIZE / 2.f); // Neutral at 1 (~one texel)
 		// We move the coordinates back by the normal of the coordinates in excess of 0-1, by a LUT texel.
+#if 1
+		const float3 LUTCenteredCoordinates = LUTCoordinates - (normalize(unclampedLUTCoordinates - LUTCoordinates) * (LUTCenteringMultiplier / LUT_MAX_UINT));
+#else // TODOFT: this was wrong? Very likely (double check with Prey)
 		const float3 LUTCenteredCoordinates = LUTCoordinates - (normalize(unclampedLUTCoordinates - LUTCoordinates) * (1.f - (LUTCenteringMultiplier / LUT_MAX_UINT)));
+#endif
 		float3 LUTCenteredColor = LUTTexture.Sample(Sampler0, (LUTCenteredCoordinates * LUTCoordinatesScale) + LUTCoordinatesOffset);
 #if LUT_MAPPING_TYPE == 0 // NOTE: this and the above gamma->linear conversion could be optimized away in the "LUTExtrapolationColorSpace" 3 case
 		LUTCenteredColor = gamma_sRGB_to_linear_mirrored(LUTCenteredColor);

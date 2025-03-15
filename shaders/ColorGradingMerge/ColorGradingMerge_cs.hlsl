@@ -146,7 +146,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	const float3 originalLab = linear_srgb_to_oklab(originalLinear);
 	const float3 originalLCh = oklab_to_oklch(originalLab);
 
-	//TODOFT: store this information on the alpha so that later we can retrieve it quickly from the tonemapper and do lut extrapolation differently
+	//TODOFT: store this information on the alpha so that later we can retrieve it quickly from the tonemapper and do lut extrapolation differently, or store the amount of black raise correction in the alpha channel so we can later do less gamma mismatch correction for LUTs that were already lowered in black level
 	if (analysis.whiteY < analysis.blackY) // If LUT is inversed (eg: photo negative) don't do anything
 	{
 #if LUT_BLENDING_TYPE == 1
