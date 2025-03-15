@@ -146,6 +146,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	const float3 originalLab = linear_srgb_to_oklab(originalLinear);
 	const float3 originalLCh = oklab_to_oklch(originalLab);
 
+	//TODOFT: store this information on the alpha so that later we can retrieve it quickly from the tonemapper and do lut extrapolation differently
 	if (analysis.whiteY < analysis.blackY) // If LUT is inversed (eg: photo negative) don't do anything
 	{
 #if LUT_BLENDING_TYPE == 1
@@ -311,7 +312,11 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 
 	float highlightsStart = midGrayAvg;
 	float highlightsStop = min(neutralGamma.r, min(neutralGamma.g, neutralGamma.b));
+#if 1
 	float3 liftHighlights = removedGamma * ((max(highlightsStart, highlightsStop) - highlightsStart) / highlightsStart);
+#else //TODOFT: in renodx it's now like this, test it in SF
+  	float3 liftHighlights = removedGamma * (max(0, highlightsStart - highlightsStop) / highlightsStart);
+#endif
 
 	// Note: some texels have some channels dip below 0 (eg: single-channel colors)
 	const float3 detintedGamma = (originalGamma - removeFog) + liftHighlights;

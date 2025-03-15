@@ -23,6 +23,7 @@
 #define ENABLE_LUT 1
 // LUTs are too low resolutions to resolve gradients smoothly if the LUT color suddenly changes between samples
 #define ENABLE_LUT_TETRAHEDRAL_INTERPOLATION (FORCE_VANILLA_LOOK ? 0 : 1)
+//TODOFT: disable ENABLE_LUT_TETRAHEDRAL_INTERPOLATION with extrapolation? It makes it less accurate
 // 0 Disabled.
 // 1 "Proper" LUT extrapolation done in conservative ways to determine colors outside of the LUT range as accurately as possible. It might look flat compared to other methods.
 // 2 Fast LUT extrapolation (restoration) that isn't hue conserving (works by rgb ratio) (generally looks good and is fairly accurate, though it generates hues that weren't there, even from "white").

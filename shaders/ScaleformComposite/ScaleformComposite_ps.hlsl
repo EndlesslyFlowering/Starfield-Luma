@@ -7,6 +7,7 @@
 #define OPTIMIZE_REPLACED_COMPOSITION_BLENDS (FORCE_VANILLA_LOOK ? 0 : 0)
 #define CLIP_HDR_UI 0
 #define CLIP_HDR_BACKGROUND 0
+//TODOFT: type 3 is broken? Port new code from Prey
 // 0) Raw linear blend instead of sRGB gamma blend (looks very different from Vanilla).
 // 1) Apply pow on blend alpha (luminance based). Looks better than linear blends, though results vary on the background brightness.
 // 2) DEPRECATED: Apply pow on blend alpha (percentage based).
@@ -180,7 +181,7 @@ float4 PS(PSInputs psInputs) : SV_Target
 		float3 UIInfluence = select(SDRBackgroundColorGammaSpace == 0.f, 1.f, 1.f - (SDRBackgroundColorGammaSpace / (UIColorGammaSpace + SDRBackgroundColorGammaSpace)));
 		// Lerp the UI influence to 1 if the UI alpha is higher, as that means the background had been darkened by that amount, and thus had reduced influence in the final color.
 		UIInfluence = lerp(UIInfluence, 1.f, UIColor.a);
-		outputColor *= lerp(GamePaperWhite, LinearUIPaperWhite, UIInfluence);
+		outputColor *= lerp(GamePaperWhite, LinearUIPaperWhite, UIInfluence); //TODOFT: NOTE: we could do even better and scale the paper whites individually before blending?
 
 		// 3) Then add any color in excess in linear space, as there's no other way really:
 

@@ -157,3 +157,54 @@ float3 clampCubeCoordinates(float3 coordinates, out bool clamped, bool clampFrom
 	}
 	return coordinates;
 }
+
+float getDistanceFromCubeEdge(float3 normal)
+{
+	static const float cubeDiagonalLength = sqrt(3.0);
+  
+#if 1 // Theoretically the input is already a normal so we could skip this
+	if (length(normal) <= FLT_MIN)
+	{  
+		// For pure black, pretend the output is pure white
+		return cubeDiagonalLength;
+	}
+#endif
+
+	// Abs() because all directions are mirrored.
+	// We restrict the possible intersections from 6 to 3 cube faces
+	normal = abs(normal);
+  
+	// Multiply by (e.g.) 3 to make the vector long enough to always intersect with an edge of the cube
+	normal *= 3.0;
+
+	float3 currentIntersection;
+	float intersectionLength = FLT_MAX;
+	bool foundIntersection = false;
+	// Find the closest intersection with each cube edge as a plane (multiple planes would intersect, likely all 3)
+	if (cubeCoordinatesIntersection(currentIntersection, normal, float3(-1.f, 0.f, 0.f)))
+	{
+		foundIntersection = true;
+		intersectionLength = length(currentIntersection);
+	}
+	if (cubeCoordinatesIntersection(currentIntersection, normal, float3(0.f, -1.f, 0.f)))
+	{
+		foundIntersection = true;
+		float currentIntersectionLength = length(currentIntersection);
+		if (currentIntersectionLength < intersectionLength)
+			intersectionLength = currentIntersectionLength;
+	}
+	if (cubeCoordinatesIntersection(currentIntersection, normal, float3(0.f, 0.f, -1.f)))
+	{
+		foundIntersection = true;
+		float currentIntersectionLength = length(currentIntersection);
+		if (currentIntersectionLength < intersectionLength)
+			intersectionLength = currentIntersectionLength;
+	}
+
+#if 1 // This can't can't really happen so we can disabled as an optimization
+	if (!foundIntersection)
+    return cubeDiagonalLength;
+#endif
+
+	return intersectionLength;
+}
