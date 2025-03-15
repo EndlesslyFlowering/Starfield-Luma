@@ -61,8 +61,8 @@ If you use a Nvidia GPU, you can set "UpgradeExtraRenderTargets" to true in the 
 Issues and limitations:
 -scRGB HDR doesn't work with DLSS Frame Generation (due to DLSS limitations) (Luma automatically falls back to HDR10 so it's not a problem)
 -HDR10 doesn't work with FSR Frame Generation (Luma automatically falls back to scRGB so it's not a problem)
--FSR Frame Generation does not support dynamic brightness on the UI in HDR
--The DLSS 3 FG to FSR 3 FG mods (e.g. https://www.nexusmods.com/site/mods/738) work, but might cause a crash on the first launch after being added or removed (following launches will be fine). The UI might also flicker (we are working on fixing it)
+-FSR Frame Generation does not support brightness adjustments on the UI in HDR, it's fixed to 203 nits
+-The DLSS 3 FG to FSR 3 FG mods (e.g. https://www.nexusmods.com/site/mods/738) work, but might cause a crash on the first launch after being added or removed (following launches will be fine). The UI might also flicker when brighter than 80 nits (we are working on fixing it)
 -The photo mode frames are not rendered in screenshots taken directly from the game (photo mode space button). Screenshots taken with external tools will show frames as normal
 -FSR 3 FG prevents screenshots taken directly from the game (e.g. photo mode space button) from working (they are skipped). Simply take screenshots with external tools as a workaround
 -Changing from fullscreen to windowed mode has a chance of crashing the game
