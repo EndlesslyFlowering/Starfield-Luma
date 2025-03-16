@@ -316,7 +316,7 @@ float3 PatchLUTColor(Texture2D<float3> LUT, uint3 UVW, float3 neutralGamma, floa
 	float3 liftHighlights = removedGamma * ((max(highlightsStart, highlightsStop) - highlightsStart) / highlightsStart);
 #else 
 	// With current math midgray above 0.5 would undershoot for example:
-	// (max(1.f - 0.6) - 0.6) / 0.6) == 0.4 / 0.6 == 66% restored
+	// (max(1.f, 0.6) - 0.6) / 0.6) == 0.4 / 0.6 == 66% restored
 
 	// Needs visual confirmation, but the following is properly balanced for midgray not being exactly 0.5f:
 
