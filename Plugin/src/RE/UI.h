@@ -144,7 +144,7 @@ namespace RE
 
 		void AddItem(const BSFixedStringCS& Item)
 		{
-			auto addr = dku::Hook::IDToAbs(134612);
+			auto addr = dku::Hook::IDToAbs(0);  // TODO: was 134612
 			auto func = reinterpret_cast<void (*)(ArrayUIValue<T, Count>*, const BSFixedStringCS&)>(addr);
 			func(this, Item);
 		}
@@ -162,7 +162,7 @@ namespace RE
 		void AddItem(T& Item)
 		{
 			// Seems like they have a helper function to apply NestedUIValue<> to the type
-			auto addr = dku::Hook::IDToAbs(135760);
+			auto addr = dku::Hook::IDToAbs(88843);  // TODO: unsure
 			auto func = reinterpret_cast<void (*)(TUIDataShuttleContainerArray<NestedUIValue<T>>*, T&)>(addr);
 			func(&__super::m_ShuttleArray, Item);
 		}

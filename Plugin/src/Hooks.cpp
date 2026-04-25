@@ -333,7 +333,7 @@ namespace Hooks
 		};
 
 		using AllocateDescriptors_t = void (*)(void*, DescriptorAllocation&, uint32_t, DescriptorAllocation::Type, uint32_t&);
-		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(207691));
+		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(0));  // TODO: cant find it
 
 		// This seems to be the best place to shove our screenshot code in. It's not worth adding new hooks.
 		// This will end up missing the photo mode frames as they are drawn in later passes.
@@ -543,7 +543,7 @@ namespace Hooks
 		CreateSettings(settingList);
     }
 
-    void Hooks::Hook_SettingsDataModelCheckboxChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
+    void Hooks::Hook_SettingsDataModelCheckboxChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		const auto settings = Settings::Main::GetSingleton();
 
@@ -615,10 +615,10 @@ namespace Hooks
 			break;
 		}
 
-		_SettingsDataModelCheckboxChanged(a_arg1, a_eventData);
+		_SettingsDataModelCheckboxChanged(a_eventData);
     }
 
-    void Hooks::Hook_SettingsDataModelStepperChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
+    void Hooks::Hook_SettingsDataModelStepperChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
 		const auto settings = Settings::Main::GetSingleton();
 
@@ -713,7 +713,7 @@ namespace Hooks
 		    break;
 		}
 
-		_SettingsDataModelStepperChanged(a_arg1, a_eventData);
+		_SettingsDataModelStepperChanged(a_eventData);
     }
 
     bool Hooks::OnSettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
@@ -746,7 +746,7 @@ namespace Hooks
 			};
 
 			const auto modelData = *reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(a_eventData.m_Model) + 0x8);
-			const auto func = reinterpret_cast<void (*)(void*, const void*)>(dku::Hook::IDToAbs(135746));
+			const auto func = reinterpret_cast<void (*)(void*, const void*)>(dku::Hook::IDToAbs(88972));
 
 			if (modelData) {
 				func(modelData, &callbackData);

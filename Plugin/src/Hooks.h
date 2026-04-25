@@ -59,46 +59,46 @@ namespace Hooks
 		static void Hook()
 		{
 			// set color space and save swapchain object pointer
-			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204384, 0x387), Hook_UnkFunc);
+			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143272, 0xAC9), Hook_UnkFunc);
 
 			// just after loading ini settings; deal with initial framegen setting value
-			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(149040, 0x533), Hook_UnkFunc2);
+			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(99482, 0x61D), Hook_UnkFunc2);
 
 			// disable photo mode screenshots with HDR
-			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(415473);
+			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(443439);
 			auto       _Hook_TakeSnapshot = dku::Hook::AddVMTHook(&takeSnapshotVtbl, 1, FUNC_INFO(Hook_TakeSnapshot));
 			_TakeSnapshot = reinterpret_cast<std::add_pointer_t<decltype(Hook_TakeSnapshot)>>(_Hook_TakeSnapshot->OldAddress);
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
-			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078398, 0x759), Hook_CreateMonitorSetting);
+			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(88728, 0x121C), Hook_CreateMonitorSetting);
 
 			// Hide vanilla brightness, contrast and hdr brightness
 			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xBBB), nop5, 5);
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xD06), nop5, 5);
-			dku::Hook::WriteData(dku::Hook::IDToAbs(1078398, 0xE8F), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(88728, 0x1B2E), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(88728, 0x1DAA), nop5, 5);
+			dku::Hook::WriteData(dku::Hook::IDToAbs(88728, 0x209D), nop5, 5);
 
-			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136121, 0x43), Hook_SettingsDataModelCheckboxChanged);
-			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136131, 0x40), Hook_SettingsDataModelStepperChanged);
-			_SettingsDataModelSliderChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(136130, 0x40), Hook_SettingsDataModelSliderChanged);
+			_SettingsDataModelCheckboxChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(88705, 0xE6), Hook_SettingsDataModelCheckboxChanged);
+			_SettingsDataModelStepperChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(88700, 0xE3), Hook_SettingsDataModelStepperChanged);
+			_SettingsDataModelSliderChanged = dku::Hook::write_call<5>(dku::Hook::IDToAbs(88690, 0xE3), Hook_SettingsDataModelSliderChanged);
 
-			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(203027, 0x8F), Hook_RecreateSwapchain);
+			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(141998, 0xBF), Hook_RecreateSwapchain);
 
-			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204409, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
-			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(204408, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
+			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144651, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
+			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144655, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
 
-			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x12F5), Hook_EndOfFrame);
-			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078950, 0x1B2B), Hook_PostEndOfFrame);
+			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0xCBD), Hook_EndOfFrame);
+			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0x148F), Hook_PostEndOfFrame);  // CmdEnd, was CmdEndProfilingMarker previously
 
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x21D), HookedScaleformCompositeSetRenderTarget);
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(208157, 0x33E), HookedScaleformCompositeDraw);
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(145827, 0), HookedScaleformCompositeSetRenderTarget);  // TODO: can't find it
+			dku::Hook::write_call<5>(dku::Hook::IDToAbs(145827, 0x4A0), HookedScaleformCompositeDraw);
 
 			// fsr3 fixes
-			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1391756, 0x3B2), Hook_ffxFsr3ContextCreate);
-			dku::Hook::write_call<6>(dku::Hook::IDToAbs(1391482, 0x3CE), Hook_CreateShaderResourceView);
-			_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x5DB), Hook_UnkFunc3);
-			_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0x113), Hook_UnkFunc3_Internal);
+			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144625, 0x374), Hook_ffxFsr3ContextCreate);
+			dku::Hook::write_call<6>(dku::Hook::IDToAbs(178624, 0x3CE), Hook_CreateShaderResourceView);
+			//_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x5DB), Hook_UnkFunc3);  // mess
+			//_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0x113), Hook_UnkFunc3_Internal);  // mess
 		}
 
 	private:
@@ -129,9 +129,9 @@ namespace Hooks
 
 		static void Hook_CreateMonitorSetting(void* a1, void* a2);
 		static inline std::add_pointer_t<decltype(Hook_CreateMonitorSetting)> _CreateMonitorSetting;
-		static void Hook_SettingsDataModelCheckboxChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static void Hook_SettingsDataModelCheckboxChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelCheckboxChanged)> _SettingsDataModelCheckboxChanged;
-		static void Hook_SettingsDataModelStepperChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData);
+		static void Hook_SettingsDataModelStepperChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
 		static inline std::add_pointer_t<decltype(Hook_SettingsDataModelStepperChanged)> _SettingsDataModelStepperChanged;
 
 		static bool OnSettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
