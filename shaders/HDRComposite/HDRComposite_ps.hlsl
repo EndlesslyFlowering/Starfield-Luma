@@ -105,42 +105,42 @@ T FROM_LUT_EXTRAPOLATION_SPACE(T x, uint LUTExtrapolationColorSpace)
 	return oklch_to_linear_srgb(x);
 }
 
-cbuffer CSharedFrameData : register(b0, space6)
+cbuffer CSharedFrameData : register(b0, space2)
 {
 	FrameData SharedFrameData : packoffset(c0);
 };
 
-cbuffer CPerSceneConstants : register(b0, space7)
+cbuffer CPerSceneConstants : register(b0, space3)
 {
-	float4 PerSceneConstants[3317] : packoffset(c0);
+	float4 PerSceneConstants[3313] : packoffset(c0);
 };
 
-cbuffer CPushConstantWrapper_HDRComposite : register(b0, space0)
+cbuffer CPushConstantWrapper_HDRComposite : register(b0)
 {
 	PushConstantWrapper_HDRComposite PcwHdrComposite : packoffset(c0);
 };
 
 
-Texture2D<float3> InputColorTexture : register(t0, space9);
+Texture2D<float3> InputColorTexture : register(t0, space5);
 
 #if defined(APPLY_MERGED_COLOR_GRADING_LUT)
 
-Texture2D<float3> LUTMaskTexture : register(t1, space9);
-Texture3D<float3> LUTTexture     : register(t3, space9);
+Texture2D<float3> LUTMaskTexture : register(t1, space5);
+Texture3D<float3> LUTTexture     : register(t3, space5);
 
 #endif
 
 #if defined(APPLY_BLOOM)
 
-Texture2D<float3> Bloom : register(t2, space9);
+Texture2D<float3> Bloom : register(t2, space5);
 
 #endif
 
-StructuredBuffer<HDRCompositeData> HdrCmpDat : register(t4, space9);
+StructuredBuffer<HDRCompositeData> HdrCmpDat : register(t4, space5);
 
 #if (defined(APPLY_MERGED_COLOR_GRADING_LUT) || defined(APPLY_BLOOM))
 
-SamplerState Sampler0 : register(s0, space9); // Clamped Bilinear
+SamplerState Sampler0 : register(s0, space5); // Clamped Bilinear
 
 #endif
 

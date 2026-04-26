@@ -91,16 +91,16 @@
 
 static const float AdditionalNeutralLUTPercentage = 0.f; // ~0.25 might be a good compromise, but this is mostly replaced by "HdrDllPluginConstants.LUTCorrectionStrength"
 
-cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0, space0)
+cbuffer CPushConstantWrapper_ColorGradingMerge : register(b0)
 {
 	PushConstantWrapper_ColorGradingMerge PcwColorGradingMerge : packoffset(c0);
 };
 
-Texture2D<float3> LUT1 : register(t0, space8);
-Texture2D<float3> LUT2 : register(t1, space8);
-Texture2D<float3> LUT3 : register(t2, space8);
-Texture2D<float3> LUT4 : register(t3, space8);
-RWTexture3D<float4> OutMixedLUT : register(u0, space8);
+Texture2D<float3> LUT1 : register(t0, space4);
+Texture2D<float3> LUT2 : register(t1, space4);
+Texture2D<float3> LUT3 : register(t2, space4);
+Texture2D<float3> LUT4 : register(t3, space4);
+RWTexture3D<float4> OutMixedLUT : register(u0, space4);
 
 struct LUTAnalysis
 {

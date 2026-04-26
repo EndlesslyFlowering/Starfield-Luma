@@ -2,11 +2,11 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-Texture2D<float> TexY  : register(t0, space8);
-Texture2D<float> TexCb : register(t2, space8);
-Texture2D<float> TexCr : register(t1, space8);
+Texture2D<float> TexY  : register(t0, space4);
+Texture2D<float> TexCb : register(t2, space4);
+Texture2D<float> TexCr : register(t1, space4);
 
-SamplerState Sampler0 : register(s0, space8);
+SamplerState Sampler0 : register(s0, space4);
 
 struct PSInputs
 {

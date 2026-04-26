@@ -44,10 +44,10 @@ struct PushConstantWrapper_ScaleformCompositeLayout
 
 ConstantBuffer<PushConstantWrapper_ScaleformCompositeLayout> ScaleformCompositeLayout : register(b0);
 
-Texture2D<float4> UITexture : register(t0, space8);
-SamplerState UISampler : register(s0, space8);
+Texture2D<float4> UITexture : register(t0, space4);
+SamplerState UISampler : register(s0, space4);
 #if USE_REPLACED_COMPOSITION
-RWTexture2D<float4> FinalColorTexture : register(u0, space8);
+RWTexture2D<float4> FinalColorTexture : register(u0, space4);
 #endif // USE_REPLACED_COMPOSITION
 
 struct PSInputs

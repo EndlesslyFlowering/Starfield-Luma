@@ -16,14 +16,14 @@
 	#define PEAK_BRIGHTNESS_THRESHOLD_HDR10 FLT_MAX
 #endif
 
-cbuffer CopyLayout : register(b0, space0)
+cbuffer CopyLayout : register(b0)
 {
 	uint UsePointSampler : packoffset(c0);
 };
 
-Texture2D<float4> inputTexture : register(t0, space8);
-SamplerState pointSampler : register(s0, space8);
-SamplerState linearSampler : register(s1, space8);
+Texture2D<float4> inputTexture : register(t0, space4);
+SamplerState pointSampler : register(s0, space4);
+SamplerState linearSampler : register(s1, space4);
 
 struct PSInputs
 {

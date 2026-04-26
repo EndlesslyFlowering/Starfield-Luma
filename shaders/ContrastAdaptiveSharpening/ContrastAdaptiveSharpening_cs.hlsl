@@ -12,18 +12,18 @@
 // - CAS upscaling in FP16 with FFX_CAS_USE_PRECISE_MATH [300FF94/601FE96] (USE_PACKED_MATH + USE_UPSCALING)
 
 // don't need it
-//cbuffer _16_18 : register(b0, space6)
+//cbuffer _16_18 : register(b0, space2)
 //{
 //	float4 _18_m0[9] : packoffset(c0); // _18_m0[1u].w = Gamma
 //};
 
-cbuffer CCASData : register(b0, space8)
+cbuffer CCASData : register(b0, space4)
 {
 	ContrastAdaptiveSharpeningData CASData : packoffset(c0);
 };
 
-Texture2D<float4>   ColorIn  : register(t0, space8);
-RWTexture2D<float4> ColorOut : register(u0, space8);
+Texture2D<float4>   ColorIn  : register(t0, space4);
+RWTexture2D<float4> ColorOut : register(u0, space4);
 
 struct CSInput
 {

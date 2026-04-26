@@ -45,7 +45,7 @@ $main =
 	Compile-Shader -Type "ps" -TechniqueName "BinkMovie" -TechniqueId "1FEAD"
 
 	#FidelityFX3FI (FSR 3 Frame Generation)
-	Compile-Shader -Type "ps" -TechniqueName "FidelityFX3FI" -TechniqueId "7CDA689BC1662BD8" -Entry "main"
+	Compile-Shader -Type "ps" -TechniqueName "FidelityFX3FI" -TechniqueId "7CDA689BC1662BD8" -Entry "main" -ExtractRootSignature $false
 }
 
 
@@ -102,7 +102,10 @@ function Compile-Shader {
 		[array]$Defines,
 
 		[parameter(Mandatory = $false)]
-		[array]$AdditionalParams
+		[array]$AdditionalParams,
+		
+		[parameter(Mandatory = $false)]
+		[bool]$ExtractRootSignature = $true
 	)
 
 	$inputHlslName = "${TechniqueName}_${Type}.hlsl"
@@ -134,13 +137,17 @@ function Compile-Shader {
 
 	# Extract and strip away the DXIL root signature
 	# TODO: Can extractrootsignature and Qstrip_rootsignature be used in the same operation?
-	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -extractrootsignature -Fo `"${stagedSigPath}`""
-	Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
+	if ($ExtractRootSignature -eq $true) {
+		Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -extractrootsignature -Fo `"${stagedSigPath}`""
+		Run-DXC -Arguments "-dumpbin `"${stagedBinPath}`" -Qstrip_rootsignature -Fo `"${stagedBinPath}`""
+	}
 
     # Copy the resulting bins to the dist directory.
     New-Item -Force -ItemType Directory -Path "${DistDirectory}\${OutputName}" | Out-Null
     Copy-Item -Force -Path $stagedBinPath -Destination "${DistDirectory}\${OutputName}\${outputBinName}"
-    Copy-Item -Force -Path $stagedSigPath -Destination "${DistDirectory}\${OutputName}\${outputSigName}"
+	if ($ExtractRootSignature -eq $true) {
+		Copy-Item -Force -Path $stagedSigPath -Destination "${DistDirectory}\${OutputName}\${outputSigName}"
+	}
     
     $ShaderOutputDirectory = $null
     If (Test-Path -path $ShaderOutputDirectoryFile -PathType Leaf) {
@@ -154,7 +161,9 @@ function Compile-Shader {
 	# is enabled.
 	New-Item -Force -ItemType Directory -Path "${ShaderOutputDirectory}\${OutputName}" | Out-Null
 	Move-Item -Force -Path $stagedBinPath -Destination "${ShaderOutputDirectory}\${OutputName}\${outputBinName}"
-	Move-Item -Force -Path $stagedSigPath -Destination "${ShaderOutputDirectory}\${OutputName}\${outputSigName}"
+	if ($ExtractRootSignature -eq $true) {
+		Move-Item -Force -Path $stagedSigPath -Destination "${ShaderOutputDirectory}\${OutputName}\${outputSigName}"
+	}
 }
 
 try {

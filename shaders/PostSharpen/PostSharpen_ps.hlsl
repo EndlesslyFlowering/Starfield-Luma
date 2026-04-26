@@ -2,9 +2,9 @@
 #include "../color.hlsl"
 #include "RootSignature.hlsl"
 
-cbuffer CPerSceneConstants : register(b0, space7)
+cbuffer CPerSceneConstants : register(b0, space3)
 {
-	float4 PerSceneConstants[3317] : packoffset(c0);
+	float4 PerSceneConstants[3313] : packoffset(c0);
 };
 
 
@@ -15,14 +15,14 @@ struct PushConstantWrapper_PostSharpen
 };
 
 
-cbuffer CPushConstantWrapper_PostSharpen : register(b0, space0)
+cbuffer CPushConstantWrapper_PostSharpen : register(b0)
 {
 	PushConstantWrapper_PostSharpen PcwPostSharpen : packoffset(c0);
 };
 
-Texture2D<float3> TonemappedColorTexture : register(t0, space8); // Possibly in gamma space in SDR
-SamplerState Sampler0 : register(s13, space6); // Likely bilinear
-SamplerState Sampler1 : register(s15, space6); // Likely nearest neighbor
+Texture2D<float3> TonemappedColorTexture : register(t0, space4); // Possibly in gamma space in SDR
+SamplerState Sampler0 : register(s13, space2); // Likely bilinear
+SamplerState Sampler1 : register(s15, space2); // Likely nearest neighbor
 
 struct PSInput
 {

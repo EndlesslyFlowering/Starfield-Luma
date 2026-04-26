@@ -18,13 +18,13 @@
 
 #define IMPROVED_FILM_GRAIN true
 
-cbuffer _13_15 : register(b0, space0)
+cbuffer _13_15 : register(b0)
 {
 	float4 filmGrainColorAndIntensity : packoffset(c0);
 };
 
-Texture2D<float3> TonemappedColorTexture : register(t0, space8); // Possibly in gamma space in SDR
-SamplerState Sampler0 : register(s0, space8);
+Texture2D<float3> TonemappedColorTexture : register(t0, space4); // Possibly in gamma space in SDR
+SamplerState Sampler0 : register(s0, space4);
 
 static float4 TEXCOORD;
 static float4 SV_Target;
