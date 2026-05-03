@@ -11,12 +11,8 @@ DLLEXPORT constinit auto SFSEPlugin_Version = []() noexcept {
 	data.PluginName(Plugin::NAME);
 	data.AuthorName(Plugin::AUTHOR);
 
-	// Address Library v1 (https://www.nexusmods.com/starfield/mods/3256)
-	data.UsesAddressLibrary(true);
-
-	// Uses version specific structure definitions
-	//data.IsLayoutDependent(true);
-	data.structureCompatibility = 1 << 3;  // kStructureIndependence_1_14_70_Layout = 1 << 3,
+	data.addressIndependence = 1 << 2;    // kAddressIndependence_AddressLibraryV2 (Address library v2, 1.15.216+)
+	data.structureCompatibility = 1 << 3; // kStructureIndependence_1_14_70_Layout
 
 	data.CompatibleVersions({ CURRENT_RELEASE_RUNTIME });
 

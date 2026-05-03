@@ -33,22 +33,6 @@ namespace Hooks
 			Utils::LogBuffers();
 		}
 
-		static void PatchStreamline()
-		{
-			// TODO: add version check
-			auto address = reinterpret_cast<uintptr_t>(GetModuleHandleW(L"sl.dlss_g.dll"));
-
-			DWORD d = 0;
-			VirtualProtect(reinterpret_cast<void*>(address + 0x1897F), 1, PAGE_EXECUTE_READWRITE, &d);
-			memset(reinterpret_cast<void*>(address + 0x1897F), 0xEB, 1);
-			VirtualProtect(reinterpret_cast<void*>(address + 0x1897F), 1, d, &d);
-
-			VirtualProtect(reinterpret_cast<void*>(address + 0x19D46), 2, PAGE_EXECUTE_READWRITE, &d);
-			memset(reinterpret_cast<void*>(address + 0x19D46), 0x90, 1);
-			memset(reinterpret_cast<void*>(address + 0x19D47), 0xE9, 1);
-			VirtualProtect(reinterpret_cast<void*>(address + 0x19D46), 2, d, &d);
-		}
-
 	private:
 		static RE::BufferDefinition* GetBufferFromString(std::string_view a_bufferName);
 	};
@@ -67,7 +51,7 @@ namespace Hooks
 			// disable photo mode screenshots with HDR
 			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(443439);
 			auto       _Hook_TakeSnapshot = dku::Hook::AddVMTHook(&takeSnapshotVtbl, 1, FUNC_INFO(Hook_TakeSnapshot));
-			_TakeSnapshot = reinterpret_cast<std::add_pointer_t<decltype(Hook_TakeSnapshot)>>(_Hook_TakeSnapshot->OldAddress);
+			_TakeSnapshot = reinterpret_cast<decltype(&Hook_TakeSnapshot)>(_Hook_TakeSnapshot->OldAddress);
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
@@ -91,8 +75,11 @@ namespace Hooks
 			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0xCBD), Hook_EndOfFrame);
 			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0x148F), Hook_PostEndOfFrame);  // CmdEnd, was CmdEndProfilingMarker previously
 
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(145827, 0), HookedScaleformCompositeSetRenderTarget);  // TODO: can't find it
-			dku::Hook::write_call<5>(dku::Hook::IDToAbs(145827, 0x4A0), HookedScaleformCompositeDraw);
+			const auto scaleformCompositeRenderPassVtbl = dku::Hook::IDToAbs(497272);
+			auto hookScaleformCompositeRenderPass = dku::Hook::AddVMTHook(&scaleformCompositeRenderPassVtbl, 7, FUNC_INFO(HookedScaleformCompositeRenderPass));
+			_ScaleformCompositeRenderPass = reinterpret_cast<decltype(&HookedScaleformCompositeRenderPass)>(hookScaleformCompositeRenderPass->OldAddress);
+			hookScaleformCompositeRenderPass->Enable();
+			dku::Hook::write_call<5>(hookScaleformCompositeRenderPass->OldAddress + 0x4A0, HookedScaleformCompositeRenderPassExecuteDraw);
 
 			// fsr3 fixes
 			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144625, 0x374), Hook_ffxFsr3ContextCreate);
@@ -112,8 +99,9 @@ namespace Hooks
 
 		static void UploadRootConstants(void* a1, void* a2);
 
-		static void HookedScaleformCompositeSetRenderTarget(void* a1, void* a2, void** a_rtArray, void* a4, void* a5, void* a6, void* a7, void* a8, void* a9);
-		static void HookedScaleformCompositeDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount);
+		static void HookedScaleformCompositeRenderPass(void* a1, void* a2, void* a_renderPassData);
+		static inline std::add_pointer_t<decltype(HookedScaleformCompositeRenderPass)> _ScaleformCompositeRenderPass;
+		static void HookedScaleformCompositeRenderPassExecuteDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount);
 
 		static void Hook_UnkFunc(uintptr_t a1, RE::BGSSwapChainObject* a_bgsSwapchainObject);
 		static inline std::add_pointer_t<decltype(Hook_UnkFunc)> _UnkFunc;

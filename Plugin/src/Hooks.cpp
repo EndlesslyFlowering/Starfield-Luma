@@ -277,87 +277,164 @@ namespace Hooks
 
 	struct Dx12Resource
 	{
-		char _pad0[0x48];                // 0
-		int  m_CpuDescriptorArrayCount;  // 48 Greater than 0 (msb bit) indicates an array
+		char _pad0[0x8];
+		int  m_SRVCpuDescriptorArrayCount;  // 8 Greater than -1 (most significant bit) indicates an array
 		union
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE  m_CpuDescriptor;       // 50 Possibly mip levels? No idea w.r.t. its purpose
-			D3D12_CPU_DESCRIPTOR_HANDLE* m_CpuDescriptorArray;  // 50
+			D3D12_CPU_DESCRIPTOR_HANDLE  m_SRVCpuDescriptor;       // 10
+			D3D12_CPU_DESCRIPTOR_HANDLE* m_SRVCpuDescriptorArray;  // 10 Possibly mip levels?
 		};
-		char _pad1[0x8];                    // 58
-		int  m_UAVCpuDescriptorArrayCount;  // 60
+		char _pad1[0x8];                    // 18
+		int  m_UAVCpuDescriptorArrayCount;  // 20 Greater than -1 (most significant bit) indicates an array
 		union
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE  m_UAVCpuDescriptor;       // 68
-			D3D12_CPU_DESCRIPTOR_HANDLE* m_UAVCpuDescriptorArray;  // 68
+			D3D12_CPU_DESCRIPTOR_HANDLE  m_UAVCpuDescriptor;       // 28
+			D3D12_CPU_DESCRIPTOR_HANDLE* m_UAVCpuDescriptorArray;  // 28 Possibly mip levels?
 		};
-		char            _pad2[0x8];  // 70
-		ID3D12Resource* m_Resource;  // 78
+		char            _pad2[0x8];  // 30
+		ID3D12Resource* m_Resource;  // 38
+
+		D3D12_CPU_DESCRIPTOR_HANDLE GetSRVDescriptorCPU(uint32_t a_index) const
+		{
+			return (m_SRVCpuDescriptorArrayCount >= 0) ? m_SRVCpuDescriptorArray[a_index] : m_SRVCpuDescriptor;
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE GetUAVDescriptorCPU(uint32_t a_index) const
+		{
+			return (m_UAVCpuDescriptorArrayCount >= 0) ? m_UAVCpuDescriptorArray[a_index] : m_UAVCpuDescriptor;
+		}
 	};
-	static_assert(offsetof(Dx12Resource, m_CpuDescriptorArrayCount) == 0x48);
-	static_assert(offsetof(Dx12Resource, m_UAVCpuDescriptor) == 0x68);
-	static_assert(offsetof(Dx12Resource, m_Resource) == 0x78);
+	static_assert(offsetof(Dx12Resource, m_SRVCpuDescriptorArrayCount) == 0x8);
+	static_assert(offsetof(Dx12Resource, m_UAVCpuDescriptorArrayCount) == 0x20);
+	static_assert(offsetof(Dx12Resource, m_Resource) == 0x38);
 
-	thread_local Dx12Resource *ScaleformCompositeRenderTarget;
-
-	void Hooks::HookedScaleformCompositeSetRenderTarget(void* a1, void* a2, void** a_rtArray, void* a4, void* a5, void* a6, void* a7, void* a8, void* a9)
+	struct Dx12Unknown
 	{
-		ScaleformCompositeRenderTarget = *reinterpret_cast<Dx12Resource**>(reinterpret_cast<uintptr_t>(a_rtArray[0]) + 0x48);
+		char                         _pad0[0x8];           // 00
+		D3D12_CPU_DESCRIPTOR_HANDLE* m_RTVCpuDescriptors;  // 08
+		char                         _pad1[0x48];          // 10
+		Dx12Resource*                m_Resource;           // 58
+	};
 
-		// Ignore render target sets. They're going to be overwritten anyway.
-		//_ScaleformCompositeSetRenderTarget(a1, a2, a_rtArray, a4, a5, a6, a7, a8, a9);
+	Dx12Unknown* AcquireRenderPassIO(void* RenderPassData, uint32_t IOIndex)
+	{
+		auto v19 = *(uint64_t*)RenderPassData + 16LL;
+		if (*(int*)(*(uint64_t*)RenderPassData + 8LL) >= 0)
+			v19 = *(uint64_t*)v19;
+
+		auto v20 = *(uint64_t*)((uint64_t)RenderPassData + 8);
+		auto v21 = (uint64_t)*(uint32_t*)(v19 + 4 + (IOIndex * 32)) << 32;
+
+		struct
+		{
+			uint64_t arg0;
+			uint64_t arg1;
+		} tempdata = {
+			.arg0 = *(uint32_t*)(v19 + (IOIndex * 32)) | v21,
+			.arg1 = *(uint32_t*)(v19 + 8 + (IOIndex * 32)),
+		};
+
+		static auto func = reinterpret_cast<Dx12Unknown* (*)(uint64_t, void*)>(dku::Hook::IDToAbs(145523));
+		return func(v20, &tempdata);
 	}
 
-	void Hooks::HookedScaleformCompositeDraw(void* a_arg1, void* a_arg2, uint32_t a_vertexCount)
+	void AllocateDescriptors(void* CommandPool, DescriptorAllocation& OutAlloc, uint32_t Count, DescriptorAllocation::Type Type, uint32_t& HandleSizeIncrement)
 	{
-		auto creationRendererInstance = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x0);
-		auto device = *reinterpret_cast<ID3D12Device2**>(creationRendererInstance + 0x3A8);
+		const auto handleHeap = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(CommandPool) + 0x48 + (0x8 * static_cast<uint8_t>(Type)));
+		HandleSizeIncrement = *reinterpret_cast<uint32_t*>(*reinterpret_cast<uintptr_t*>(handleHeap) + 0x1F8);
 
-		auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_arg1) + 0x10);
+		struct
+		{
+			uint32_t EntryBaseIndex;
+			char     _pad[0x4];
+			size_t   DescriptorBaseIndex;
+		} allocInfo = {};
 
-		auto getDescriptorManager = [&]() {
-			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x8);
-			return *reinterpret_cast<void**>(v1 + 0x18);
+		static auto sub_142AFD7C0 = reinterpret_cast<void (*)(uintptr_t, void*, uint32_t, uint32_t)>(dku::Hook::IDToAbs(145292));
+		sub_142AFD7C0(*reinterpret_cast<uintptr_t*>(handleHeap), &allocInfo, Count, *reinterpret_cast<uint32_t*>(handleHeap + 0x8));
+
+		auto nextIndex = allocInfo.EntryBaseIndex;
+		if (nextIndex != *reinterpret_cast<uint32_t*>(handleHeap + 0x8) && nextIndex != 0xFFFFFFFF)
+		{
+			const auto v16 = reinterpret_cast<uint32_t**>(handleHeap + 0x18);
+
+			if (*v16 == *reinterpret_cast<uint32_t**>(handleHeap + 0x20)) {
+				static auto sub_140D951A0 = reinterpret_cast<void (*)(uintptr_t*, uint32_t*, void*)>(dku::Hook::IDToAbs(69643));
+				sub_140D951A0(reinterpret_cast<uintptr_t*>(handleHeap + 0x10), *v16, &allocInfo);
+
+				nextIndex = allocInfo.EntryBaseIndex;
+			} else {
+				**v16 = allocInfo.EntryBaseIndex;
+				*v16 += 1;
+			}
+		}
+
+		*reinterpret_cast<uint32_t*>(handleHeap + 0x8) = nextIndex;
+
+		if (allocInfo.DescriptorBaseIndex != 0xFFFFFFFFFFFFFFFF && nextIndex != 0xFFFFFFFF) {
+			const auto descriptorBaseOffset = allocInfo.DescriptorBaseIndex * HandleSizeIncrement;
+
+			const auto cpuDescriptor = descriptorBaseOffset + *reinterpret_cast<size_t*>(*reinterpret_cast<uintptr_t*>(handleHeap) + 0x1E8);
+			const auto gpuDescriptor = descriptorBaseOffset + *reinterpret_cast<size_t*>(*reinterpret_cast<uintptr_t*>(handleHeap) + 0x1F0);
+
+			OutAlloc.CpuHandleBase.ptr = cpuDescriptor;
+			OutAlloc.GpuHandleBase.ptr = gpuDescriptor;
+		}
+	}
+
+	thread_local Dx12Resource* ScaleformCompositeRenderTarget;
+
+	void Hooks::HookedScaleformCompositeRenderPass(void* a1, void* a2, void* a_renderPassData)
+	{
+		ScaleformCompositeRenderTarget = AcquireRenderPassIO(a_renderPassData, 1)->m_Resource;
+		_ScaleformCompositeRenderPass(a1, a2, a_renderPassData);
+	}
+
+	void Hooks::HookedScaleformCompositeRenderPassExecuteDraw(void* a_renderGraph, void* a_arg2, uint32_t a_vertexCount)
+	{
+		const auto creationRenderer = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_renderGraph) + 0x30);
+
+		auto device = *reinterpret_cast<ID3D12Device2**>(creationRenderer + 0x418);
+		auto commandPool = *reinterpret_cast<void**>(reinterpret_cast<uintptr_t>(a_renderGraph) + 0x38);
+		auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_renderGraph) + 0x60);
+
+		auto getCommandQueue = [&](uint32_t a_queueIndex) {
+			const auto queueArray = *reinterpret_cast<uintptr_t**>(creationRenderer + 0x118);
+
+			return *reinterpret_cast<ID3D12CommandQueue**>(queueArray[a_queueIndex] + 0x60);
 		};
 
-		auto getCommandQueue = [&]() {
-			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg1) + 0x8);
-			const auto v2 = *reinterpret_cast<uintptr_t*>(v1 + 0x10);
-			return *reinterpret_cast<ID3D12CommandQueue**>(v2 + 0x28);
-		};
+		auto getBoundShaderResource = [&]() {
+			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg2) + 0x20);
+			const auto v2 = *reinterpret_cast<uint32_t*>(*reinterpret_cast<uintptr_t*>(v1) + 0x18) * 3;
+			const auto v3 = *reinterpret_cast<uintptr_t*>(v1 + 0x8) + (0x8 * v2) + 0x8;
 
-		auto getBoundShaderResource = [&](uint32_t a_index) {
-			const auto v1 = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a_arg2) + 0x30);
-			const auto v2 = *reinterpret_cast<uintptr_t*>(v1 + 0x10) + 24 * *(uint32_t*)(*(uintptr_t*)v1 + (4 * a_index) + 0x20);
-			return *reinterpret_cast<Dx12Resource**>(v2 + 0x8);
+			return *reinterpret_cast<Dx12Resource**>(v3);
 		};
-
-		using AllocateDescriptors_t = void (*)(void*, DescriptorAllocation&, uint32_t, DescriptorAllocation::Type, uint32_t&);
-		auto allocateDescriptors = reinterpret_cast<AllocateDescriptors_t>(dku::Hook::IDToAbs(0));  // TODO: cant find it
 
 		// This seems to be the best place to shove our screenshot code in. It's not worth adding new hooks.
 		// This will end up missing the photo mode frames as they are drawn in later passes.
-		bool bScreenshotMade = CheckForScreenshotRequest(device, getCommandQueue(), commandList, ScaleformCompositeRenderTarget->m_Resource);
+		bool bScreenshotMade = CheckForScreenshotRequest(device, getCommandQueue(0), commandList, ScaleformCompositeRenderTarget->m_Resource);
 
-		if (Hook_ApplyRenderPassRenderState1(a_arg1, a_arg2)) {
+		if (Hook_ApplyRenderPassRenderState1(a_renderGraph, a_arg2)) {
 			// Remove all render targets; we're treating this pixel shader as a compute shader. All RT writes end
 			// up discarded.
 			//
 			// The ScaleformComposite pass contains exactly one draw so we can safely unbind them without informing
-			// the game. Game code also happens to unbind RTs immediately after the hook.
+			// the game.
 			commandList->OMSetRenderTargets(0, nullptr, false, nullptr);
 
 			// Instead of creating copies and worrying about resource allocations, bind the original RT and SRV as
 			// UAVs that can be modified in-place.
 			DescriptorAllocation alloc;
 			uint32_t             handleSizeIncrement;
-			allocateDescriptors(getDescriptorManager(), alloc, 2, DescriptorAllocation::Type::CbvSrvUav, handleSizeIncrement);
+			AllocateDescriptors(commandPool, alloc, 2, DescriptorAllocation::Type::CbvSrvUav, handleSizeIncrement);
 
-			alloc.CpuHandleBase.ptr += (0 * handleSizeIncrement);
-			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, getBoundShaderResource(0)->m_CpuDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			alloc.CpuHandleBase.ptr += 0 * handleSizeIncrement;
+			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, getBoundShaderResource()->GetSRVDescriptorCPU(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-			alloc.CpuHandleBase.ptr += (1 * handleSizeIncrement);
-			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, ScaleformCompositeRenderTarget->m_UAVCpuDescriptor, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			alloc.CpuHandleBase.ptr += 1 * handleSizeIncrement;
+			device->CopyDescriptorsSimple(1, alloc.CpuHandleBase, ScaleformCompositeRenderTarget->GetUAVDescriptorCPU(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 			D3D12_RESOURCE_BARRIER barrier = {};
 			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -382,13 +459,13 @@ namespace Hooks
 		}
 	}
 
-    void Hooks::UploadRootConstants(void* a1, void* a2)
+    void Hooks::UploadRootConstants(void* a_renderGraph, void* a2)
     {
-		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8);
-		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x60);
+		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8); // fixme
+		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x68);
 
 		auto uploadRootConstants = [&](const Settings::ShaderConstants& a_shaderConstants, uint32_t a_rootParameterIndex, bool a_bCompute) {
-			auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a1) + 0x10);
+			auto commandList = *reinterpret_cast<ID3D12GraphicsCommandList**>(reinterpret_cast<uintptr_t>(a_renderGraph) + 0x60);
 
 			if (!a_bCompute)
 				commandList->SetGraphicsRoot32BitConstants(a_rootParameterIndex, Settings::shaderConstantsCount, &a_shaderConstants, 0);
@@ -505,7 +582,7 @@ namespace Hooks
     {
 		bool skippedScreenshot = true;
 		const auto settings = Settings::Main::GetSingleton();
-		// FSR 3 fails to call "HookedScaleformCompositeDraw()" (it probably has an alternative mirrored path we haven't implemented),
+		// FSR 3 fails to call "HookedScaleformCompositeRenderPassExecuteDraw()" (it probably has an alternative mirrored path we haven't implemented),
 		// so skip the screenshot for now (it would be black otherwise)
 		if (*Offsets::uiFrameGenerationTech != RE::FrameGenerationTech::kFSR3) {
 			skippedScreenshot = false;

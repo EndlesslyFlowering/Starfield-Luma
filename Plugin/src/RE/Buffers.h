@@ -377,7 +377,6 @@ namespace RE
 		uint64_t unk28;
 		uint64_t unk30;
 		uint64_t unk38;
-		uint64_t unk40;
 		IDXGISwapChain3* swapChainInterface;
 		uint64_t unk50;
 		ID3D12Resource** renderTargets;

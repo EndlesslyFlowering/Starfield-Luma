@@ -90,10 +90,7 @@ namespace Settings
 
 		// check if Nukem's dlss fg to fsr 3 fg is present
 		bIsDLSSFGToFSRFGPresent = isModuleLoaded(moduleNameDLSSGTOFSR3);
-		if (bIsDLSSFGToFSRFGPresent && !bIsDLSSFGToFSRFGPatched) {
-			bIsDLSSFGToFSRFGPatched = true;
-		    Hooks::Patches::PatchStreamline();
-		}
+
 		if (*DLSSFGToFSRFGMod.value != bIsDLSSFGToFSRFGPresent) {
 			*DLSSFGToFSRFGMod.value = bIsDLSSFGToFSRFGPresent;
 			Save();
