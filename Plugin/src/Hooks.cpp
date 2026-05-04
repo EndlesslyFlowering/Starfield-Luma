@@ -461,7 +461,7 @@ namespace Hooks
 
     void Hooks::UploadRootConstants(void* a_renderGraph, void* a2)
     {
-		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8); // fixme
+		const auto technique = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(a2) + 0x8);
 		const auto techniqueId = *reinterpret_cast<uint64_t*>(technique + 0x68);
 
 		auto uploadRootConstants = [&](const Settings::ShaderConstants& a_shaderConstants, uint32_t a_rootParameterIndex, bool a_bCompute) {
@@ -488,7 +488,7 @@ namespace Hooks
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants, Settings::ShaderConstantsMode::kLUT);
-				uploadRootConstants(shaderConstants, 14, false);  // HDRComposite
+				uploadRootConstants(shaderConstants, 5, false);  // HDRComposite
 				break;
 			}
 
@@ -514,7 +514,7 @@ namespace Hooks
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants, Settings::ShaderConstantsMode::kLUT);
-				uploadRootConstants(shaderConstants, 7, true);  // ColorGradingMerge / HDRColorGradingMerge
+				uploadRootConstants(shaderConstants, 4, true);  // ColorGradingMerge / HDRColorGradingMerge
 				break;
 			}
 
@@ -525,7 +525,7 @@ namespace Hooks
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
-				uploadRootConstants(shaderConstants, 14, true);  // ContrastAdaptiveSharpening
+				uploadRootConstants(shaderConstants, 4, true);  // ContrastAdaptiveSharpening
 				break;
 			}
 
@@ -533,7 +533,7 @@ namespace Hooks
 			{
 				Settings::ShaderConstants shaderConstants;
 				Settings::Main::GetSingleton()->GetShaderConstants(shaderConstants);
-				uploadRootConstants(shaderConstants, 14, false);  // PostSharpen
+				uploadRootConstants(shaderConstants, 5, false);  // PostSharpen
 				break;
 			}
 
