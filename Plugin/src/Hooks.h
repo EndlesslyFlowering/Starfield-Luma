@@ -86,6 +86,10 @@ namespace Hooks
 			dku::Hook::write_call<6>(dku::Hook::IDToAbs(178624, 0x3CE), Hook_CreateShaderResourceView);
 			//_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x5DB), Hook_UnkFunc3);  // mess
 			//_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0x113), Hook_UnkFunc3_Internal);  // mess
+
+			// Starfield immediately crashes because of an unhandled assertion when any D3D12 debug layer is active
+			// const uint8_t retn[] = { 0xC3 };
+			// dku::Hook::WriteData(dku::Hook::IDToAbs(140240), retn, 1);
 		}
 
 	private:

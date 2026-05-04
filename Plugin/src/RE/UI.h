@@ -142,11 +142,13 @@ namespace RE
 
 		TUIDataShuttleContainerArray<T> m_ShuttleArray;  // 28
 
-		void AddItem(const BSFixedStringCS& Item)
+		void AddItem(const char *Item)
 		{
-			auto addr = dku::Hook::IDToAbs(0);  // TODO: was 134612
-			auto func = reinterpret_cast<void (*)(ArrayUIValue<T, Count>*, const BSFixedStringCS&)>(addr);
-			func(this, Item);
+			BSFixedStringCS itemFixedString(Item);// Passed in as an rvalue (std::move)
+
+			auto addr = dku::Hook::IDToAbs(87844);
+			auto func = reinterpret_cast<void (*)(ArrayUIValue<T, Count>*, BSFixedStringCS*)>(addr);
+			func(this, &itemFixedString);
 		}
 
 		[[nodiscard]] auto Items() const noexcept
@@ -162,7 +164,7 @@ namespace RE
 		void AddItem(T& Item)
 		{
 			// Seems like they have a helper function to apply NestedUIValue<> to the type
-			auto addr = dku::Hook::IDToAbs(88843);  // TODO: unsure
+			auto addr = dku::Hook::IDToAbs(88843);
 			auto func = reinterpret_cast<void (*)(TUIDataShuttleContainerArray<NestedUIValue<T>>*, T&)>(addr);
 			func(&__super::m_ShuttleArray, Item);
 		}
