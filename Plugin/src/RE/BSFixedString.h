@@ -12,7 +12,7 @@ namespace RE
 
 		BSFixedString(const char* String)
 		{
-			auto addr = dku::Hook::IDToAbs(139352);
+			auto addr = dku::Hook::IDToAbs(1186742);
 			auto func = reinterpret_cast<void (*)(BSFixedString*, const char*)>(addr);
 			func(this, String);
 		}
@@ -49,7 +49,7 @@ namespace RE
 
 		BSFixedStringCS(const char* String)
 		{
-			auto addr = dku::Hook::IDToAbs(139352);
+			auto addr = dku::Hook::IDToAbs(1186742);
 			auto func = reinterpret_cast<void (*)(BSFixedStringCS*, const char*)>(addr);
 			func(this, String);
 		}

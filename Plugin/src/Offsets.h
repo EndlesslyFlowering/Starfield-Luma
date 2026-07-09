@@ -42,13 +42,18 @@ public:
 	static inline RE::UpscalingTechnique*  uiUpscalingTechnique = nullptr;
 	static inline RE::FrameGenerationTech* uiFrameGenerationTech = nullptr;
 
+	using tGetSettingsDataModelParams = void* (*)(uintptr_t a1, uintptr_t a2);
+	static inline tGetSettingsDataModelParams GetSettingsDataModelCheckboxParams = nullptr;
+	static inline tGetSettingsDataModelParams GetSettingsDataModelStepperParams = nullptr;
+	static inline tGetSettingsDataModelParams GetSettingsDataModelSliderParams = nullptr;
+
 	static void Initialize()
 	{
 		bufferArray = reinterpret_cast<BufferArray*>(dku::Hook::IDToAbs(370539));
 		GetDXGIFormat = reinterpret_cast<tGetDXGIFormat>(dku::Hook::IDToAbs(142460));
 
-		ToggleVsync = reinterpret_cast<tToggleVsync>(dku::Hook::IDToAbs(184653));  // need to find it but it's probably called in 141518650
-		unkToggleVsyncArg1Ptr = reinterpret_cast<uintptr_t*>(dku::Hook::IDToAbs(878340));  // the argument of the above
+		ToggleVsync = reinterpret_cast<tToggleVsync>(dku::Hook::IDToAbs(128505));
+		unkToggleVsyncArg1Ptr = reinterpret_cast<uintptr_t*>(dku::Hook::IDToAbs(937583));
 		bEnableVsync = reinterpret_cast<bool*>(dku::Hook::IDToAbs(933467));
 
 		//MessageMenuManagerPtr = reinterpret_cast<void**>(dku::Hook::IDToAbs(878772));
@@ -72,5 +77,9 @@ public:
 		fGammaUI = reinterpret_cast<float*>(dku::Hook::IDToAbs(933237));
 		uiUpscalingTechnique = reinterpret_cast<RE::UpscalingTechnique*>(dku::Hook::IDToAbs(933266));
 		uiFrameGenerationTech = reinterpret_cast<RE::FrameGenerationTech*>(dku::Hook::IDToAbs(933291));
+
+		GetSettingsDataModelCheckboxParams = reinterpret_cast<tGetSettingsDataModelParams>(dku::Hook::IDToAbs(88949));
+		GetSettingsDataModelStepperParams = reinterpret_cast<tGetSettingsDataModelParams>(dku::Hook::IDToAbs(88948));
+		GetSettingsDataModelSliderParams = reinterpret_cast<tGetSettingsDataModelParams>(dku::Hook::IDToAbs(88946));
 	}
 };

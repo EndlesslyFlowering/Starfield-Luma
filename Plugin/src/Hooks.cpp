@@ -620,8 +620,14 @@ namespace Hooks
 		CreateSettings(settingList);
     }
 
-    void Hooks::Hook_SettingsDataModelCheckboxChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
+    bool Hooks::Hook_SettingsDataModelCheckboxChanged(uintptr_t a1, uintptr_t a2)
     {
+		bool ret = _SettingsDataModelCheckboxChanged(a1, a2);
+
+		RE::SettingsDataModel::UpdateEventData a_eventData{};
+		Offsets::GetSettingsDataModelCheckboxParams(reinterpret_cast<uintptr_t>(&a_eventData.m_Value), a2);
+		a_eventData.m_Model = reinterpret_cast<RE::SettingsDataModel*>(a1 - 0x88);
+
 		const auto settings = Settings::Main::GetSingleton();
 
 		auto HandleSetting = [&](Settings::Checkbox& a_setting) {
@@ -692,11 +698,17 @@ namespace Hooks
 			break;
 		}
 
-		_SettingsDataModelCheckboxChanged(a_eventData);
+		return ret;
     }
 
-    void Hooks::Hook_SettingsDataModelStepperChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
+    bool Hooks::Hook_SettingsDataModelStepperChanged(uintptr_t a1, uintptr_t a2)
     {
+		bool ret = _SettingsDataModelStepperChanged(a1, a2);
+		
+		RE::SettingsDataModel::UpdateEventData a_eventData{};
+		Offsets::GetSettingsDataModelStepperParams(reinterpret_cast<uintptr_t>(&a_eventData.m_Value), a2);
+		a_eventData.m_Model = reinterpret_cast<RE::SettingsDataModel*>(a1 - 0x80);
+
 		const auto settings = Settings::Main::GetSingleton();
 
 		auto HandleSetting = [&](Settings::Stepper& a_setting) {
@@ -790,8 +802,23 @@ namespace Hooks
 		    break;
 		}
 
-		_SettingsDataModelStepperChanged(a_eventData);
+		return ret;
     }
+
+	bool Hooks::Hook_SettingsDataModelSliderChanged(uintptr_t a1, uintptr_t a2)
+	{
+		bool ret = _SettingsDataModelSliderChanged(a1, a2);
+		
+		RE::SettingsDataModel::UpdateEventData a_eventData{};
+		Offsets::GetSettingsDataModelSliderParams(reinterpret_cast<uintptr_t>(&a_eventData.m_Value), a2);
+		a_eventData.m_Model = reinterpret_cast<RE::SettingsDataModel*>(a1 - 0x78);
+
+		if (!OnSettingsDataModelSliderChanged(a_eventData)) {
+			return ret;
+		}
+
+		return ret;
+	}
 
     bool Hooks::OnSettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData)
     {
@@ -867,13 +894,6 @@ namespace Hooks
 		}
 
 		return false;
-    }
-
-    void Hooks::Hook_SettingsDataModelSliderChanged(void* a_arg1, RE::SettingsDataModel::UpdateEventData& a_eventData)
-    {
-		if (!OnSettingsDataModelSliderChanged(a_eventData)) {
-			_SettingsDataModelSliderChanged(a_arg1, a_eventData);
-		}
     }
 
     bool Hooks::Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2)

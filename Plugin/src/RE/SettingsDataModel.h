@@ -108,6 +108,7 @@ namespace RE
 				float Float;
 			} m_Value;
 			int m_SettingID;
+			int m_Unk;
 		};
 
 		char _pad0[0x1B8];                                             // 0

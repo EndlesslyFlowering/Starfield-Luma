@@ -248,7 +248,7 @@ namespace Settings
 		swapChainObject->format = newFormat;
 
 		// toggle vsync to force a swapchain recreation (it will seemengly happen in one of the renderer threads, even if this is called by the main/game thread)
-		Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x8), *Offsets::bEnableVsync);
+		Offsets::ToggleVsync(reinterpret_cast<void*>(*Offsets::unkToggleVsyncArg1Ptr + 0x10), *Offsets::bEnableVsync);
 	}
 
     void Main::OnDisplayModeChanged()
