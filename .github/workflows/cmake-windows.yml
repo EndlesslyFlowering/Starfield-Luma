@@ -39,7 +39,7 @@ jobs:
         # version database won't contain the package versions the baseline resolves to.
         vcpkgGitCommitId: '66affb04e3b889a3210f7f24bef2fa93a557fa62'
         vcpkgJsonGlob: '**/Plugin/vcpkg.json'
-      
+
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
@@ -52,3 +52,8 @@ jobs:
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Release
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        path: D:\a\Starfield-Luma\Starfield-Luma\build
