@@ -56,4 +56,4 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v7
       with:
-        path: D:\a\Starfield-Luma\Starfield-Luma\build
+        path: D:\a\Starfield-Luma\Starfield-Luma
