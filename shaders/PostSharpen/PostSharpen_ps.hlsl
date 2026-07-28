@@ -76,7 +76,7 @@ PSOutput PS(PSInput psInput)
 				inColor = GAMMA_TO_LINEAR(inColor);
 			}
 
-			static const float2 cbConst = PerSceneConstants[161u].zw;
+			static const float2 cbConst = PerSceneConstants[157u].zw;
 
 			float2 _70 = (cbConst * psInput.TEXCOORD.xy * sharpenParams.xy) + 0.5f;
 
