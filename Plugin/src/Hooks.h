@@ -1,4 +1,5 @@
 #pragma once
+#include "Offsets.h"
 #include "Settings.h"
 #include "Utils.h"
 #include "RE/Buffers.h"
@@ -40,13 +41,23 @@ namespace Hooks
 	class Hooks
 	{
 	public:
+		// Resolves a hook site and checks it still holds a call before we patch over it. Offsets
+		// into a function move whenever the game is rebuilt, even when the address library id
+		// still points at the right function.
+		static std::uintptr_t CallSite(std::uint64_t a_id, std::ptrdiff_t a_offset, std::size_t a_size, std::string_view a_name)
+		{
+			const auto address = dku::Hook::IDToAbs(a_id, a_offset);
+			Offsets::IsCallSite(address, a_size, a_name);
+			return address;
+		}
+
 		static void Hook()
 		{
 			// set color space and save swapchain object pointer
-			_UnkFunc = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143272, 0xAC9), Hook_UnkFunc);
+			_UnkFunc = dku::Hook::write_call<5>(CallSite(143272, 0xAC9, 5, "UnkFunc"), Hook_UnkFunc);
 
 			// just after loading ini settings; deal with initial framegen setting value
-			_UnkFunc2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(99482, 0x61D), Hook_UnkFunc2);
+			_UnkFunc2 = dku::Hook::write_call<5>(CallSite(99482, 0x61D, 5, "UnkFunc2"), Hook_UnkFunc2);
 
 			// disable photo mode screenshots with HDR
 			const auto takeSnapshotVtbl = dku::Hook::IDToAbs(443439);
@@ -55,13 +66,21 @@ namespace Hooks
 			_Hook_TakeSnapshot->Enable();
 
 			// Settings UI
-			_CreateMonitorSetting = dku::Hook::write_call<5>(dku::Hook::IDToAbs(88728, 0x121C), Hook_CreateMonitorSetting);
+			_CreateMonitorSetting = dku::Hook::write_call<5>(CallSite(88728, 0x121C, 5, "CreateMonitorSetting"), Hook_CreateMonitorSetting);
 
-			// Hide vanilla brightness, contrast and hdr brightness
+			// Hide vanilla brightness, contrast and hdr brightness. Only NOP these out once we know
+			// they are still the calls we expect - blanking five bytes of something else would
+			// corrupt the function rather than just fail.
 			const uint8_t nop5[] = { 0x90, 0x90, 0x90, 0x90, 0x90 };
-			dku::Hook::WriteData(dku::Hook::IDToAbs(88728, 0x1B2E), nop5, 5);
-			dku::Hook::WriteData(dku::Hook::IDToAbs(88728, 0x1DAA), nop5, 5);
-			dku::Hook::WriteData(dku::Hook::IDToAbs(88728, 0x209D), nop5, 5);
+			for (const auto& [offset, name] : std::initializer_list<std::pair<std::ptrdiff_t, std::string_view>>{
+					 { 0x1B2E, "HideVanillaBrightness" },
+					 { 0x1DAA, "HideVanillaContrast" },
+					 { 0x209D, "HideVanillaHDRBrightness" } }) {
+				const auto address = dku::Hook::IDToAbs(88728, offset);
+				if (Offsets::IsCallSite(address, 5, name)) {
+					dku::Hook::WriteData(address, nop5, 5);
+				}
+			}
 
 			const auto settingsDataModelCheckboxVtbl = dku::Hook::IDToAbs(439683);
 			const auto settingsDataModelStepperVtbl = dku::Hook::IDToAbs(439693);
@@ -79,29 +98,37 @@ namespace Hooks
 			hookSettingsDataModelStepper->Enable();
 			hookSettingsDataModelSlider->Enable();
 
-			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(141998, 0xBF), Hook_RecreateSwapchain);
+			_RecreateSwapchain = dku::Hook::write_call<5>(CallSite(141998, 0xBF, 5, "RecreateSwapchain"), Hook_RecreateSwapchain);
 
-			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144651, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
-			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144655, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
+			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(CallSite(144651, 0x18, 5, "ApplyRenderPassRenderState1"), Hook_ApplyRenderPassRenderState1);  // CmdDraw
+			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(CallSite(144655, 0x20, 5, "ApplyRenderPassRenderState2"), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
 
-			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0xCBD), Hook_EndOfFrame);
-			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0x148F), Hook_PostEndOfFrame);  // CmdEnd, was CmdEndProfilingMarker previously
+			_EndOfFrame = dku::Hook::write_call<5>(CallSite(143152, 0xCBD, 5, "EndOfFrame"), Hook_EndOfFrame);
+			_PostEndOfFrame = dku::Hook::write_call<5>(CallSite(143152, 0x148F, 5, "PostEndOfFrame"), Hook_PostEndOfFrame);  // CmdEnd, was CmdEndProfilingMarker previously
 
 			const auto scaleformCompositeRenderPassVtbl = dku::Hook::IDToAbs(497272);
 			auto hookScaleformCompositeRenderPass = dku::Hook::AddVMTHook(&scaleformCompositeRenderPassVtbl, 7, FUNC_INFO(HookedScaleformCompositeRenderPass));
 			_ScaleformCompositeRenderPass = reinterpret_cast<decltype(&HookedScaleformCompositeRenderPass)>(hookScaleformCompositeRenderPass->OldAddress);
 			hookScaleformCompositeRenderPass->Enable();
-			dku::Hook::write_call<5>(hookScaleformCompositeRenderPass->OldAddress + 0x4A0, HookedScaleformCompositeRenderPassExecuteDraw);
+			const auto scaleformExecuteDrawSite = hookScaleformCompositeRenderPass->OldAddress + 0x4A0;
+			Offsets::IsCallSite(scaleformExecuteDrawSite, 5, "ScaleformCompositeRenderPassExecuteDraw");
+			dku::Hook::write_call<5>(scaleformExecuteDrawSite, HookedScaleformCompositeRenderPassExecuteDraw);
 
 			// fsr3 fixes
-			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144625, 0x374), Hook_ffxFsr3ContextCreate);
-			dku::Hook::write_call<6>(dku::Hook::IDToAbs(178624, 0x3CE), Hook_CreateShaderResourceView);
+			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(CallSite(144625, 0x374, 5, "ffxFsr3ContextCreate"), Hook_ffxFsr3ContextCreate);
+			dku::Hook::write_call<6>(CallSite(178624, 0x3CE, 6, "CreateShaderResourceView"), Hook_CreateShaderResourceView);
 			//_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x5DB), Hook_UnkFunc3);  // mess
 			//_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0x113), Hook_UnkFunc3_Internal);  // mess
 
 			// Starfield immediately crashes because of an unhandled assertion when any D3D12 debug layer is active
 			// const uint8_t retn[] = { 0xC3 };
 			// dku::Hook::WriteData(dku::Hook::IDToAbs(140240), retn, 1);
+
+			if (const auto failures = Offsets::GetResolveFailureCount(); failures > 0) {
+				WARN("Hooks: finished with {} failed address validation(s) in total, expect broken or missing features", failures)
+			} else {
+				INFO("Hooks: all hook sites validated")
+			}
 		}
 
 	private:
