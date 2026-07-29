@@ -416,7 +416,7 @@ namespace Hooks
 		// This will end up missing the photo mode frames as they are drawn in later passes.
 		bool bScreenshotMade = CheckForScreenshotRequest(device, getCommandQueue(0), commandList, ScaleformCompositeRenderTarget->m_Resource);
 
-		if (Hook_ApplyRenderPassRenderState1(a_renderGraph, a_arg2)) {
+		if (Hook_ApplyRenderPassRenderState(a_renderGraph, a_arg2)) {
 			// Remove all render targets; we're treating this pixel shader as a compute shader. All RT writes end
 			// up discarded.
 			//
@@ -896,9 +896,9 @@ namespace Hooks
 		return false;
     }
 
-    bool Hooks::Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2)
+    bool Hooks::Hook_ApplyRenderPassRenderState(void* a_arg1, void* a_arg2)
 	{
-		const bool result = _ApplyRenderPassRenderState1(a_arg1, a_arg2);
+		const bool result = _ApplyRenderPassRenderState(a_arg1, a_arg2);
 
 		if (result) {
 			UploadRootConstants(a_arg1, a_arg2);
@@ -906,17 +906,6 @@ namespace Hooks
 
 		return result;
 	}
-
-    bool Hooks::Hook_ApplyRenderPassRenderState2(void* a_arg1, void* a_arg2)
-    {
-		const bool result = _ApplyRenderPassRenderState2(a_arg1, a_arg2);
-
-		if (result) {
-			UploadRootConstants(a_arg1, a_arg2);
-		}
-
-		return result;
-    }
 
     void Hooks::Hook_EndOfFrame(void* a1, void* a2, const char* a3)
     {

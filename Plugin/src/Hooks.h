@@ -81,8 +81,15 @@ namespace Hooks
 
 			_RecreateSwapchain = dku::Hook::write_call<5>(dku::Hook::IDToAbs(141998, 0xBF), Hook_RecreateSwapchain);
 
-			_ApplyRenderPassRenderState1 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144651, 0x18), Hook_ApplyRenderPassRenderState1);  // CmdDraw
-			_ApplyRenderPassRenderState2 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144655, 0x20), Hook_ApplyRenderPassRenderState2);  // CmdDispatch
+			// Hook ApplyRenderPassRenderState before any CmdDraw or CmdDispatch calls. DKUtil doesn't provide a sane way to restore function prologues so we do it manually.
+			const auto applyRenderPassRenderState = dku::Hook::IDToAbs(142462);
+			const auto temp = reinterpret_cast<uintptr_t>(dku::Hook::Trampoline::Allocate(5 + 2 + 4 + 8));
+			dku::Hook::WriteData(temp + 0, reinterpret_cast<void *>(applyRenderPassRenderState), 5, false);
+			dku::Hook::WriteImm(temp + 5, static_cast<uint16_t>(0x25FF), false);
+			dku::Hook::WriteImm(temp + 7, static_cast<uint32_t>(0), false);
+			dku::Hook::WriteImm(temp + 11, static_cast<uintptr_t>(applyRenderPassRenderState + 0x5), false);
+			_ApplyRenderPassRenderState = reinterpret_cast<decltype(&Hook_ApplyRenderPassRenderState)>(temp);
+			dku::Hook::write_branch<5>(applyRenderPassRenderState, Hook_ApplyRenderPassRenderState);
 
 			_EndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0xCBD), Hook_EndOfFrame);
 			_PostEndOfFrame = dku::Hook::write_call<5>(dku::Hook::IDToAbs(143152, 0x148F), Hook_PostEndOfFrame);  // CmdEnd, was CmdEndProfilingMarker previously
@@ -142,10 +149,8 @@ namespace Hooks
 
 		static bool OnSettingsDataModelSliderChanged(RE::SettingsDataModel::UpdateEventData& a_eventData);
 
-		static bool Hook_ApplyRenderPassRenderState1(void* a_arg1, void* a_arg2);
-		static bool Hook_ApplyRenderPassRenderState2(void* a_arg1, void* a_arg2);
-		static inline std::add_pointer_t<decltype(Hook_ApplyRenderPassRenderState1)> _ApplyRenderPassRenderState1;
-		static inline std::add_pointer_t<decltype(Hook_ApplyRenderPassRenderState2)> _ApplyRenderPassRenderState2;
+		static bool Hook_ApplyRenderPassRenderState(void* a_arg1, void* a_arg2);
+		static inline std::add_pointer_t<decltype(Hook_ApplyRenderPassRenderState)> _ApplyRenderPassRenderState;
 
 		static void Hook_EndOfFrame(void* a1, void* a2, const char* a3);
 		static inline std::add_pointer_t<decltype(Hook_EndOfFrame)> _EndOfFrame;
