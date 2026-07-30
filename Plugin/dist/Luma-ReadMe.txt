@@ -20,7 +20,7 @@ List of features:
 -Improved film grain to be more realistic and nice to look at (e.g. rebalancing the grain size and strength on dark/bright colors)
 -Fixed the game using very wrong gamma formulas
 -Customization settings for you to personalize the game visuals (all of the features above are adjustable at runtime)
--The game photo mode allows you to take HDR (.jxr) screenshots as well as SDR ones
+-The game photo mode allows you to take HDR (.png) screenshots as well as SDR ones
 -More!
 
 Details on the implementation:

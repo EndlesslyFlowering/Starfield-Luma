@@ -41,6 +41,7 @@ source_group(
 # dependencies
 find_package(directxtex CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_path(STB_INCLUDE_DIRS "stb_image_write.h")
 find_dependency_path(DKUtil include/DKUtil/Logger.hpp)
 find_dependency_path(SFSE sfse/sfse.cpp)
 
@@ -75,6 +76,7 @@ target_include_directories(
 		${CMAKE_CURRENT_BINARY_DIR}/include
 		${CMAKE_CURRENT_SOURCE_DIR}/include
 		${CMAKE_CURRENT_SOURCE_DIR}/src
+		${STB_INCLUDE_DIRS}
 )
 
 # linkage

@@ -28,10 +28,12 @@ static inline bool bIsLoaded = false;
 
 void LoadPlugin(bool a_bIsSFSE)
 {
+#if 0
 #ifndef NDEBUG
 	while (!IsDebuggerPresent()) {
 		Sleep(100);
 	}
+#endif
 #endif
 
 	dku::Logger::Init(Plugin::NAME, std::to_string(Plugin::Version));

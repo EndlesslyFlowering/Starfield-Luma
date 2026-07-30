@@ -30,7 +30,6 @@ namespace Settings
 		kSTART = 600,
 
 		kDisplayMode,
-		kEnforceUserDisplayMode,
 		kForceSDROnHDR,
 		kHDR_PeakBrightness,
 		kHDR_GamePaperWhite,
@@ -217,24 +216,15 @@ namespace Settings
 		EnumStepper DisplayMode {
 		    SettingID::kDisplayMode,
 		    "Display Mode",
-		    "Sets the game's display mode between SDR (Gamma 2.2 Rec.709), HDR10 BT.2020 PQ, or HDR scRGB."
-					"\n"
-					"\nIn case Frame Generation is on, the format will internally fall back to the required one regardless of this setting.",
+		    "Sets the game's display mode between SDR or HDR.",
 		    "DisplayMode", "Main",
 		    0,
-		    { "SDR", "HDR10", "HDR scRGB" }
-		};
-		Checkbox EnforceUserDisplayMode{
-			SettingID::kEnforceUserDisplayMode,
-			"Enforce User Display Mode",
-			"Forces the user selected \"Display Mode\", ignoring the automatic fallback for Frame Generation compatibility (avoid using this unless you know what you are doing).",
-			"EnforceUserDisplayMode", "Main",
-			false
+		    { "SDR", "HDR" }
 		};
 		Checkbox ForceSDROnHDR{
 			SettingID::kForceSDROnHDR,
-			"Force SDR on scRGB HDR",
-			"When enabled, the game will still tonemap to SDR but output on an HDR scRGB swapchain.",
+			"Force SDR on HDR",
+			"When enabled, the game will still tonemap to SDR but output on an HDR swapchain.",
 			"ForceSDROnHDR", "Dev",
 			false
 		};
@@ -468,16 +458,9 @@ namespace Settings
 		Checkbox HDRScreenshots{
 			SettingID::kHDRScreenshots,
 			"HDR Screenshots",
-			"Capture an additional HDR screenshot (.jxr) when using Photo Mode while in HDR.",
+			"Capture an additional HDR screenshot (.png) when using Photo Mode while in HDR.",
 			"HDRScreenshots", "HDR",
 			true
-		};
-		Checkbox HDRScreenshotsLossless{
-			SettingID::kHDRScreenshotsLossless,
-			"HDR Screenshots Lossless",
-			"Enable to save the HDR screenshots with a lossless parameter. It vastly increases their filesize without a perceptible difference.",
-			"HDRScreenshotsLossless", "HDR",
-			false
 		};
 		Checkbox DLSSFGToFSRFGMod{
 			SettingID::kDLSSFGToFSRFGMod,
@@ -513,7 +496,6 @@ namespace Settings
 		void SetAtEndOfFrame(bool a_bIsAtEndOfFrame) { bIsAtEndOfFrame.store(a_bIsAtEndOfFrame); }
 
 		RE::BGSSwapChainObject* GetSwapChainObject() const { return swapChainObject; }
-		int32_t GetActualDisplayMode(bool bAcknowledgeScreenshots = false, std::optional<RE::FrameGenerationTech> a_frameGenerationTech = std::nullopt) const;
 		RE::BS_DXGI_FORMAT GetDisplayModeFormat(std::optional<RE::FrameGenerationTech> a_frameGenerationTech = std::nullopt) const;
         DXGI_COLOR_SPACE_TYPE GetDisplayModeColorSpaceType() const;
 
@@ -533,8 +515,6 @@ namespace Settings
 
 		std::atomic_bool bRequestedSDRScreenshot = false;
 		std::atomic_bool bRequestedHDRScreenshot = false;
-
-        std::atomic_bool bNeedsToRefreshFSR3 = false;
 
     private:
 		TomlConfig sfseConfig = COMPILE_PROXY("Data\\SFSE\\Plugins\\Luma.toml");

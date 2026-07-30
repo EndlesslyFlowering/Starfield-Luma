@@ -103,8 +103,7 @@ namespace Hooks
 			// fsr3 fixes
 			_ffxFsr3ContextCreate = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144625, 0x374), Hook_ffxFsr3ContextCreate);
 			dku::Hook::write_call<6>(dku::Hook::IDToAbs(178624, 0x3CE), Hook_CreateShaderResourceView);
-			//_UnkFunc3 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1078894, 0x5DB), Hook_UnkFunc3);  // mess
-			//_UnkFunc3_Internal = dku::Hook::write_call<5>(dku::Hook::IDToAbs(1722115, 0x113), Hook_UnkFunc3_Internal);  // mess
+			_ffxGetSwapchainDX12 = dku::Hook::write_call<5>(dku::Hook::IDToAbs(144623, 0x1D5), Hook_ffxGetSwapchainDX12);
 
 			// Starfield immediately crashes because of an unhandled assertion when any D3D12 debug layer is active
 			// const uint8_t retn[] = { 0xC3 };
@@ -163,11 +162,8 @@ namespace Hooks
 
 		static void Hook_CreateShaderResourceView(ID3D12Device* a_this, ID3D12Resource* a_resource, D3D12_SHADER_RESOURCE_VIEW_DESC* a_desc, D3D12_CPU_DESCRIPTOR_HANDLE a_destDescriptor);
 
-		static void Hook_UnkFunc3(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint8_t a7);
-		static inline std::add_pointer_t<decltype(Hook_UnkFunc3)> _UnkFunc3;
-
-		static void Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint64_t a7);
-		static inline std::add_pointer_t<decltype(Hook_UnkFunc3_Internal)> _UnkFunc3_Internal;
+		static IDXGISwapChain4* Hook_ffxGetSwapchainDX12(void* a1);
+		static inline std::add_pointer_t<decltype(Hook_ffxGetSwapchainDX12)> _ffxGetSwapchainDX12;
 	};
 
 	void Install();

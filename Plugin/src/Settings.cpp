@@ -84,9 +84,9 @@ namespace Settings
 			return false;
 		}
 
-		*DisplayMode.value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2);  // Clamp to valid range
+		*DisplayMode.value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 1);  // Clamp to valid range
 
-		const auto previousActualDisplayMode = GetActualDisplayMode();
+		const auto previousActualDisplayMode = DisplayMode.value.get_data();
 
 		// check if Nukem's dlss fg to fsr 3 fg is present
 		bIsDLSSFGToFSRFGPresent = isModuleLoaded(moduleNameDLSSGTOFSR3);
@@ -104,7 +104,7 @@ namespace Settings
 
 		// "bIsDLSSFGToFSRFGPresent" and "RefreshHDRDisplayEnableState()" might have changed the "actual" display mode.
 		// No need to refresh the swapchain ("RefreshSwapchainFormat()") here as it's not been fully created yet.
-		if (previousActualDisplayMode != GetActualDisplayMode()) {
+		if (previousActualDisplayMode != DisplayMode.value.get_data()) {
 			const RE::BS_DXGI_FORMAT newFormat = GetDisplayModeFormat();
 			Utils::SetBufferFormat(RE::Buffers::FrameBuffer, newFormat);
 
@@ -185,56 +185,21 @@ namespace Settings
 		return FilmGrainType.value.get_data() == 1;
 	}
 
-    int32_t Main::GetActualDisplayMode(bool bAcknowledgeScreenshots, std::optional<RE::FrameGenerationTech> a_frameGenerationTech) const
-	{
-		// This mode is for development only and only supports scRGB to it bypasses the display mode branches by frame generation tech
-		if (IsSDRForcedOnHDR(bAcknowledgeScreenshots)) {
-		    return -1;
-		}
-
-		const auto value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 2); // Clamp to valid range
-
-		RE::FrameGenerationTech frameGenerationTech = a_frameGenerationTech.has_value() ? a_frameGenerationTech.value() : *Offsets::uiFrameGenerationTech;
-
-		if (frameGenerationTech > RE::FrameGenerationTech::kNone && !EnforceUserDisplayMode.value.get_data()) {
-			// force scRGB HDR with fsr3 or dlssg if dlssg_to_fsr3 is present
-			if (value == 1 && (frameGenerationTech == RE::FrameGenerationTech::kFSR3 || (frameGenerationTech == RE::FrameGenerationTech::kDLSSG && bIsDLSSFGToFSRFGPresent))) {
-			    return 2;
-			}
-
-			// otherwise force HDR10
-			if (value == 2 && frameGenerationTech == RE::FrameGenerationTech::kDLSSG && !bIsDLSSFGToFSRFGPresent) {
-			    return 1;
-			}
-		}
-
-		return value;
-	}
-
     RE::BS_DXGI_FORMAT Main::GetDisplayModeFormat(std::optional<RE::FrameGenerationTech> a_frameGenerationTech) const
     {
-		switch (GetActualDisplayMode(false, a_frameGenerationTech)) {
-		default:
-		case 0:
-		case 1:
-			return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM;
-		case -1:
-		case 2:
-			return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R16G16B16A16_FLOAT;
-		}
+		return RE::BS_DXGI_FORMAT::BS_DXGI_FORMAT_R10G10B10A2_UNORM;
     }
 
     DXGI_COLOR_SPACE_TYPE Main::GetDisplayModeColorSpaceType() const
     {
-		switch (GetActualDisplayMode()) {
+		const auto value = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 1);
+
+		switch (value) {
 		default:
 		case 0:
 			return DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
 		case 1:
 			return DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
-		case -1:
-		case 2:
-			return DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
 		}
     }
 
@@ -253,11 +218,6 @@ namespace Settings
 
     void Main::OnDisplayModeChanged()
 	{
-		// When we change the display mode we need to refresh some internal FSR 3 stuff (this might already be refreshed when toggling FSR 3, but not when changing other display settings)
-		if (*Offsets::uiFrameGenerationTech == RE::FrameGenerationTech::kFSR3) {
-			bNeedsToRefreshFSR3 = true;
-		}
-
 		RefreshHDRDisplaySupportState();
 		RefreshHDRDisplayEnableState();
 
@@ -266,7 +226,7 @@ namespace Settings
 
     void Main::GetShaderConstants(ShaderConstants& a_outShaderConstants, ShaderConstantsMode a_shaderConstantsMode) const
     {
-		a_outShaderConstants.DisplayMode = GetActualDisplayMode(true);
+		a_outShaderConstants.DisplayMode = std::clamp((int32_t)DisplayMode.value.get_data(), 0, 1);
 		// TODO: expose HDR screenshot normalization as a user (advanced/config only) setting
 		if (bRequestedHDRScreenshot) {
 			// Unlock HDR range to HDR10 max when taking screenshots, so they appear consistently independently of the user peak brightness.
@@ -342,7 +302,6 @@ namespace Settings
 		std::call_once(ConfigInit, [&]() {
 			// HDR
 			config->Bind(DisplayMode.value, DisplayMode.defaultValue);
-			config->Bind(EnforceUserDisplayMode.value, EnforceUserDisplayMode.defaultValue);
 			config->Bind(ForceSDROnHDR.value, ForceSDROnHDR.defaultValue);
 			config->Bind(PeakBrightness.value, PeakBrightness.defaultValue);
 			config->Bind(GamePaperWhite.value, GamePaperWhite.defaultValue);
@@ -372,7 +331,6 @@ namespace Settings
 			config->Bind(FilmGrainFPSLimit.value, FilmGrainFPSLimit.defaultValue);
 			config->Bind(PostSharpen.value, PostSharpen.defaultValue);
 			config->Bind(HDRScreenshots.value, HDRScreenshots.defaultValue);
-			config->Bind(HDRScreenshotsLossless.value, HDRScreenshotsLossless.defaultValue);
 			config->Bind(DLSSFGToFSRFGMod.value, DLSSFGToFSRFGMod.defaultValue);
 			config->Bind(DevSetting01.value, DevSetting01.defaultValue);
 			config->Bind(DevSetting02.value, DevSetting02.defaultValue);
@@ -605,10 +563,6 @@ namespace Settings
 		DrawReshadeCheckbox(PostSharpen);
 		ImGui::Spacing();
 		DrawReshadeCheckbox(HDRScreenshots);
-		if (HDRScreenshots.value) {
-			ImGui::SameLine();
-			DrawReshadeCheckbox(HDRScreenshotsLossless);
-		}
 
 #if DEVELOPMENT
 		DrawReshadeSlider(DevSetting01);

@@ -12,6 +12,7 @@
 		"spdlog",
 		"nlohmann-json",
 		"simpleini",
+		"stb",
 		"tomlplusplus",
 		"xbyak"
 	],

@@ -6,6 +6,10 @@
 #include <DirectXTex.h>
 #include <wincodec.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+#include <stb_image_write_hdr_png.h>
+
 namespace Utils
 {
     std::unordered_map<DXGI_FORMAT, std::string> GetDXGIFormatNameMap()
@@ -364,44 +368,42 @@ namespace Utils
 		return std::format("Photo_{}-{:02d}-{:02d}-{:02d}{:02d}{:02d}", systemTime.wYear, systemTime.wMonth, systemTime.wDay, systemTime.wHour, systemTime.wMinute, systemTime.wSecond);
     }
 
-    void TransformColor_HDR(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t a_y)
+	void TransformColor_HDR10(DirectX::XMVECTOR* a_outPixels, const DirectX::XMVECTOR* a_inPixels, size_t a_width, size_t)
 	{
-		const DirectX::XMMATRIX c_fromBT709toBT2020 = {
-			   0.62722527980804443359375f,      0.0690418779850006103515625f, 0.01639117114245891571044921875f, 0.f,
-			  0.329476892948150634765625f,       0.919605672359466552734375f,        0.0880887508392333984375f, 0.f,
-			0.04329781234264373779296875f, 0.011352437548339366912841796875f,       0.89552009105682373046875f, 0.f,
-			                          0.f,                               0.f,                              0.f, 1.f
-		};
-
-		const DirectX::XMMATRIX c_fromBT2020toBT709 = {
-			1.6609637737274169921875f, -0.124477200210094451904296875f, -0.0181571580469608306884765625f, 0.f,
-			-0.58811271190643310546875f, 1.1328194141387939453125f, -0.10066641867160797119140625f, 0.f,
-			-0.072851054370403289794921875f, -0.00834227167069911956787109375f, 1.118823528289794921875f, 0.f,
+		const DirectX::XMMATRIX fromBT709ToBT2020 = {
+			0.6274039149284363f, 0.06909728795289993f, 0.0163914393633604f, 0.f,
+			0.3292830288410187f, 0.9195404052734375f, 0.08801330626010895f, 0.f,
+			0.04331306740641594f, 0.01136231515556574f, 0.8955952525138855f, 0.f,
 			0.f, 0.f, 0.f, 1.f
 		};
 
-#if 0
-		const auto  settings = Settings::Main::GetSingleton();
-		const float peakBrightness = settings->PeakBrightness.value.get_data();
-		const auto  peakBrightnessThreshold = DirectX::XMVectorReplicate(peakBrightness * (1.05f / 80.f));
-#endif
+		const auto linearToPQ = [](float value) {
+			constexpr float pqMaxWhitePoint = 10000.f / 80.f;
+			constexpr float m1 = 0.1593017578125f;
+			constexpr float m2 = 78.84375f;
+			constexpr float c1 = 0.8359375f;
+			constexpr float c2 = 18.8515625f;
+			constexpr float c3 = 18.6875f;
+
+			const float colorPow = std::pow(std::max(value, 0.f) / pqMaxWhitePoint, m1);
+			return std::pow((c1 + c2 * colorPow) / (1.f + c3 * colorPow), m2);
+		};
 
 		for (size_t i = 0; i < a_width; ++i) {
-			// color.rgb = BT709_To_BT2020(color.rgb);
-			auto color = DirectX::XMVector4Transform(a_inPixels[i], c_fromBT709toBT2020);
-
-#if 0 // Replicate the same peak brightness clamping we have in the copy shader. This has been disabled as it's not necessary.
-			color = DirectX::XMVectorClamp(color, DirectX::XMVectorZero(), peakBrightnessThreshold);
-#endif
-
-			// color.rgb = BT2020_To_BT709(color.rgb);
-			color = DirectX::XMVector4Transform(color, c_fromBT2020toBT709);
-
-			// color.a = 1.0f;
-			color = DirectX::XMVectorSetW(color, 1.0f);
-
-			a_outPixels[i] = color;
+			DirectX::XMFLOAT4 color;
+			DirectX::XMStoreFloat4(&color, DirectX::XMVector4Transform(a_inPixels[i], fromBT709ToBT2020));
+			a_outPixels[i] = DirectX::XMVectorSet(
+				linearToPQ(color.x),
+				linearToPQ(color.y),
+				linearToPQ(color.z),
+				1.f);
 		}
+	}
+
+	constexpr std::uint16_t QuantizeTo10Bit(std::uint16_t a_value)
+	{
+		const std::uint32_t value10Bit = (static_cast<std::uint32_t>(a_value) * 1023u + 32767u) / 65535u;
+		return static_cast<std::uint16_t>((value10Bit << 6u) | (value10Bit >> 4u));
 	}
 
 	void TakeSDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_name)
@@ -431,30 +433,65 @@ namespace Utils
 
 	void TakeHDRPhotoModeScreenshot(ID3D12CommandQueue* a_queue, ID3D12Resource* a_resource, D3D12_RESOURCE_STATES a_state, std::string a_name)
 	{
-		const auto fullPath = GetPhotoModeScreenshotDirectory() / "HDR" / std::format("{}.jxr", a_name);
+		const auto fullPath = GetPhotoModeScreenshotDirectory() / "HDR" / std::format("{}.png", a_name);
 		std::filesystem::create_directories(fullPath.parent_path());
 
 		DirectX::ScratchImage scratchImage;
 		DirectX::CaptureTexture(a_queue, a_resource, false, scratchImage, a_state, a_state);
 
 		DirectX::ScratchImage transformedImage;
-		DirectX::TransformImage(scratchImage.GetImages(), scratchImage.GetImageCount(), scratchImage.GetMetadata(), &TransformColor_HDR, transformedImage);
+		if (FAILED(DirectX::TransformImage(
+				scratchImage.GetImages(),
+				scratchImage.GetImageCount(),
+				scratchImage.GetMetadata(),
+				&TransformColor_HDR10,
+				transformedImage))) {
+			a_resource->Release();
+			return;
+		}
 
-		const auto settings = Settings::Main::GetSingleton();
+		DirectX::ScratchImage convertedImage;
+		if (FAILED(DirectX::Convert(
+				transformedImage.GetImages(),
+				transformedImage.GetImageCount(),
+				transformedImage.GetMetadata(),
+				DXGI_FORMAT_R16G16B16A16_UNORM,
+				DirectX::TEX_FILTER_DEFAULT,
+				DirectX::TEX_THRESHOLD_DEFAULT,
+				convertedImage))) {
+			a_resource->Release();
+			return;
+		}
 
-		if (settings->HDRScreenshotsLossless.value) {
-			DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, fullPath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, [&](IPropertyBag2* props) {
-				PROPBAG2 options[1] = {};
-				options[0].pstrName = const_cast<wchar_t*>(L"Lossless");
+		const auto image = convertedImage.GetImage(0, 0, 0);
+		std::vector<std::uint16_t> pixels(image->width * image->height * 3);
 
-				VARIANT varValues[1] = {};
-				varValues[0].vt = VT_BOOL;
-				varValues[0].bVal = VARIANT_TRUE;
+		for (size_t y = 0; y < image->height; ++y) {
+			const auto row = reinterpret_cast<const std::uint16_t*>(image->pixels + y * image->rowPitch);
+			for (size_t x = 0; x < image->width; ++x) {
+				const auto pixelIndex = (y * image->width + x) * 3;
+				pixels[pixelIndex + 0] = QuantizeTo10Bit(row[x * 4 + 0]);
+				pixels[pixelIndex + 1] = QuantizeTo10Bit(row[x * 4 + 1]);
+				pixels[pixelIndex + 2] = QuantizeTo10Bit(row[x * 4 + 2]);
+			}
+		}
 
-				std::ignore = props->Write(1, options, varValues);
-			});
-		} else {
-			DirectX::SaveToWICFile(transformedImage.GetImages(), transformedImage.GetImageCount(), DirectX::WIC_FLAGS_FORCE_SRGB, GUID_ContainerFormatWmp, fullPath.c_str(), &GUID_WICPixelFormat64bppRGBHalf, nullptr);
+		if (FILE* file = nullptr; _wfopen_s(&file, fullPath.c_str(), L"wb") == 0) {
+			const auto writeCallback = [](void* context, void* data, int size) {
+				std::ignore = std::fwrite(data, 1, size, static_cast<FILE*>(context));
+			};
+			std::ignore = stbi_write_hdr_png_to_func(
+				writeCallback,
+				file,
+				static_cast<int>(image->width),
+				static_cast<int>(image->height),
+				3,
+				pixels.data(),
+				0,
+				9,  // BT.2020 primaries
+				16  // PQ transfer function
+			);
+			std::fclose(file);
 		}
 
 		a_resource->Release();

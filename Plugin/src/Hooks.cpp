@@ -958,28 +958,14 @@ namespace Hooks
 	    a_this->CreateShaderResourceView(a_resource, a_desc, a_destDescriptor);
 	}
 
-	static uint64_t g_savedUnk;
-
-    void Hooks::Hook_UnkFunc3(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint8_t a7)
+	IDXGISwapChain4* Hooks::Hook_ffxGetSwapchainDX12(void* a1)
 	{
+		IDXGISwapChain4* swapChain = _ffxGetSwapchainDX12(a1);
+
 		const auto settings = Settings::Main::GetSingleton();
-		if (settings->bNeedsToRefreshFSR3) {
-			g_savedUnk = a1;
-			a1 = UINT64_MAX;  // force fail check
-		}
+		swapChain->SetColorSpace1(settings->GetDisplayModeColorSpaceType());
 
-		_UnkFunc3(a1, a2, a3, a4, a5, a6, a7);
-	}
-
-    void Hooks::Hook_UnkFunc3_Internal(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t* a5, uint64_t a6, uint64_t a7)
-	{
-		const auto settings = Settings::Main::GetSingleton();
-		if (settings->bNeedsToRefreshFSR3) {
-			a1 = g_savedUnk;
-			settings->bNeedsToRefreshFSR3 = false;
-		}
-
-		_UnkFunc3_Internal(a1, a2, a3, a4, a5, a6, a7);
+		return swapChain;
 	}
 
     void Install()
